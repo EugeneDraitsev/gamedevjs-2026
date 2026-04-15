@@ -1,0 +1,36 @@
+{
+  "name": "gamedevjs-2026",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "prepare": "svelte-kit sync || echo ''",
+    "lint": "ultracite check",
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check": "bun run lint && bun run typecheck",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "fix": "ultracite fix"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
+    "@threlte/core": "^8.5.9",
+    "@threlte/extras": "^9.14.6",
+    "@threlte/rapier": "^3.4.2",
+    "svelte-tweakpane-ui": "^1.5.16",
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.11",
+    "@sveltejs/adapter-auto": "^7.0.1",
+    "@sveltejs/kit": "^2.57.0",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "svelte": "^5.55.2",
+    "svelte-check": "^4.4.6",
+    "typescript": "^6.0.2",
+    "ultracite": "7.5.9",
+    "vite": "^8.0.7"
+  }
+}
