@@ -9,6 +9,10 @@
   } from "three";
   import type { OrbitControls as OrbitControlsInstance } from "three/examples/jsm/controls/OrbitControls.js";
   import PlayerController from "$lib/components/player-controller.svelte";
+  import Projectile, {
+    type ProjectileData,
+  } from "$lib/components/projectile.svelte";
+  import ShootingTarget from "$lib/components/shooting-target.svelte";
 
   type Vec3 = [number, number, number];
   type CameraMode = "follow" | "orbit";
@@ -47,6 +51,8 @@
     position: Vec3;
   }
 
+  interface ActiveProjectile extends ProjectileData {}
+
   const walls: StaticWall[] = [
     {
       args: [0.25, 2.8, 6.2],
@@ -75,7 +81,10 @@
   ];
 
   let orbitControls = $state<OrbitControlsInstance>();
+  let projectiles = $state<ActiveProjectile[]>([]);
   let sunLight = $state<DirectionalLight>();
+  let crosshairX = $state(0);
+  let crosshairY = $state(0);
 
   let {
     ambientLightIntensity = 0.52,
@@ -126,6 +135,32 @@
 
     light.shadow.needsUpdate = true;
   });
+
+  const spawnProjectile = ({
+    position,
+    velocity,
+  }: {
+    position: Vec3;
+    velocity: Vec3;
+  }) => {
+    projectiles = [
+      ...projectiles,
+      {
+        id: crypto.randomUUID(),
+        position,
+        velocity,
+      },
+    ];
+  };
+
+  const removeProjectile = (id: string) => {
+    projectiles = projectiles.filter((projectile) => projectile.id !== id);
+  };
+
+  const handleMouseMove = (x: number, y: number) => {
+    crosshairX = x;
+    crosshairY = y;
+  };
 </script>
 
 <div class="scene">
@@ -256,6 +291,36 @@
         </RigidBody>
       </T.Group>
 
+      <ShootingTarget position={[-4, 0, -3.5]} color="#e63946" />
+      <ShootingTarget position={[-3, 0, -3.5]} color="#e63946" />
+      <ShootingTarget position={[-2, 0, -3.5]} color="#e63946" />
+
+      <ShootingTarget
+        position={[4.5, 0, -4]}
+        color="#f4a261"
+        height={2}
+        width={0.3}
+      />
+      <ShootingTarget
+        position={[5.5, 0, -4]}
+        color="#f4a261"
+        height={2}
+        width={0.3}
+      />
+
+      <ShootingTarget
+        position={[-5, 0, 3]}
+        color="#2a9d8f"
+        height={1.2}
+        width={0.4}
+      />
+      <ShootingTarget
+        position={[6, 0, 2]}
+        color="#2a9d8f"
+        height={1.2}
+        width={0.4}
+      />
+
       <PlayerController
         {cameraMode}
         {cameraSmoothing}
@@ -266,10 +331,16 @@
         {lookHeight}
         {moveResponsiveness}
         {moveSpeed}
+        onMouseMove={handleMouseMove}
+        onShoot={spawnProjectile}
         {orbitControls}
         {playerLinearDamping}
         {showDebugGeometry}
       />
+
+      {#each projectiles as projectile (projectile.id)}
+        <Projectile data={projectile} onExpire={removeProjectile} />
+      {/each}
 
       <T.Group position={[0, 0.08, 0]}>
         <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
@@ -279,6 +350,17 @@
       </T.Group>
     </World>
   </Canvas>
+
+  {#if cameraMode === 'follow'}
+    <div
+      class="crosshair"
+      style:left="{crosshairX}px"
+      style:top="{crosshairY}px"
+    >
+      <div class="crosshair-dot"></div>
+      <div class="crosshair-ring"></div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -286,5 +368,35 @@
     position: relative;
     inline-size: 100%;
     block-size: 100%;
+  }
+
+  .crosshair {
+    position: fixed;
+    z-index: 10;
+    pointer-events: none;
+    translate: -50% -50%;
+  }
+
+  .crosshair-dot {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: 4px;
+    block-size: 4px;
+    background: rgba(138, 198, 255, 0.95);
+    border-radius: 50%;
+    box-shadow: 0 0 6px 2px rgba(138, 198, 255, 0.5);
+    translate: -50% -50%;
+  }
+
+  .crosshair-ring {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: 24px;
+    block-size: 24px;
+    border: 1.5px solid rgba(138, 198, 255, 0.6);
+    border-radius: 50%;
+    translate: -50% -50%;
   }
 </style>

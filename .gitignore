@@ -15,6 +15,7 @@ Thumbs.db
 # Editors
 .idea/
 .vscode/
+.junie/
 *.swp
 *.swo
 

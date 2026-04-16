@@ -3,7 +3,14 @@
   import { T, useTask, useThrelte } from "@threlte/core";
   import { Collider, RigidBody, useRapier } from "@threlte/rapier";
   import { onMount } from "svelte";
-  import { MathUtils, PerspectiveCamera, Vector3 } from "three";
+  import {
+    MathUtils,
+    PerspectiveCamera,
+    Plane,
+    Raycaster,
+    Vector2,
+    Vector3,
+  } from "three";
   import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
   type CameraMode = "follow" | "orbit";
@@ -18,6 +25,11 @@
     lookHeight?: number;
     moveResponsiveness?: number;
     moveSpeed?: number;
+    onMouseMove?: (x: number, y: number) => void;
+    onShoot?: (projectile: {
+      position: [number, number, number];
+      velocity: [number, number, number];
+    }) => void;
     orbitControls?: OrbitControls;
     playerLinearDamping?: number;
     showDebugGeometry?: boolean;
@@ -37,15 +49,29 @@
   const lookTarget = new Vector3();
   const groundProbePosition = new Vector3();
   const jumpVelocity = new Vector3();
+  const forwardDirection = new Vector3();
+  const shootSpawnPosition = new Vector3();
+  const mouseNdc = new Vector2();
+  const raycaster = new Raycaster();
+  const groundPlane = new Plane(new Vector3(0, 1, 0), 0);
+  const groundHit = new Vector3();
 
   const groundProbeOffset = 0.45;
   const groundProbeLength = 0.22;
   const groundedNormalThreshold = 0.35;
   const orbitKeyboardPanSpeed = 0.9;
+  const projectileForwardOffset = 0.95;
+  const projectileHeightOffset = 0.18;
+  const projectileSpeed = 18;
+  const shootCooldownMs = 180;
 
   let jumpRequested = false;
+  let shootRequested = false;
+  let mouseScreenX = 0;
+  let mouseScreenY = 0;
   let isGroundedState = $state(false);
   let rigidBody = $state<RapierRigidBody>();
+  let lastShotAt = 0;
 
   let {
     cameraMode = "follow",
@@ -57,6 +83,8 @@
     lookHeight = 0.4,
     moveResponsiveness = 12,
     moveSpeed = 7.5,
+    onMouseMove,
+    onShoot,
     orbitControls,
     playerLinearDamping = 1.6,
     showDebugGeometry = false,
@@ -73,6 +101,7 @@
   $effect(() => {
     if (cameraMode === "orbit") {
       jumpRequested = false;
+      shootRequested = false;
       pressed.clear();
     }
   });
@@ -199,18 +228,43 @@
 
     const handleBlur = () => {
       jumpRequested = false;
+      shootRequested = false;
       orbitPressed.clear();
       pressed.clear();
+    };
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0 || cameraMode === "orbit") {
+        return;
+      }
+
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      mouseScreenX = event.clientX;
+      mouseScreenY = event.clientY;
+      shootRequested = true;
+    };
+
+    const handleMouseMove = (event: MouseEvent) => {
+      mouseScreenX = event.clientX;
+      mouseScreenY = event.clientY;
+      onMouseMove?.(event.clientX, event.clientY);
     };
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
     window.addEventListener("blur", handleBlur);
+    window.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mousemove", handleMouseMove);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mousemove", handleMouseMove);
     };
   });
 
@@ -310,6 +364,73 @@
     }
   };
 
+  const tryShoot = (
+    body: RapierRigidBody,
+    activeCamera: NonNullable<typeof camera.current>
+  ) => {
+    if (!shootRequested || cameraMode === "orbit") {
+      shootRequested = false;
+      return;
+    }
+
+    const now = performance.now();
+
+    if (now - lastShotAt < shootCooldownMs) {
+      shootRequested = false;
+      return;
+    }
+
+    const translation = body.translation();
+
+    activeCamera.updateMatrixWorld();
+
+    mouseNdc.set(
+      (mouseScreenX / window.innerWidth) * 2 - 1,
+      -(mouseScreenY / window.innerHeight) * 2 + 1
+    );
+
+    groundPlane.constant = -(translation.y + projectileHeightOffset);
+    raycaster.setFromCamera(mouseNdc, activeCamera);
+    const hit = raycaster.ray.intersectPlane(groundPlane, groundHit);
+
+    if (hit) {
+      forwardDirection.set(
+        groundHit.x - translation.x,
+        0,
+        groundHit.z - translation.z
+      );
+    } else {
+      activeCamera.getWorldDirection(forwardDirection);
+      forwardDirection.y = 0;
+    }
+
+    if (forwardDirection.lengthSq() === 0) {
+      forwardDirection.set(0, 0, -1);
+    }
+
+    forwardDirection.normalize();
+
+    shootSpawnPosition
+      .set(translation.x, translation.y + projectileHeightOffset, translation.z)
+      .addScaledVector(forwardDirection, projectileForwardOffset);
+
+    onShoot?.({
+      position: [
+        shootSpawnPosition.x,
+        shootSpawnPosition.y,
+        shootSpawnPosition.z,
+      ],
+      velocity: [
+        forwardDirection.x * projectileSpeed,
+        forwardDirection.y * projectileSpeed,
+        forwardDirection.z * projectileSpeed,
+      ],
+    });
+
+    lastShotAt = now;
+    shootRequested = false;
+  };
+
   const updateOrbitKeyboardCamera = (
     activeCamera: NonNullable<typeof camera.current>,
     delta: number
@@ -374,6 +495,7 @@
 
     updateCamera(activeCamera, delta);
     updateOrbitKeyboardCamera(activeCamera, delta);
+    tryShoot(body, activeCamera);
   });
 </script>
 
