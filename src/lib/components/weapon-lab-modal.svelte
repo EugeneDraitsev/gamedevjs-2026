@@ -6,6 +6,7 @@
   import {
     createWeaponEdge,
     createWeaponFlowNode,
+    getWeaponNodeTemplate,
     type WeaponBuild,
     type WeaponFlowEdge,
     type WeaponFlowNode as WeaponFlowNodeType,
@@ -13,14 +14,16 @@
     type WeaponNodeType,
     weaponEntryNodeId,
     weaponExitNodeId,
-    weaponNodeTemplates,
     weaponRarityColors,
   } from "$lib/config/weapon-graph";
 
   interface WeaponLabModalProps {
+    availableModules: WeaponNodeType[];
     edges: WeaponFlowEdge[];
     nodes: WeaponFlowNodeType[];
+    onAddModule?: (type: WeaponNodeType) => void;
     onClose?: () => void;
+    onReturnModule?: (type: WeaponNodeType) => void;
     open?: boolean;
     preview: WeaponBuild;
   }
@@ -37,12 +40,16 @@
   ];
 
   let {
+    availableModules,
     edges = $bindable(),
     nodes = $bindable(),
+    onAddModule,
     onClose,
     open = false,
+    onReturnModule,
     preview,
   }: WeaponLabModalProps = $props();
+  let knownModifierTypes = new Map<string, WeaponNodeType>();
 
   const orderModifiers = (sourceNodes: WeaponFlowNodeType[]) =>
     sourceNodes
@@ -117,6 +124,7 @@
       ...nodes,
       createWeaponFlowNode(type, slotPositions[modifierCount]),
     ];
+    onAddModule?.(type);
   };
 
   const resetLayout = () => {
@@ -179,10 +187,18 @@
   });
 
   const groupedTemplates = $derived(
-    rarityOrder.map((rarity) => ({
-      items: weaponNodeTemplates.filter((item) => item.rarity === rarity),
-      rarity,
-    }))
+    rarityOrder
+      .map((rarity) => ({
+        items: availableModules
+          .map((type, index) => ({
+            id: `${type}-${index}`,
+            template: getWeaponNodeTemplate(type),
+            type,
+          }))
+          .filter((item) => item.template.rarity === rarity),
+        rarity,
+      }))
+      .filter((group) => group.items.length > 0)
   );
   const modifierCount = $derived(
     nodes.filter((node) => node.data.kind === "modifier").length
@@ -207,6 +223,24 @@
     modifierCount;
     syncPipeline();
   });
+
+  $effect(() => {
+    const nextModifierTypes = new Map(
+      nodes.flatMap((node) =>
+        node.data.kind === "modifier" && node.data.type
+          ? [[node.id, node.data.type as WeaponNodeType] as const]
+          : []
+      )
+    );
+
+    for (const [id, type] of knownModifierTypes) {
+      if (!nextModifierTypes.has(id)) {
+        onReturnModule?.(type);
+      }
+    }
+
+    knownModifierTypes = nextModifierTypes;
+  });
 </script>
 
 {#if open}
@@ -220,43 +254,54 @@
       <div class="layout">
         <aside class="palette">
           <div class="palette-status">
-            <strong>Module Rack</strong>
-            <span>{modifierCount}/{modifierLimit} mounted</span>
+            <strong>Module Locker</strong>
+            <span
+              >{availableModules.length}
+              loose, {modifierCount}/{modifierLimit}
+              mounted</span
+            >
           </div>
 
-          {#each groupedTemplates as group (group.rarity)}
-            <section class="rarity-group">
-              <p
-                class="rarity-title"
-                style:--rarity={weaponRarityColors[group.rarity]}
-              >
-                <span></span>
-                {group.rarity}
-              </p>
-
-              {#each group.items as template (template.type)}
-                <button
-                  type="button"
-                  disabled={modifierCount >= modifierLimit}
-                  onclick={() => addNode(template.type)}
-                  style:--accent={template.accent}
-                  style:--rarity={weaponRarityColors[template.rarity]}
+          {#if groupedTemplates.length === 0}
+            <div class="palette-empty">
+              <strong>No loose modules</strong>
+              <span>Find treasure rooms and salvage new parts.</span>
+            </div>
+          {:else}
+            {#each groupedTemplates as group (group.rarity)}
+              <section class="rarity-group">
+                <p
+                  class="rarity-title"
+                  style:--rarity={weaponRarityColors[group.rarity]}
                 >
-                  <div class="palette-head">
-                    <WeaponModIcon
-                      icon={template.icon}
-                      tint={template.accent}
-                    />
-                    <div class="palette-copy">
-                      <strong>{template.label}</strong>
-                      <small>{template.rarity}</small>
+                  <span></span>
+                  {group.rarity}
+                </p>
+
+                {#each group.items as item (item.id)}
+                  <button
+                    type="button"
+                    disabled={modifierCount >= modifierLimit}
+                    onclick={() => addNode(item.type)}
+                    style:--accent={item.template.accent}
+                    style:--rarity={weaponRarityColors[item.template.rarity]}
+                  >
+                    <div class="palette-head">
+                      <WeaponModIcon
+                        icon={item.template.icon}
+                        tint={item.template.accent}
+                      />
+                      <div class="palette-copy">
+                        <strong>{item.template.label}</strong>
+                        <small>{item.template.rarity}</small>
+                      </div>
                     </div>
-                  </div>
-                  <span>{template.effect}</span>
-                </button>
-              {/each}
-            </section>
-          {/each}
+                    <span>{item.template.effect}</span>
+                  </button>
+                {/each}
+              </section>
+            {/each}
+          {/if}
         </aside>
 
         <div class="flow-pane">
@@ -534,6 +579,25 @@
 
   .palette-status span {
     color: rgba(231, 243, 252, 0.62);
+  }
+
+  .palette-empty {
+    display: grid;
+    gap: 0.28rem;
+    padding: 0.9rem;
+    background: rgba(8, 17, 29, 0.82);
+    border: 1px dashed rgba(125, 211, 252, 0.18);
+    border-radius: 1rem;
+  }
+
+  .palette-empty strong {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .palette-empty span {
+    color: rgba(231, 243, 252, 0.58);
   }
 
   .rarity-group {

@@ -346,6 +346,10 @@ export const weaponNodeTemplates: WeaponNodeTemplate[] = [
   },
 ];
 
+export const getWeaponNodeTemplate = (type: WeaponNodeType) =>
+  weaponNodeTemplates.find((item) => item.type === type) ??
+  weaponNodeTemplates[0];
+
 const createCoreNode = (
   id: string,
   label: string,
@@ -372,9 +376,7 @@ export const createWeaponFlowNode = (
   type: WeaponNodeType,
   position: XYPosition
 ): WeaponFlowNode => {
-  const template =
-    weaponNodeTemplates.find((item) => item.type === type) ??
-    weaponNodeTemplates[0];
+  const template = getWeaponNodeTemplate(type);
 
   return {
     data: {

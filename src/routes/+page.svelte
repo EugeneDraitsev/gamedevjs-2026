@@ -3,11 +3,13 @@
   import { onMount } from "svelte";
   import PhysicsShowcase from "$lib/components/physics-showcase.svelte";
   import WeaponLabModal from "$lib/components/weapon-lab-modal.svelte";
+  import { createDungeonLayout } from "$lib/config/dungeon-layout";
   import type { SceneSettings } from "$lib/config/scene-settings";
   import { createSceneSettings } from "$lib/config/scene-settings";
   import {
     computeWeaponBuild,
     createDefaultWeaponGraph,
+    type WeaponNodeType,
   } from "$lib/config/weapon-graph";
 
   let DebugPane = $state<Component<{
@@ -19,6 +21,15 @@
   let settings = $state(createSceneSettings());
   let sceneResetKey = $state(0);
   let weaponLabOpen = $state(false);
+  let collectedArtifactRooms = $state<string[]>([]);
+
+  const dungeonSeed =
+    typeof window === "undefined"
+      ? "polygon-001"
+      : new URL(window.location.href).searchParams.get("seed")?.trim() ||
+        "polygon-001";
+  const dungeon = createDungeonLayout(dungeonSeed);
+  let looseModules = $state<WeaponNodeType[]>([...dungeon.initialModules]);
 
   const defaultWeaponGraph = createDefaultWeaponGraph();
 
@@ -36,6 +47,29 @@
     resetScene();
   };
 
+  const installModule = (type: WeaponNodeType) => {
+    const index = looseModules.indexOf(type);
+
+    if (index === -1) {
+      return;
+    }
+
+    looseModules = looseModules.toSpliced(index, 1);
+  };
+
+  const returnModule = (type: WeaponNodeType) => {
+    looseModules = [...looseModules, type];
+  };
+
+  const collectArtifact = (roomId: string, type: WeaponNodeType) => {
+    if (collectedArtifactRooms.includes(roomId)) {
+      return;
+    }
+
+    collectedArtifactRooms = [...collectedArtifactRooms, roomId];
+    looseModules = [...looseModules, type];
+  };
+
   const isEditableTarget = (target: EventTarget | null) =>
     target instanceof HTMLElement &&
     Boolean(
@@ -47,12 +81,12 @@
 
   const controlsHint = $derived.by(() => {
     if (weaponLabOpen) {
-      return "Weapon Lab open: fit up to 3 modules in the weapon rack";
+      return "Weapon Lab open: mount up to 3 modules from your locker";
     }
 
     return settings.cameraMode === "orbit"
       ? "Mouse to orbit, WASD to pan camera, E opens Weapon Lab"
-      : "Mouse aim, LMB shoot, WASD move, Space jump, E opens Weapon Lab";
+      : "Mouse aim, LMB shoot, WASD move, walk through doorways, grab treasure artifacts, Space jump, E opens Weapon Lab";
   });
 
   onMount(() => {
@@ -110,7 +144,9 @@
       cameraFov={settings.cameraFov}
       cameraMode={settings.cameraMode}
       cameraSmoothing={settings.cameraSmoothing}
+      collectedArtifactRoomIds={collectedArtifactRooms}
       controlsLocked={weaponLabOpen}
+      {dungeon}
       followDistance={settings.followDistance}
       followPitch={settings.followPitch}
       followYaw={settings.followYaw}
@@ -119,6 +155,7 @@
       lookHeight={settings.lookHeight}
       moveResponsiveness={settings.moveResponsiveness}
       moveSpeed={settings.moveSpeed}
+      onCollectArtifact={collectArtifact}
       playerLinearDamping={settings.playerLinearDamping}
       shadowBias={settings.shadowBias}
       shadowFar={settings.shadowFar}
@@ -148,9 +185,12 @@
   <div class="hint">{controlsHint}</div>
 
   <WeaponLabModal
+    availableModules={looseModules}
     bind:edges={weaponEdges}
     bind:nodes={weaponNodes}
+    onAddModule={installModule}
     open={weaponLabOpen}
+    onReturnModule={returnModule}
     preview={weaponPreview}
     onClose={() => (weaponLabOpen = false)}
   />

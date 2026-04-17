@@ -28,6 +28,7 @@
     moveResponsiveness?: number;
     moveSpeed?: number;
     onMouseMove?: (x: number, y: number) => void;
+    onPositionChange?: (position: [number, number, number]) => void;
     onShoot?: (projectile: {
       position: [number, number, number];
       velocity: [number, number, number];
@@ -35,6 +36,8 @@
     orbitControls?: OrbitControls;
     playerLinearDamping?: number;
     showDebugGeometry?: boolean;
+    teleportNonce?: number;
+    teleportTarget?: [number, number, number] | null;
     weaponBuild: WeaponBuild;
   }
 
@@ -87,10 +90,13 @@
     moveResponsiveness = 12,
     moveSpeed = 7.5,
     onMouseMove,
+    onPositionChange,
     onShoot,
     orbitControls,
     playerLinearDamping = 1.6,
     showDebugGeometry = false,
+    teleportNonce = 0,
+    teleportTarget = null,
     weaponBuild,
   }: PlayerControllerProps = $props();
   let previousCameraMode: CameraMode | undefined;
@@ -100,6 +106,31 @@
 
   $effect(() => {
     rigidBody?.setLinearDamping(playerLinearDamping);
+  });
+
+  $effect(() => {
+    teleportNonce;
+    const body = rigidBody;
+
+    if (!(body && teleportTarget)) {
+      return;
+    }
+
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setTranslation(
+      { x: teleportTarget[0], y: teleportTarget[1], z: teleportTarget[2] },
+      true
+    );
+    body.wakeUp();
+
+    playerPosition.set(...teleportTarget);
+    smoothedAnchor.set(...teleportTarget);
+    cameraTarget.set(...teleportTarget);
+    lookTarget.set(
+      teleportTarget[0],
+      teleportTarget[1] + lookHeight,
+      teleportTarget[2]
+    );
   });
 
   $effect(() => {
@@ -497,6 +528,7 @@
 
     const translation = body.translation();
     playerPosition.set(translation.x, translation.y, translation.z);
+    onPositionChange?.([translation.x, translation.y, translation.z]);
     groundProbePosition.set(
       translation.x,
       translation.y - groundProbeOffset - groundProbeLength * 0.5,
