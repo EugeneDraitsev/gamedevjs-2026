@@ -1,17 +1,13 @@
 import {
+  type DungeonRoomKind,
+  roomTemplateById,
+} from "$lib/config/room-templates";
+import {
   type WeaponNodeType,
   weaponNodeTemplates,
 } from "$lib/config/weapon-graph";
 
 export type DungeonRoomDirection = "east" | "north" | "south" | "west";
-export type DungeonRoomKind =
-  | "boss"
-  | "challenge"
-  | "normal"
-  | "polygon"
-  | "secret"
-  | "shop"
-  | "treasure";
 
 export interface DungeonRoom {
   artifactType?: WeaponNodeType;
@@ -20,9 +16,11 @@ export interface DungeonRoom {
   id: string;
   kind: DungeonRoomKind;
   label: string;
+  templateId: string;
 }
 
 export interface DungeonLayout {
+  floor: number;
   initialModules: WeaponNodeType[];
   rooms: Record<string, DungeonRoom>;
   seed: string;
@@ -54,6 +52,28 @@ const commonModules = weaponNodeTemplates
 const premiumModules = weaponNodeTemplates
   .filter((template) => template.rarity !== "common")
   .map((template) => template.type);
+const floor1NormalTemplateIds = [
+  "normal-line",
+  "normal-pincer",
+  "normal-crossfire",
+  "normal-arc",
+  "normal-lava-lane",
+  "normal-lava-ring",
+  "normal-lava-bridge",
+  "normal-lava-cross",
+  "normal-catwalk",
+  "normal-zigzag",
+] as const;
+const floor2NormalTemplateIds = [
+  "normal-furnace",
+  "normal-relay",
+  "normal-gauntlet",
+  "normal-blocks",
+  "normal-hexes",
+  "normal-lava-bridge",
+  "normal-lava-cross",
+  "normal-zigzag",
+] as const;
 
 const getCellKey = ([x, y]: [number, number]) => `${x}:${y}`;
 
@@ -83,7 +103,7 @@ const sampleUnique = <T>(items: T[], count: number, random: () => number) => {
   return picked;
 };
 
-export const createDungeonLayout = (seed: string): DungeonLayout => {
+export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
   const random = createSeededRandom(seed);
   const rooms: Record<string, DungeonRoom> = {};
   const occupied = new Map<string, string>();
@@ -91,8 +111,8 @@ export const createDungeonLayout = (seed: string): DungeonLayout => {
 
   const createRoom = (
     kind: DungeonRoomKind,
-    label: string,
     grid: [number, number],
+    templateId: string,
     artifactType?: WeaponNodeType
   ) => {
     if (kind !== "polygon") {
@@ -100,6 +120,7 @@ export const createDungeonLayout = (seed: string): DungeonLayout => {
     }
 
     const id = kind === "polygon" ? "polygon" : `${kind}-${roomIndex}`;
+    const template = roomTemplateById[templateId];
 
     rooms[id] = {
       artifactType,
@@ -107,7 +128,8 @@ export const createDungeonLayout = (seed: string): DungeonLayout => {
       grid,
       id,
       kind,
-      label,
+      label: template.label,
+      templateId,
     };
     occupied.set(getCellKey(grid), id);
 
@@ -128,64 +150,104 @@ export const createDungeonLayout = (seed: string): DungeonLayout => {
     right.exits[oppositeDirection[direction]] = left.id;
   };
 
-  const start = createRoom("polygon", "Polygon", [0, 0]);
-  const mainPath = [start];
-  let cursor = start;
+  const normalTemplatePool =
+    floor === 1 ? floor1NormalTemplateIds : floor2NormalTemplateIds;
+  const sampleNormalTemplateId = () =>
+    normalTemplatePool[Math.floor(random() * normalTemplatePool.length)];
+  const start = createRoom("polygon", [0, 0], "polygon-training");
+  const branches = sampleUnique(directions, 3, random).map((direction) => {
+    const firstRoom = createRoom(
+      "normal",
+      [start.grid[0] + direction.dx, start.grid[1] + direction.dy],
+      sampleNormalTemplateId()
+    );
 
-  for (let step = 0; step < 2 + Math.floor(random() * 2); step += 1) {
-    const options = getFreeDirections(cursor.grid);
+    connectRooms(start, firstRoom, direction.key);
 
-    if (options.length === 0) {
-      break;
+    const rooms = [start, firstRoom];
+
+    for (
+      let step = 0;
+      step < (floor === 1 ? 1 : 3) + Math.floor(random() * 2);
+      step += 1
+    ) {
+      const previous = rooms.at(-1) ?? firstRoom;
+      const options = getFreeDirections(previous.grid);
+
+      if (options.length === 0) {
+        break;
+      }
+
+      const nextDirection =
+        options.find((candidate) => candidate.key === direction.key) ??
+        options[Math.floor(random() * options.length)];
+      const nextRoom = createRoom(
+        "normal",
+        [
+          previous.grid[0] + nextDirection.dx,
+          previous.grid[1] + nextDirection.dy,
+        ],
+        sampleNormalTemplateId()
+      );
+
+      connectRooms(previous, nextRoom, nextDirection.key);
+      rooms.push(nextRoom);
     }
 
-    const direction = options[Math.floor(random() * options.length)];
-    const next = createRoom("normal", "Chamber", [
-      cursor.grid[0] + direction.dx,
-      cursor.grid[1] + direction.dy,
-    ]);
+    return { direction: direction.key, rooms };
+  });
+  const mainBranch = [...branches].sort(
+    (left, right) => right.rooms.length - left.rooms.length
+  )[0];
+  const mainPath = mainBranch.rooms;
 
-    connectRooms(cursor, next, direction.key);
-    mainPath.push(next);
-    cursor = next;
-  }
-
-  const bossAnchor =
-    [...mainPath]
-      .reverse()
-      .find((room) => getFreeDirections(room.grid).length) ?? start;
+  const bossAnchor = mainPath.at(-1) ?? start;
   const bossOptions = getFreeDirections(bossAnchor.grid);
-  const bossDirection = bossOptions[Math.floor(random() * bossOptions.length)];
-  const boss = createRoom("boss", "Boss", [
-    bossAnchor.grid[0] + bossDirection.dx,
-    bossAnchor.grid[1] + bossDirection.dy,
-  ]);
+  const previousMainRoom = mainPath.at(-2) ?? start;
+  const forwardDx = bossAnchor.grid[0] - previousMainRoom.grid[0];
+  const forwardDy = bossAnchor.grid[1] - previousMainRoom.grid[1];
+  const bossDirection =
+    bossOptions.find(
+      (option) => option.dx === forwardDx && option.dy === forwardDy
+    ) ?? bossOptions[Math.floor(random() * bossOptions.length)];
+  const boss = createRoom(
+    "boss",
+    [
+      bossAnchor.grid[0] + bossDirection.dx,
+      bossAnchor.grid[1] + bossDirection.dy,
+    ],
+    floor === 1 ? "boss-warden" : "boss-smelter",
+    premiumModules[Math.floor(random() * premiumModules.length)]
+  );
 
   connectRooms(bossAnchor, boss, bossDirection.key);
 
   const treasureAnchor =
     sampleUnique(
-      mainPath.filter((room) => getFreeDirections(room.grid).length),
-      mainPath.length,
+      branches.filter((branch) => branch !== mainBranch),
+      branches.length,
       random
-    )[0] ?? bossAnchor;
+    )
+      .flatMap((branch) => [...branch.rooms].reverse())
+      .find((room) => getFreeDirections(room.grid).length) ?? bossAnchor;
   const treasureOptions = getFreeDirections(treasureAnchor.grid);
   const treasureDirection =
     treasureOptions[Math.floor(random() * treasureOptions.length)];
   const treasure = createRoom(
     "treasure",
-    "Treasure",
     [
       treasureAnchor.grid[0] + treasureDirection.dx,
       treasureAnchor.grid[1] + treasureDirection.dy,
     ],
+    "treasure-artifact",
     premiumModules[Math.floor(random() * premiumModules.length)]
   );
 
   connectRooms(treasureAnchor, treasure, treasureDirection.key);
 
   return {
-    initialModules: sampleUnique(commonModules, 2, random),
+    floor,
+    initialModules: [...commonModules],
     rooms,
     seed,
     startRoomId: start.id,

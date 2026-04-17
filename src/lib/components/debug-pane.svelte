@@ -9,7 +9,12 @@
     Separator,
     Slider,
   } from "svelte-tweakpane-ui";
-  import type { CameraMode, SceneSettings } from "$lib/config/scene-settings";
+  import type {
+    CameraMode,
+    FloorTheme,
+    SceneSettings,
+    WallTheme,
+  } from "$lib/config/scene-settings";
 
   interface DebugPaneProps {
     onResetDefaults: () => void;
@@ -20,6 +25,16 @@
   const cameraModeOptions: ListOptions<CameraMode> = {
     Follow: "follow",
     Orbit: "orbit",
+  };
+  const floorThemeOptions: ListOptions<FloorTheme> = {
+    Check: "check",
+    Ember: "ember",
+    Steel: "steel",
+  };
+  const wallThemeOptions: ListOptions<WallTheme> = {
+    Aqua: "aqua",
+    Brass: "brass",
+    Foundry: "foundry",
   };
 
   const formatAngle = (value: number) => `${value.toFixed(0)}°`;
@@ -211,6 +226,19 @@
       min={0}
       max={0.2}
       step={0.001}
+    />
+  </Folder>
+
+  <Folder title="Materials" expanded={false}>
+    <List
+      bind:value={settings.floorTheme}
+      label="Floor"
+      options={floorThemeOptions}
+    />
+    <List
+      bind:value={settings.wallTheme}
+      label="Walls"
+      options={wallThemeOptions}
     />
   </Folder>
 

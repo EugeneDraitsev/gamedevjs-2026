@@ -45,6 +45,16 @@
     <path d="M24 14l2 6" class="line" />
     <circle cx="27" cy="24" r="3.2" class="core" />
     <circle cx="10" cy="24" r="2" class="bolt" />
+  {:else if icon === "laser"}
+    <path d="M10 18h16" class="line" />
+    <path d="M10 14h6M10 22h6" class="line faint" />
+    <rect x="7.5" y="14" width="5" height="8" rx="2" class="plate" />
+    <circle cx="27" cy="18" r="2.4" class="core" />
+  {:else if icon === "rocket"}
+    <path d="M11 23l9-9 5 1 1 5-9 9-3-3-3-3z" class="plate" />
+    <path d="M18 14l4 4" class="line" />
+    <path d="M10 26l2-6 4 4-6 2zM22 12l6-2-2 6-4-4z" class="line faint" />
+    <circle cx="24.5" cy="18" r="2.2" class="core" />
   {/if}
 </svg>
 

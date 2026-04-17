@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="ember" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#5a151a"/>
+      <stop offset="40%" stop-color="#ff6b6b"/>
+      <stop offset="100%" stop-color="#7c242a"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#4d2a30"/>
+      <stop offset="100%" stop-color="#1b1016"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="#ffb0a8" stroke-width="9" opacity=".16">
+    <rect x="42" y="42" width="940" height="940" rx="34"/>
+    <rect x="112" y="112" width="800" height="800" rx="28"/>
+    <path d="M112 256h800M112 768h800M256 112v800M768 112v800"/>
+    <path d="M208 208h608v608H208z"/>
+  </g>
+  <g fill="url(#plate)" opacity=".22" stroke="#8d454d" stroke-width="8">
+    <rect x="138" y="138" width="180" height="748" rx="24"/>
+    <rect x="706" y="138" width="180" height="748" rx="24"/>
+    <rect x="388" y="138" width="248" height="160" rx="28"/>
+    <rect x="388" y="726" width="248" height="160" rx="28"/>
+  </g>
+  <g fill="none" stroke="url(#ember)" stroke-width="18" opacity=".82" stroke-linecap="round">
+    <path d="M138 512h748"/>
+    <path d="M512 138v748"/>
+    <path d="M246 246l532 532"/>
+    <path d="M778 246L246 778"/>
+  </g>
+  <g fill="none" stroke="#ffd7a6" stroke-width="14" opacity=".72">
+    <circle cx="512" cy="512" r="224"/>
+    <circle cx="512" cy="512" r="124"/>
+  </g>
+  <g fill="#ffd7a6" opacity=".9">
+    <circle cx="512" cy="512" r="22"/>
+    <circle cx="512" cy="288" r="10"/>
+    <circle cx="512" cy="736" r="10"/>
+    <circle cx="288" cy="512" r="10"/>
+    <circle cx="736" cy="512" r="10"/>
+  </g>
+</svg>

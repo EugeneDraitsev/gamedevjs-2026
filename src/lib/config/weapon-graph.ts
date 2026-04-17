@@ -12,7 +12,9 @@ export type WeaponNodeIcon =
   | "rush"
   | "pinpoint"
   | "profile"
-  | "lob";
+  | "lob"
+  | "laser"
+  | "rocket";
 
 export type WeaponNodeType =
   | "ripple-common"
@@ -29,24 +31,35 @@ export type WeaponNodeType =
   | "ambush-common"
   | "bloom-uncommon"
   | "cruise-rare"
-  | "lob-common";
+  | "lob-common"
+  | "laser-common"
+  | "rocket-common"
+  | "rocket-uncommon"
+  | "rocket-rare";
+
+export interface WeaponNodeChoice {
+  label: string;
+  value: number;
+}
 
 export interface WeaponNodeTemplate {
   accent: string;
-  defaultValue: number;
+  choices?: WeaponNodeChoice[];
+  defaultValue?: number;
   effect: string;
   hint: string;
   icon: WeaponNodeIcon;
   label: string;
-  max: number;
-  min: number;
+  max?: number;
+  min?: number;
   rarity: WeaponNodeRarity;
-  step: number;
+  step?: number;
   type: WeaponNodeType;
 }
 
 export interface WeaponFlowNodeData extends Record<string, unknown> {
   accent: string;
+  choices?: WeaponNodeChoice[];
   effect?: string;
   hint: string;
   icon?: WeaponNodeIcon;
@@ -70,6 +83,9 @@ export const weaponRarityColors: Record<WeaponNodeRarity, string> = {
 };
 
 export interface WeaponBuild {
+  attackMode: "beam" | "projectile";
+  beamLength: number;
+  beamWidth: number;
   burstDamage: number;
   colors: {
     core: string;
@@ -85,6 +101,7 @@ export interface WeaponBuild {
   damageProfileLabel: string;
   drag: number;
   gravity: number;
+  homingTurn: number;
   knockback: number;
   mass: number;
   massFactor: number;
@@ -92,13 +109,17 @@ export interface WeaponBuild {
   pelletCount: number;
   radius: number;
   rangeFactor: number;
+  rocketCadence: number;
+  rocketTurn: number;
   speed: number;
   speedFactor: number;
   spread: number;
+  supportLabel: string | null;
   ttlMs: number;
 }
 
 interface WeaponBuildDraft {
+  attackMode: "beam" | "projectile";
   curve: number;
   damageFactor: number;
   damageProfile: [number, number, number];
@@ -107,6 +128,8 @@ interface WeaponBuildDraft {
   massFactor: number;
   pelletCount: number;
   radiusFactor: number;
+  rocketCadence: number;
+  rocketTurn: number;
   speedFactor: number;
   spread: number;
   ttlMs: number;
@@ -190,41 +213,44 @@ export const weaponNodeTemplates: WeaponNodeTemplate[] = [
   },
   {
     accent: "#ffd166",
-    defaultValue: 0.4,
+    choices: [
+      { label: "2x", value: 2 },
+      { label: "3x", value: 3 },
+    ],
+    defaultValue: 2,
     effect: "Splits into 2-3 shots.",
     hint: "Common: brutal damage drop, quick way to spray.",
     icon: "split",
     label: "Split",
-    max: 1,
-    min: 0.2,
     rarity: "common",
-    step: 0.05,
     type: "fork-common",
   },
   {
     accent: "#ffcb6b",
-    defaultValue: 0.45,
+    choices: [
+      { label: "3x", value: 3 },
+      { label: "4x", value: 4 },
+    ],
+    defaultValue: 3,
     effect: "Splits into 3-4 shots.",
     hint: "Uncommon: still hurts, but the math is less miserable.",
     icon: "split",
     label: "Split",
-    max: 1,
-    min: 0.2,
     rarity: "uncommon",
-    step: 0.05,
     type: "cluster-uncommon",
   },
   {
     accent: "#ffe08a",
-    defaultValue: 0.5,
+    choices: [
+      { label: "4x", value: 4 },
+      { label: "5x", value: 5 },
+    ],
+    defaultValue: 4,
     effect: "Splits into 4-5 shots.",
     hint: "Rare: proper shotgun node instead of a self-own.",
     icon: "split",
     label: "Split",
-    max: 1,
-    min: 0.2,
     rarity: "rare",
-    step: 0.05,
     type: "hive-rare",
   },
   {
@@ -344,6 +370,42 @@ export const weaponNodeTemplates: WeaponNodeTemplate[] = [
     step: 0.05,
     type: "lob-common",
   },
+  {
+    accent: "#ff7bd8",
+    effect: "Replaces shots with a beam.",
+    hint: "Common: instant line attack, keeps most stat mods and split lanes.",
+    icon: "laser",
+    label: "Laser",
+    rarity: "common",
+    type: "laser-common",
+  },
+  {
+    accent: "#ff8d5b",
+    effect: "Launches a homing rocket every 5 shots.",
+    hint: "Common: free seeking punch, but it takes a while to cycle.",
+    icon: "rocket",
+    label: "Rocket",
+    rarity: "common",
+    type: "rocket-common",
+  },
+  {
+    accent: "#ffae6d",
+    effect: "Launches a homing rocket every 3 shots.",
+    hint: "Uncommon: the support rack starts showing up consistently.",
+    icon: "rocket",
+    label: "Rocket",
+    rarity: "uncommon",
+    type: "rocket-uncommon",
+  },
+  {
+    accent: "#ffd166",
+    effect: "Launches a homing rocket every 2 shots.",
+    hint: "Rare: almost constant backup pressure with no tuning needed.",
+    icon: "rocket",
+    label: "Rocket",
+    rarity: "rare",
+    type: "rocket-rare",
+  },
 ];
 
 export const getWeaponNodeTemplate = (type: WeaponNodeType) =>
@@ -359,8 +421,7 @@ const createCoreNode = (
 ): WeaponFlowNode => ({
   data: {
     accent,
-    hint:
-      kind === "entry" ? "Base attack starts here." : "Projectile exits here.",
+    hint: kind === "entry" ? "Base attack starts here." : "Attack exits here.",
     kind,
     label,
   },
@@ -381,6 +442,7 @@ export const createWeaponFlowNode = (
   return {
     data: {
       accent: template.accent,
+      choices: template.choices,
       effect: template.effect,
       hint: template.hint,
       icon: template.icon,
@@ -412,7 +474,7 @@ export const createDefaultWeaponGraph = () => ({
     ),
     createCoreNode(
       weaponExitNodeId,
-      "Projectile",
+      "Payload",
       "exit",
       { x: 980, y: 170 },
       "#ff6b6b"
@@ -513,6 +575,7 @@ const getSplitDamageFactor = (
 };
 
 const createWeaponBuildDraft = (): WeaponBuildDraft => ({
+  attackMode: "projectile",
   curve: 0,
   damageFactor: 1,
   damageProfile: [1, 1, 1],
@@ -521,6 +584,8 @@ const createWeaponBuildDraft = (): WeaponBuildDraft => ({
   massFactor: 1,
   pelletCount: 1,
   radiusFactor: 1,
+  rocketCadence: 0,
+  rocketTurn: 0,
   speedFactor: 1,
   spread: BASE_SPREAD,
   ttlMs: BASE_TTL_MS,
@@ -546,7 +611,7 @@ const modifierAppliers: Record<
     draft.damageProfile[2] -= 0.08 + value * 0.08;
   },
   "cluster-uncommon": (draft, value) => {
-    const count = 3 + Math.round(value);
+    const count = Math.round(value);
 
     draft.pelletCount += count - 1;
     draft.damageFactor *= getSplitDamageFactor(count, value * 0.03, 0.08);
@@ -566,14 +631,14 @@ const modifierAppliers: Record<
     draft.damageFactor *= 1.01 + value * 0.1;
   },
   "fork-common": (draft, value) => {
-    const count = 2 + Math.round(value);
+    const count = Math.round(value);
 
     draft.pelletCount += count - 1;
     draft.damageFactor *= getSplitDamageFactor(count, value * 0.05, 0);
     draft.spread += 0.085 + value * 0.085;
   },
   "hive-rare": (draft, value) => {
-    const count = 4 + Math.round(value);
+    const count = Math.round(value);
 
     draft.pelletCount += count - 1;
     draft.damageFactor *= getSplitDamageFactor(count, value * 0.02, 0.13);
@@ -585,8 +650,16 @@ const modifierAppliers: Record<
     draft.speedFactor *= 0.98 - value * 0.12;
     draft.ttlMs *= 1.05 + value * 0.13;
   },
+  "laser-common": (draft) => {
+    draft.attackMode = "beam";
+    draft.damageFactor *= 0.56;
+    draft.massFactor *= 0.78;
+    draft.speedFactor *= 1.08;
+    draft.spread *= 0.8;
+    draft.ttlMs *= 0.72;
+  },
   "maelstrom-rare": (draft, value) => {
-    draft.curve += 4.2 + value * 4.4;
+    draft.curve += 6.8 + value * 8.2;
     draft.speedFactor *= 0.99 - value * 0.08;
     draft.spread += 0.012 + value * 0.03;
     draft.ttlMs *= 1.08 + value * 0.1;
@@ -603,13 +676,13 @@ const modifierAppliers: Record<
     draft.massFactor *= 0.98 - value * 0.09;
   },
   "ribbon-uncommon": (draft, value) => {
-    draft.curve += 2.3 + value * 3.6;
+    draft.curve += 4 + value * 6.2;
     draft.speedFactor *= 0.98 - value * 0.11;
     draft.spread += 0.015 + value * 0.035;
     draft.ttlMs *= 1.04 + value * 0.08;
   },
   "ripple-common": (draft, value) => {
-    draft.curve += 1.2 + value * 2.8;
+    draft.curve += 2.4 + value * 5.4;
     draft.speedFactor *= 0.96 - value * 0.16;
     draft.spread += 0.02 + value * 0.045;
   },
@@ -617,6 +690,24 @@ const modifierAppliers: Record<
     draft.speedFactor *= 1.1 + value * 0.34;
     draft.massFactor *= 0.96 - value * 0.24;
     draft.damageFactor *= 1 - value * 0.1;
+  },
+  "rocket-common": (draft) => {
+    draft.rocketCadence = draft.rocketCadence
+      ? Math.min(draft.rocketCadence, 5)
+      : 5;
+    draft.rocketTurn = Math.max(draft.rocketTurn, 3.8);
+  },
+  "rocket-rare": (draft) => {
+    draft.rocketCadence = draft.rocketCadence
+      ? Math.min(draft.rocketCadence, 2)
+      : 2;
+    draft.rocketTurn = Math.max(draft.rocketTurn, 5.8);
+  },
+  "rocket-uncommon": (draft) => {
+    draft.rocketCadence = draft.rocketCadence
+      ? Math.min(draft.rocketCadence, 3)
+      : 3;
+    draft.rocketTurn = Math.max(draft.rocketTurn, 4.8);
   },
 };
 
@@ -627,7 +718,7 @@ const finalizeDraft = (draft: WeaponBuildDraft) => {
   draft.massFactor = clamp(draft.massFactor, 0.45, 4.5);
   draft.radiusFactor = clamp(draft.radiusFactor, 0.85, 2.2);
   draft.spread = clamp(draft.spread, 0.008, 0.42);
-  draft.curve = clamp(draft.curve, 0, 8.8);
+  draft.curve = clamp(draft.curve, 0, 14);
   draft.gravity = clamp(draft.gravity, 0, 7);
   draft.drag = clamp(
     draft.drag + Math.max(0, draft.pelletCount - 1) * 0.008,
@@ -659,6 +750,10 @@ const getDamageProfileLabel = (damageProfile: [number, number, number]) => {
 };
 
 const getPatternLabel = (draft: WeaponBuildDraft) => {
+  if (draft.attackMode === "beam") {
+    return draft.pelletCount > 1 ? "beam split" : "beam";
+  }
+
   if (draft.curve > 5) {
     return draft.pelletCount > 1 ? "chaos split" : "chaos wave";
   }
@@ -697,6 +792,16 @@ export const computeWeaponBuild = (
   const speed = BASE_SPEED * draft.speedFactor;
   const mass = BASE_MASS * draft.massFactor;
   const radius = BASE_RADIUS * draft.radiusFactor;
+  const beamLength = clamp(
+    6.2 + draft.speedFactor * 3.8 + (draft.ttlMs / BASE_TTL_MS) * 2.8,
+    7.4,
+    16
+  );
+  const beamWidth = clamp(
+    0.045 + draft.radiusFactor * 0.025 + draft.massFactor * 0.015,
+    0.08,
+    0.18
+  );
   const burstDamage = Math.round(damage * draft.pelletCount);
   const knockback = clamp(damage * 0.045 + mass * 2.9, 0.8, 10);
   const damageShare = clamp(
@@ -727,8 +832,14 @@ export const computeWeaponBuild = (
   )}%, #ff5a5f 100%)`;
   const damageProfileLabel = getDamageProfileLabel(draft.damageProfile);
   const patternLabel = getPatternLabel(draft);
+  const supportLabel = draft.rocketCadence
+    ? `rocket / ${draft.rocketCadence} shots`
+    : null;
 
   return {
+    attackMode: draft.attackMode,
+    beamLength,
+    beamWidth,
     burstDamage,
     colors: { core, glow, gradient, shell },
     connectedModifierCount: modifierNodes.length,
@@ -739,9 +850,12 @@ export const computeWeaponBuild = (
     damageProfileLabel,
     drag: draft.drag,
     gravity: draft.gravity,
+    homingTurn: 0,
     knockback,
     mass,
     massFactor: draft.massFactor,
+    rocketCadence: draft.rocketCadence,
+    rocketTurn: draft.rocketTurn,
     patternLabel,
     pelletCount: draft.pelletCount,
     radius,
@@ -749,6 +863,7 @@ export const computeWeaponBuild = (
     speed,
     speedFactor: draft.speedFactor,
     spread: draft.spread,
+    supportLabel,
     ttlMs: draft.ttlMs,
   };
 };

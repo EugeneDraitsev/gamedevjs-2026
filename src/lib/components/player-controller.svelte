@@ -23,10 +23,14 @@
     followDistance?: number;
     followPitch?: number;
     followYaw?: number;
+    hitFlash?: number;
+    impactNonce?: number;
+    impactVelocity?: [number, number, number] | null;
     jumpSpeed?: number;
     lookHeight?: number;
     moveResponsiveness?: number;
     moveSpeed?: number;
+    moveSpeedFactor?: number;
     onMouseMove?: (x: number, y: number) => void;
     onPositionChange?: (position: [number, number, number]) => void;
     onShoot?: (projectile: {
@@ -72,6 +76,7 @@
 
   let jumpRequested = false;
   let shootRequested = false;
+  let shootingHeld = false;
   let mouseScreenX = 0;
   let mouseScreenY = 0;
   let isGroundedState = $state(false);
@@ -85,10 +90,14 @@
     followDistance = 10.8,
     followPitch = 58,
     followYaw = 0,
+    hitFlash = 0,
     jumpSpeed = 6.2,
     lookHeight = 0.4,
     moveResponsiveness = 12,
     moveSpeed = 7.5,
+    moveSpeedFactor = 1,
+    impactNonce = 0,
+    impactVelocity = null,
     onMouseMove,
     onPositionChange,
     onShoot,
@@ -137,6 +146,7 @@
     if (cameraMode === "orbit" || controlsLocked) {
       jumpRequested = false;
       shootRequested = false;
+      shootingHeld = false;
       pressed.clear();
     }
   });
@@ -145,6 +155,25 @@
     if (cameraMode !== "orbit" || controlsLocked) {
       orbitPressed.clear();
     }
+  });
+
+  $effect(() => {
+    impactNonce;
+    const body = rigidBody;
+
+    if (!(body && impactVelocity)) {
+      return;
+    }
+
+    body.applyImpulse(
+      {
+        x: impactVelocity[0],
+        y: impactVelocity[1],
+        z: impactVelocity[2],
+      },
+      true
+    );
+    body.wakeUp();
   });
 
   const isEditableTarget = (target: EventTarget | null) => {
@@ -268,6 +297,7 @@
     const handleBlur = () => {
       jumpRequested = false;
       shootRequested = false;
+      shootingHeld = false;
       orbitPressed.clear();
       pressed.clear();
     };
@@ -283,7 +313,17 @@
 
       mouseScreenX = event.clientX;
       mouseScreenY = event.clientY;
+      shootingHeld = true;
       shootRequested = true;
+    };
+
+    const handleMouseUp = (event: MouseEvent) => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      shootingHeld = false;
+      shootRequested = false;
     };
 
     const handleMouseMove = (event: MouseEvent) => {
@@ -296,6 +336,7 @@
     window.addEventListener("keyup", handleKeyUp);
     window.addEventListener("blur", handleBlur);
     window.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mouseup", handleMouseUp);
     window.addEventListener("mousemove", handleMouseMove);
 
     return () => {
@@ -303,6 +344,7 @@
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleBlur);
       window.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mouseup", handleMouseUp);
       window.removeEventListener("mousemove", handleMouseMove);
     };
   });
@@ -336,8 +378,8 @@
     }
 
     return {
-      x: hasInput ? moveDirection.x * moveSpeed : velocity.x,
-      z: hasInput ? moveDirection.z * moveSpeed : velocity.z,
+      x: hasInput ? moveDirection.x * moveSpeed * moveSpeedFactor : velocity.x,
+      z: hasInput ? moveDirection.z * moveSpeed * moveSpeedFactor : velocity.z,
     };
   };
 
@@ -415,7 +457,6 @@
     const now = performance.now();
 
     if (now - lastShotAt < shootCooldownMs) {
-      shootRequested = false;
       return;
     }
 
@@ -469,7 +510,7 @@
     });
 
     lastShotAt = now;
-    shootRequested = false;
+    shootRequested = shootingHeld;
   };
 
   const updateOrbitKeyboardCamera = (
@@ -554,7 +595,9 @@
     <T.Mesh castShadow>
       <T.SphereGeometry args={[0.55, 32, 32]} />
       <T.MeshStandardMaterial
-        color="#f9c74f"
+        color={hitFlash > 0.05 ? "#ff8b8b" : "#f9c74f"}
+        emissive="#ff7b7b"
+        emissiveIntensity={hitFlash * 0.55}
         metalness={0.18}
         roughness={0.22}
       />

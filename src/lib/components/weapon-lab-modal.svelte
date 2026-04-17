@@ -149,34 +149,44 @@
 
   const previewPaths = $derived.by(() => {
     const pathCount = preview.pelletCount;
+    const isBeam = preview.attackMode === "beam";
 
     return Array.from({ length: pathCount }, (_, index) => {
       const laneOffset =
         pathCount === 1
           ? 0
-          : (index / (pathCount - 1) - 0.5) * preview.spread * 120;
-      const points = Array.from({ length: 9 }, (__unused, step) => {
-        const t = step / 8;
-        const x = 18 + t * 220;
-        const wave =
-          Math.sin(t * Math.PI * (2.2 + preview.curve * 0.38)) *
-          preview.curve *
-          5.4;
-        const drop = preview.gravity * t * t * 8;
-        const y = 88 + laneOffset * t + wave + drop;
+          : (index / (pathCount - 1) - 0.5) *
+            (isBeam ? preview.beamWidth * 90 : preview.spread * 120);
+      const points =
+        isBeam && preview.curve < 0.25
+          ? [
+              `18,${clamp(88 + laneOffset, 16, 152)}`,
+              `238,${clamp(88 + laneOffset, 16, 152)}`,
+            ]
+          : Array.from({ length: 9 }, (__unused, step) => {
+              const t = step / 8;
+              const x = 18 + t * 220;
+              const wave =
+                Math.sin(t * Math.PI * (2.2 + preview.curve * 0.38)) *
+                preview.curve *
+                (isBeam ? 8.8 : 5.4);
+              const drop = isBeam ? 0 : preview.gravity * t * t * 8;
+              const y = 88 + laneOffset * t + wave + drop;
 
-        return `${x},${clamp(y, 16, 152)}`;
-      });
+              return `${x},${clamp(y, 16, 152)}`;
+            });
 
       return {
         endX: 18 + 220,
         endY: clamp(
-          88 +
-            laneOffset +
-            Math.sin(Math.PI * (2.2 + preview.curve * 0.38)) *
-              preview.curve *
-              5.4 +
-            preview.gravity * 8,
+          isBeam
+            ? 88 + laneOffset
+            : 88 +
+                laneOffset +
+                Math.sin(Math.PI * (2.2 + preview.curve * 0.38)) *
+                  preview.curve *
+                  5.4 +
+                preview.gravity * 8,
           16,
           152
         ),
@@ -369,7 +379,11 @@
           <section class="preview-card">
             <div class="preview-head">
               <strong>Current Attack</strong>
-              <span>{preview.patternLabel}</span>
+              <span
+                >{preview.supportLabel
+                  ? `${preview.patternLabel} · ${preview.supportLabel}`
+                  : preview.patternLabel}</span
+              >
             </div>
 
             <svg viewBox="0 0 256 168" aria-label="Attack preview">
@@ -385,14 +399,26 @@
                   stroke-linejoin="round"
                   stroke-width="4"
                 />
-                <circle
-                  cx={path.endX}
-                  cy={path.endY}
-                  r={6 + preview.massFactor * 1.8}
-                  fill={preview.colors.core}
-                  stroke={preview.colors.shell}
-                  stroke-width="2"
-                />
+                {#if preview.attackMode === "beam"}
+                  <rect
+                    x={path.endX - 4}
+                    y={path.endY - 6}
+                    width="8"
+                    height="12"
+                    rx="3"
+                    fill={preview.colors.core}
+                    opacity="0.9"
+                  />
+                {:else}
+                  <circle
+                    cx={path.endX}
+                    cy={path.endY}
+                    r={6 + preview.massFactor * 1.8}
+                    fill={preview.colors.core}
+                    stroke={preview.colors.shell}
+                    stroke-width="2"
+                  />
+                {/if}
               {/each}
             </svg>
 

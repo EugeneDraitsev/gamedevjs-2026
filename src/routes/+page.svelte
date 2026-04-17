@@ -22,14 +22,20 @@
   let sceneResetKey = $state(0);
   let weaponLabOpen = $state(false);
   let collectedArtifactRooms = $state<string[]>([]);
+  let floorIndex = $state(1);
 
   const dungeonSeed =
     typeof window === "undefined"
       ? "polygon-001"
       : new URL(window.location.href).searchParams.get("seed")?.trim() ||
         "polygon-001";
-  const dungeon = createDungeonLayout(dungeonSeed);
-  let looseModules = $state<WeaponNodeType[]>([...dungeon.initialModules]);
+  const startingDungeon = createDungeonLayout(`${dungeonSeed}-f1`, 1);
+  const dungeon = $derived(
+    createDungeonLayout(`${dungeonSeed}-f${floorIndex}`, floorIndex)
+  );
+  let looseModules = $state<WeaponNodeType[]>([
+    ...startingDungeon.initialModules,
+  ]);
 
   const defaultWeaponGraph = createDefaultWeaponGraph();
 
@@ -68,6 +74,11 @@
 
     collectedArtifactRooms = [...collectedArtifactRooms, roomId];
     looseModules = [...looseModules, type];
+
+    if (floorIndex === 1 && dungeon.rooms[roomId]?.kind === "boss") {
+      collectedArtifactRooms = [];
+      floorIndex = 2;
+    }
   };
 
   const isEditableTarget = (target: EventTarget | null) =>
@@ -147,6 +158,7 @@
       collectedArtifactRoomIds={collectedArtifactRooms}
       controlsLocked={weaponLabOpen}
       {dungeon}
+      floorTheme={settings.floorTheme}
       followDistance={settings.followDistance}
       followPitch={settings.followPitch}
       followYaw={settings.followYaw}
@@ -168,6 +180,7 @@
       sunPositionX={settings.sunPositionX}
       sunPositionY={settings.sunPositionY}
       sunPositionZ={settings.sunPositionZ}
+      wallTheme={settings.wallTheme}
       weaponBuild={weaponPreview}
     />
   {/key}

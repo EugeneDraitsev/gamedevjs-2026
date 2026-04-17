@@ -1,10 +1,13 @@
 export type CameraMode = "follow" | "orbit";
+export type FloorTheme = "check" | "ember" | "steel";
+export type WallTheme = "aqua" | "brass" | "foundry";
 
 export interface SceneSettings {
   ambientLightIntensity: number;
   cameraFov: number;
   cameraMode: CameraMode;
   cameraSmoothing: number;
+  floorTheme: FloorTheme;
   followDistance: number;
   followPitch: number;
   followYaw: number;
@@ -25,6 +28,7 @@ export interface SceneSettings {
   sunPositionX: number;
   sunPositionY: number;
   sunPositionZ: number;
+  wallTheme: WallTheme;
 }
 
 export const createSceneSettings = (): SceneSettings => ({
@@ -32,6 +36,7 @@ export const createSceneSettings = (): SceneSettings => ({
   cameraFov: 63,
   cameraMode: "follow",
   cameraSmoothing: 8,
+  floorTheme: "check",
   followDistance: 12.3,
   followPitch: 52,
   followYaw: 0,
@@ -52,4 +57,5 @@ export const createSceneSettings = (): SceneSettings => ({
   sunPositionX: 9,
   sunPositionY: 14,
   sunPositionZ: 7,
+  wallTheme: "aqua",
 });

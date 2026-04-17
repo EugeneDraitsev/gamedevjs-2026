@@ -1,0 +1,195 @@
+[
+  {
+    "id": "polygon-training",
+    "kind": "polygon",
+    "label": "Polygon",
+    "layout": "floor",
+    "spawnPattern": "none",
+    "enemyCount": 0
+  },
+  {
+    "id": "normal-line",
+    "kind": "normal",
+    "label": "Chamber",
+    "layout": "floor",
+    "spawnPattern": "line",
+    "enemyTemplateId": "scrap-runner",
+    "enemyCount": 4
+  },
+  {
+    "id": "normal-pincer",
+    "kind": "normal",
+    "label": "Chamber",
+    "layout": "floor",
+    "spawnPattern": "pincer",
+    "enemyTemplateId": "bolt-runner",
+    "enemyCount": 5
+  },
+  {
+    "id": "normal-crossfire",
+    "kind": "normal",
+    "label": "Battery",
+    "layout": "floor",
+    "spawnPattern": "crossfire",
+    "enemyTemplateId": "coil-sentry",
+    "enemyCount": 4
+  },
+  {
+    "id": "normal-arc",
+    "kind": "normal",
+    "label": "Battery",
+    "layout": "floor",
+    "spawnPattern": "arc",
+    "enemyTemplateId": "ember-artillery",
+    "enemyCount": 3
+  },
+  {
+    "id": "normal-lava-lane",
+    "kind": "normal",
+    "label": "Meltway",
+    "layout": "lava-lane",
+    "spawnPattern": "line",
+    "enemyTemplateId": "scrap-runner",
+    "enemyCount": 4
+  },
+  {
+    "id": "normal-lava-ring",
+    "kind": "normal",
+    "label": "Meltway",
+    "layout": "lava-ring",
+    "spawnPattern": "crossfire",
+    "enemyTemplateId": "coil-sentry",
+    "enemyCount": 4
+  },
+  {
+    "id": "normal-lava-bridge",
+    "kind": "normal",
+    "label": "Meltway",
+    "layout": "lava-bridge",
+    "spawnPattern": "line",
+    "enemyTemplateId": "scrap-runner",
+    "enemyCount": 4
+  },
+  {
+    "id": "normal-lava-cross",
+    "kind": "normal",
+    "label": "Meltway",
+    "layout": "lava-cross",
+    "spawnPattern": "crossfire",
+    "enemyTemplateId": "coil-sentry",
+    "enemyCount": 4
+  },
+  {
+    "id": "normal-catwalk",
+    "kind": "normal",
+    "label": "Catwalk",
+    "layout": "catwalk",
+    "spawnPattern": "pincer",
+    "enemyTemplateId": "bolt-runner",
+    "enemyCount": 5
+  },
+  {
+    "id": "normal-zigzag",
+    "kind": "normal",
+    "label": "Catwalk",
+    "layout": "zigzag",
+    "spawnPattern": "arc",
+    "enemyTemplateId": "ember-artillery",
+    "enemyCount": 3
+  },
+  {
+    "id": "normal-furnace",
+    "kind": "normal",
+    "label": "Foundry",
+    "layout": "floor",
+    "spawnPattern": "line",
+    "enemyTemplateId": "slag-brute",
+    "enemyCount": 5
+  },
+  {
+    "id": "normal-relay",
+    "kind": "normal",
+    "label": "Relay",
+    "layout": "catwalk",
+    "spawnPattern": "crossfire",
+    "enemyTemplateId": "rail-hunter",
+    "enemyCount": 4
+  },
+  {
+    "id": "normal-gauntlet",
+    "kind": "normal",
+    "label": "Gauntlet",
+    "layout": "lava-gauntlet",
+    "spawnPattern": "pincer",
+    "enemyTemplateId": "slag-brute",
+    "enemyCount": 4
+  },
+  {
+    "id": "normal-blocks",
+    "kind": "normal",
+    "label": "Forgeyard",
+    "layout": "blocks",
+    "spawnPattern": "line",
+    "enemyTemplateId": "slag-brute",
+    "enemyCount": 5
+  },
+  {
+    "id": "normal-hexes",
+    "kind": "normal",
+    "label": "Relay",
+    "layout": "hexes",
+    "spawnPattern": "crossfire",
+    "enemyTemplateId": "rail-hunter",
+    "enemyCount": 4
+  },
+  {
+    "id": "treasure-artifact",
+    "kind": "treasure",
+    "label": "Treasure",
+    "layout": "gear-floor",
+    "spawnPattern": "none",
+    "enemyCount": 0
+  },
+  {
+    "id": "boss-warden",
+    "kind": "boss",
+    "label": "Foundry",
+    "layout": "boss-foundry",
+    "spawnPattern": "boss",
+    "enemyTemplateId": "iron-warden",
+    "enemyCount": 1
+  },
+  {
+    "id": "boss-smelter",
+    "kind": "boss",
+    "label": "Crucible",
+    "layout": "boss-crucible",
+    "spawnPattern": "boss",
+    "enemyTemplateId": "brass-overseer",
+    "enemyCount": 1
+  },
+  {
+    "id": "challenge-empty",
+    "kind": "challenge",
+    "label": "Challenge",
+    "layout": "floor",
+    "spawnPattern": "none",
+    "enemyCount": 0
+  },
+  {
+    "id": "shop-empty",
+    "kind": "shop",
+    "label": "Shop",
+    "layout": "floor",
+    "spawnPattern": "none",
+    "enemyCount": 0
+  },
+  {
+    "id": "secret-empty",
+    "kind": "secret",
+    "label": "Secret",
+    "layout": "floor",
+    "spawnPattern": "none",
+    "enemyCount": 0
+  }
+]

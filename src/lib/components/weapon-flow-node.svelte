@@ -21,11 +21,19 @@
     });
   };
 
+  const setChoice = (value: number) => {
+    flow.updateNodeData(id, { value });
+  };
+
   const removeNode = () => {
     flow.deleteElements({ nodes: [{ id }] });
   };
 
   const rarityLabel = $derived(data.rarity ? data.rarity.toUpperCase() : null);
+  const activeChoiceLabel = $derived.by(
+    () =>
+      data.choices?.find((choice) => choice.value === data.value)?.label ?? null
+  );
 </script>
 
 <div class:selected class="node" style:--accent={data.accent}>
@@ -60,16 +68,32 @@
   </div>
 
   {#if data.kind === "modifier"}
-    <div class="value">roll {Math.round((data.value ?? 0) * 100)}%</div>
-    <input
-      class="nodrag nopan"
-      type="range"
-      min={data.min}
-      max={data.max}
-      step={data.step}
-      value={data.value}
-      oninput={updateValue}
-    >
+    {#if activeChoiceLabel}
+      <div class="value">{activeChoiceLabel}</div>
+      <div class="choices">
+        {#each data.choices ?? [] as choice (choice.label)}
+          <button
+            class:active={choice.value === data.value}
+            class="nodrag nopan choice"
+            type="button"
+            onclick={() => setChoice(choice.value)}
+          >
+            {choice.label}
+          </button>
+        {/each}
+      </div>
+    {:else if typeof data.min === "number"}
+      <div class="value">roll {Math.round((data.value ?? 0) * 100)}%</div>
+      <input
+        class="nodrag nopan"
+        type="range"
+        min={data.min}
+        max={data.max}
+        step={data.step}
+        value={data.value}
+        oninput={updateValue}
+      >
+    {/if}
     <p class="effect">{data.effect}</p>
     {#if selected}
       <p>{data.hint}</p>
@@ -227,6 +251,30 @@
   input {
     inline-size: 100%;
     margin: 0;
+  }
+
+  .choices {
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  .choice {
+    flex: 1;
+    min-inline-size: 0;
+    padding: 0.26rem 0.38rem;
+    font: inherit;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: rgba(231, 243, 252, 0.78);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.7rem;
+  }
+
+  .choice.active {
+    color: #06111d;
+    background: color-mix(in srgb, var(--accent) 78%, white);
+    border-color: color-mix(in srgb, var(--accent) 84%, white);
   }
 
   .remove {

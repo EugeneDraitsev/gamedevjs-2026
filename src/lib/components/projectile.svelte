@@ -18,7 +18,9 @@
 
   interface ProjectileProps {
     data: ProjectileData;
+    enemyTargets?: [number, number, number][];
     onExpire?: (id: string) => void;
+    onMove?: (id: string, position: [number, number, number]) => void;
   }
 
   const projectileVelocity = new Vector3();
@@ -26,14 +28,17 @@
   const currentPosition = new Vector3();
   const spawnPosition = new Vector3();
   const lateralDirection = new Vector3();
+  const desiredDirection = new Vector3();
+  const homingTarget = new Vector3();
 
   let rigidBody = $state<RapierRigidBody>();
   let hasExpired = false;
   let flightTime = 0;
   let ttlTimer = 0;
   let armed = false;
+  let visualYaw = $state(0);
 
-  let { data, onExpire }: ProjectileProps = $props();
+  let { data, enemyTargets = [], onExpire, onMove }: ProjectileProps = $props();
 
   const expireProjectile = () => {
     if (hasExpired) {
@@ -45,6 +50,7 @@
   };
 
   onMount(() => {
+    visualYaw = Math.atan2(data.velocity[0], data.velocity[2]);
     ttlTimer = window.setTimeout(() => {
       expireProjectile();
     }, data.build.ttlMs);
@@ -73,6 +79,54 @@
     spawnPosition.set(data.position[0], data.position[1], data.position[2]);
   });
 
+  const applyHomingVelocity = (delta: number) => {
+    if (data.build.homingTurn <= 0) {
+      return;
+    }
+
+    if (enemyTargets.length === 0) {
+      expireProjectile();
+      return;
+    }
+
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    for (const target of enemyTargets) {
+      const distance = Math.hypot(
+        target[0] - currentPosition.x,
+        target[2] - currentPosition.z
+      );
+
+      if (distance >= nearestDistance) {
+        continue;
+      }
+
+      nearestDistance = distance;
+      homingTarget.set(target[0], target[1], target[2]);
+    }
+
+    if (nearestDistance === Number.POSITIVE_INFINITY) {
+      return;
+    }
+
+    desiredDirection.set(
+      homingTarget.x - currentPosition.x,
+      0,
+      homingTarget.z - currentPosition.z
+    );
+
+    if (desiredDirection.lengthSq() === 0) {
+      return;
+    }
+
+    const turn = Math.min(1, delta * data.build.homingTurn * 4.2);
+    const speed = Math.max(data.build.speed, 1);
+
+    desiredDirection.normalize().multiplyScalar(speed);
+    projectileVelocity.x += (desiredDirection.x - projectileVelocity.x) * turn;
+    projectileVelocity.z += (desiredDirection.z - projectileVelocity.z) * turn;
+  };
+
   useTask((delta) => {
     const body = rigidBody;
 
@@ -85,10 +139,24 @@
 
     const velocity = body.linvel();
     projectileVelocity.set(velocity.x, velocity.y, velocity.z);
+    const translation = body.translation();
+    currentPosition.set(translation.x, translation.y, translation.z);
+    visualYaw = Math.atan2(projectileVelocity.x, projectileVelocity.z);
 
-    const dragFactor = Math.max(0.82, 1 - data.build.drag * delta);
+    onMove?.(data.id, [translation.x, translation.y, translation.z]);
+
+    const dragFactor =
+      data.build.homingTurn > 0
+        ? 1
+        : Math.max(0.82, 1 - data.build.drag * delta);
     projectileVelocity.x *= dragFactor;
     projectileVelocity.z *= dragFactor;
+
+    applyHomingVelocity(delta);
+
+    if (hasExpired) {
+      return;
+    }
 
     if (data.build.curve > 0.01) {
       lateralDirection.set(-projectileVelocity.z, 0, projectileVelocity.x);
@@ -96,9 +164,9 @@
       if (lateralDirection.lengthSq() > 0) {
         const curveSide =
           data.id.charCodeAt(data.id.length - 1) % 2 === 0 ? -1 : 1;
-        const waveFrequency = 6 + data.build.curve * 0.9;
+        const waveFrequency = 7.6 + data.build.curve * 1.25;
         const waveStrength =
-          data.build.curve * delta * (4.8 + data.build.curve * 0.42);
+          data.build.curve * delta * (8.4 + data.build.curve * 0.9);
 
         lateralDirection.normalize();
         projectileVelocity.addScaledVector(
@@ -124,6 +192,10 @@
     targetRigidBody: RapierRigidBody | null;
   }) => {
     if (hasExpired) {
+      return;
+    }
+
+    if (data.build.homingTurn > 0) {
       return;
     }
 
@@ -188,28 +260,85 @@
       density={data.build.mass}
       friction={0.08}
       restitution={0.18}
+      sensor={data.build.homingTurn > 0}
     />
 
-    <T.Mesh castShadow>
-      <T.SphereGeometry args={[data.build.radius, 20, 20]} />
-      <T.MeshStandardMaterial
-        color={data.build.colors.shell}
-        emissive={data.build.colors.glow}
-        emissiveIntensity={1.05}
-        metalness={0.12}
-        roughness={0.22}
-      />
-    </T.Mesh>
+    {#if data.build.homingTurn > 0}
+      <T.Group
+        rotation={[
+          0,
+          visualYaw,
+          0,
+        ]}
+      >
+        <T.Mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
+          <T.CylinderGeometry
+            args={[data.build.radius * 0.42, data.build.radius * 0.58, data.build.radius * 3.2, 12]}
+          />
+          <T.MeshStandardMaterial
+            color="#ff9a54"
+            emissive="#ff6b3d"
+            emissiveIntensity={0.9}
+            metalness={0.22}
+            roughness={0.18}
+          />
+        </T.Mesh>
 
-    <T.Mesh scale={0.62}>
-      <T.SphereGeometry args={[data.build.radius, 16, 16]} />
-      <T.MeshStandardMaterial
-        color={data.build.colors.core}
-        emissive={data.build.colors.shell}
-        emissiveIntensity={0.45}
-        metalness={0.05}
-        roughness={0.3}
-      />
-    </T.Mesh>
+        <T.Mesh
+          castShadow
+          position={[0, 0, data.build.radius * 1.8]}
+          rotation={[Math.PI / 2, 0, 0]}
+        >
+          <T.ConeGeometry
+            args={[data.build.radius * 0.62, data.build.radius * 1.4, 12]}
+          />
+          <T.MeshStandardMaterial
+            color="#ffe1a8"
+            emissive="#ffb36b"
+            emissiveIntensity={0.45}
+            metalness={0.12}
+            roughness={0.18}
+          />
+        </T.Mesh>
+
+        <T.Mesh
+          position={[0, 0, -data.build.radius * 1.9]}
+          rotation={[Math.PI / 2, 0, 0]}
+        >
+          <T.ConeGeometry
+            args={[data.build.radius * 0.44, data.build.radius * 1.1, 10]}
+          />
+          <T.MeshStandardMaterial
+            color="#ffde94"
+            emissive="#ff6b3d"
+            emissiveIntensity={1.1}
+            metalness={0.04}
+            roughness={0.1}
+          />
+        </T.Mesh>
+      </T.Group>
+    {:else}
+      <T.Mesh castShadow>
+        <T.SphereGeometry args={[data.build.radius, 20, 20]} />
+        <T.MeshStandardMaterial
+          color={data.build.colors.shell}
+          emissive={data.build.colors.glow}
+          emissiveIntensity={1.05}
+          metalness={0.12}
+          roughness={0.22}
+        />
+      </T.Mesh>
+
+      <T.Mesh scale={0.62}>
+        <T.SphereGeometry args={[data.build.radius, 16, 16]} />
+        <T.MeshStandardMaterial
+          color={data.build.colors.core}
+          emissive={data.build.colors.shell}
+          emissiveIntensity={0.45}
+          metalness={0.05}
+          roughness={0.3}
+        />
+      </T.Mesh>
+    {/if}
   </RigidBody>
 </T.Group>
