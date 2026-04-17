@@ -12,12 +12,14 @@
     Vector3,
   } from "three";
   import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+  import type { WeaponBuild } from "$lib/config/weapon-graph";
 
   type CameraMode = "follow" | "orbit";
 
   interface PlayerControllerProps {
     cameraMode?: CameraMode;
     cameraSmoothing?: number;
+    controlsLocked?: boolean;
     followDistance?: number;
     followPitch?: number;
     followYaw?: number;
@@ -33,6 +35,7 @@
     orbitControls?: OrbitControls;
     playerLinearDamping?: number;
     showDebugGeometry?: boolean;
+    weaponBuild: WeaponBuild;
   }
 
   const pressed = new Set<string>();
@@ -60,9 +63,8 @@
   const groundProbeLength = 0.22;
   const groundedNormalThreshold = 0.35;
   const orbitKeyboardPanSpeed = 0.9;
-  const projectileForwardOffset = 0.95;
+  const projectileForwardOffset = 1.1;
   const projectileHeightOffset = 0.18;
-  const projectileSpeed = 18;
   const shootCooldownMs = 180;
 
   let jumpRequested = false;
@@ -76,6 +78,7 @@
   let {
     cameraMode = "follow",
     cameraSmoothing = 10,
+    controlsLocked = false,
     followDistance = 10.8,
     followPitch = 58,
     followYaw = 0,
@@ -88,6 +91,7 @@
     orbitControls,
     playerLinearDamping = 1.6,
     showDebugGeometry = false,
+    weaponBuild,
   }: PlayerControllerProps = $props();
   let previousCameraMode: CameraMode | undefined;
 
@@ -99,7 +103,7 @@
   });
 
   $effect(() => {
-    if (cameraMode === "orbit") {
+    if (cameraMode === "orbit" || controlsLocked) {
       jumpRequested = false;
       shootRequested = false;
       pressed.clear();
@@ -107,7 +111,7 @@
   });
 
   $effect(() => {
-    if (cameraMode !== "orbit") {
+    if (cameraMode !== "orbit" || controlsLocked) {
       orbitPressed.clear();
     }
   });
@@ -188,6 +192,10 @@
         return;
       }
 
+      if (controlsLocked) {
+        return;
+      }
+
       if (cameraMode === "orbit") {
         if (isOrbitInputKey(event.code)) {
           orbitPressed.add(event.code);
@@ -219,7 +227,7 @@
     const handleKeyUp = (event: KeyboardEvent) => {
       orbitPressed.delete(event.code);
 
-      if (cameraMode === "orbit") {
+      if (cameraMode === "orbit" || controlsLocked) {
         return;
       }
 
@@ -234,7 +242,7 @@
     };
 
     const handleMouseDown = (event: MouseEvent) => {
-      if (event.button !== 0 || cameraMode === "orbit") {
+      if (event.button !== 0 || cameraMode === "orbit" || controlsLocked) {
         return;
       }
 
@@ -306,7 +314,7 @@
     const velocity = body.linvel();
     isGroundedState = isGrounded(body);
 
-    if (cameraMode !== "orbit") {
+    if (cameraMode !== "orbit" && !controlsLocked) {
       const response = Math.min(1, delta * moveResponsiveness);
       const desiredVelocity = getDesiredHorizontalVelocity(velocity);
       let nextVelocityY = velocity.y;
@@ -368,7 +376,7 @@
     body: RapierRigidBody,
     activeCamera: NonNullable<typeof camera.current>
   ) => {
-    if (!shootRequested || cameraMode === "orbit") {
+    if (!shootRequested || cameraMode === "orbit" || controlsLocked) {
       shootRequested = false;
       return;
     }
@@ -409,10 +417,12 @@
     }
 
     forwardDirection.normalize();
+    const projectileSpeed = weaponBuild.speed;
+    const spawnOffset = projectileForwardOffset + weaponBuild.radius * 2.4;
 
     shootSpawnPosition
       .set(translation.x, translation.y + projectileHeightOffset, translation.z)
-      .addScaledVector(forwardDirection, projectileForwardOffset);
+      .addScaledVector(forwardDirection, spawnOffset);
 
     onShoot?.({
       position: [

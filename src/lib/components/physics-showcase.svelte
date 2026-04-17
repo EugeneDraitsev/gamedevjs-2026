@@ -13,6 +13,7 @@
     type ProjectileData,
   } from "$lib/components/projectile.svelte";
   import ShootingTarget from "$lib/components/shooting-target.svelte";
+  import { copyWeaponBuild, type WeaponBuild } from "$lib/config/weapon-graph";
 
   type Vec3 = [number, number, number];
   type CameraMode = "follow" | "orbit";
@@ -22,6 +23,7 @@
     cameraFov?: number;
     cameraMode?: CameraMode;
     cameraSmoothing?: number;
+    controlsLocked?: boolean;
     followDistance?: number;
     followPitch?: number;
     followYaw?: number;
@@ -42,6 +44,7 @@
     sunPositionX?: number;
     sunPositionY?: number;
     sunPositionZ?: number;
+    weaponBuild: WeaponBuild;
   }
 
   interface StaticWall {
@@ -51,7 +54,9 @@
     position: Vec3;
   }
 
-  interface ActiveProjectile extends ProjectileData {}
+  interface ActiveProjectile extends ProjectileData {
+    build: WeaponBuild;
+  }
 
   const walls: StaticWall[] = [
     {
@@ -88,11 +93,12 @@
 
   let {
     ambientLightIntensity = 0.52,
-    cameraFov = 44,
+    cameraFov = 63,
     cameraMode = "follow",
-    cameraSmoothing = 10,
-    followDistance = 10.8,
-    followPitch = 58,
+    cameraSmoothing = 8,
+    controlsLocked = false,
+    followDistance = 12.3,
+    followPitch = 52,
     followYaw = 0,
     gravityY = -9.81,
     jumpSpeed = 6.2,
@@ -111,6 +117,7 @@
     sunPositionX = 6,
     sunPositionY = 10,
     sunPositionZ = 4,
+    weaponBuild,
   }: PhysicsShowcaseProps = $props();
 
   $effect(() => {
@@ -143,14 +150,41 @@
     position: Vec3;
     velocity: Vec3;
   }) => {
-    projectiles = [
-      ...projectiles,
-      {
+    const build = copyWeaponBuild(weaponBuild);
+    const baseYaw = Math.atan2(velocity[0], velocity[2]);
+    const horizontalSpeed = Math.hypot(velocity[0], velocity[2]) || build.speed;
+    const rightX = Math.cos(baseYaw);
+    const rightZ = -Math.sin(baseYaw);
+    const nextProjectiles: ActiveProjectile[] = [];
+
+    for (let index = 0; index < build.pelletCount; index += 1) {
+      const spreadOffset =
+        build.pelletCount === 1
+          ? 0
+          : (index / (build.pelletCount - 1) - 0.5) * build.spread;
+      const shotYaw = baseYaw + spreadOffset;
+      const laneOffset =
+        build.pelletCount === 1
+          ? 0
+          : (index / (build.pelletCount - 1) - 0.5) * build.radius * 2.6;
+
+      nextProjectiles.push({
+        build,
         id: crypto.randomUUID(),
-        position,
-        velocity,
-      },
-    ];
+        position: [
+          position[0] + rightX * laneOffset,
+          position[1],
+          position[2] + rightZ * laneOffset,
+        ],
+        velocity: [
+          Math.sin(shotYaw) * horizontalSpeed,
+          velocity[1],
+          Math.cos(shotYaw) * horizontalSpeed,
+        ],
+      });
+    }
+
+    projectiles = [...projectiles, ...nextProjectiles];
   };
 
   const removeProjectile = (id: string) => {
@@ -243,7 +277,7 @@
               restitution={0.22}
             />
 
-            <T.Mesh castShadow receiveShadow>
+            <T.Mesh castShadow={wall.id !== "front-wall"} receiveShadow>
               <T.BoxGeometry
                 args={[
                   wall.args[0] * 2,
@@ -254,7 +288,10 @@
               <T.MeshStandardMaterial
                 color={wall.color}
                 metalness={0.08}
+                opacity={wall.id === "front-wall" ? 0.2 : 1}
                 roughness={0.9}
+                transparent={wall.id === "front-wall"}
+                depthWrite={wall.id !== "front-wall"}
               />
             </T.Mesh>
           </RigidBody>
@@ -324,6 +361,7 @@
       <PlayerController
         {cameraMode}
         {cameraSmoothing}
+        {controlsLocked}
         {followDistance}
         {followPitch}
         {followYaw}
@@ -336,6 +374,7 @@
         {orbitControls}
         {playerLinearDamping}
         {showDebugGeometry}
+        {weaponBuild}
       />
 
       {#each projectiles as projectile (projectile.id)}
@@ -351,7 +390,7 @@
     </World>
   </Canvas>
 
-  {#if cameraMode === 'follow'}
+  {#if cameraMode === 'follow' && !controlsLocked}
     <div
       class="crosshair"
       style:left="{crosshairX}px"

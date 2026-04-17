@@ -2,8 +2,13 @@
   import type { Component } from "svelte";
   import { onMount } from "svelte";
   import PhysicsShowcase from "$lib/components/physics-showcase.svelte";
+  import WeaponLabModal from "$lib/components/weapon-lab-modal.svelte";
   import type { SceneSettings } from "$lib/config/scene-settings";
   import { createSceneSettings } from "$lib/config/scene-settings";
+  import {
+    computeWeaponBuild,
+    createDefaultWeaponGraph,
+  } from "$lib/config/weapon-graph";
 
   let DebugPane = $state<Component<{
     onResetDefaults: () => void;
@@ -13,6 +18,14 @@
   let paneLoadFailed = $state(false);
   let settings = $state(createSceneSettings());
   let sceneResetKey = $state(0);
+  let weaponLabOpen = $state(false);
+
+  const defaultWeaponGraph = createDefaultWeaponGraph();
+
+  let weaponNodes = $state.raw(defaultWeaponGraph.nodes);
+  let weaponEdges = $state.raw(defaultWeaponGraph.edges);
+
+  const weaponPreview = $derived(computeWeaponBuild(weaponNodes, weaponEdges));
 
   const resetScene = () => {
     sceneResetKey += 1;
@@ -23,19 +36,62 @@
     resetScene();
   };
 
-  const controlsHint = $derived(
-    settings.cameraMode === "orbit"
-      ? "Mouse to orbit, WASD to pan camera"
-      : "WASD to move, Space to jump"
-  );
+  const isEditableTarget = (target: EventTarget | null) =>
+    target instanceof HTMLElement &&
+    Boolean(
+      target.isContentEditable ||
+        target.closest(
+          "input, textarea, select, button, [contenteditable='true']"
+        )
+    );
 
-  onMount(async () => {
-    try {
-      const module = await import("$lib/components/debug-pane.svelte");
-      DebugPane = module.default;
-    } catch {
-      paneLoadFailed = true;
+  const controlsHint = $derived.by(() => {
+    if (weaponLabOpen) {
+      return "Weapon Lab open: fit up to 3 modules in the weapon rack";
     }
+
+    return settings.cameraMode === "orbit"
+      ? "Mouse to orbit, WASD to pan camera, E opens Weapon Lab"
+      : "Mouse aim, LMB shoot, WASD move, Space jump, E opens Weapon Lab";
+  });
+
+  onMount(() => {
+    let isActive = true;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      if (event.code === "KeyE" && !event.repeat) {
+        weaponLabOpen = !weaponLabOpen;
+        event.preventDefault();
+      }
+
+      if (event.code === "Escape" && weaponLabOpen) {
+        weaponLabOpen = false;
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    import("$lib/components/debug-pane.svelte")
+      .then((module) => {
+        if (isActive) {
+          DebugPane = module.default;
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          paneLoadFailed = true;
+        }
+      });
+
+    return () => {
+      isActive = false;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   });
 </script>
 
@@ -54,6 +110,7 @@
       cameraFov={settings.cameraFov}
       cameraMode={settings.cameraMode}
       cameraSmoothing={settings.cameraSmoothing}
+      controlsLocked={weaponLabOpen}
       followDistance={settings.followDistance}
       followPitch={settings.followPitch}
       followYaw={settings.followYaw}
@@ -74,6 +131,7 @@
       sunPositionX={settings.sunPositionX}
       sunPositionY={settings.sunPositionY}
       sunPositionZ={settings.sunPositionZ}
+      weaponBuild={weaponPreview}
     />
   {/key}
 
@@ -88,6 +146,14 @@
   {/if}
 
   <div class="hint">{controlsHint}</div>
+
+  <WeaponLabModal
+    bind:edges={weaponEdges}
+    bind:nodes={weaponNodes}
+    open={weaponLabOpen}
+    preview={weaponPreview}
+    onClose={() => (weaponLabOpen = false)}
+  />
 </main>
 
 <style>

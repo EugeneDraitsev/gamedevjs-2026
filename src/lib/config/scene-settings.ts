@@ -29,10 +29,10 @@ export interface SceneSettings {
 
 export const createSceneSettings = (): SceneSettings => ({
   ambientLightIntensity: 0.52,
-  cameraFov: 42,
+  cameraFov: 63,
   cameraMode: "follow",
   cameraSmoothing: 8,
-  followDistance: 9.8,
+  followDistance: 12.3,
   followPitch: 52,
   followYaw: 0,
   gravityY: -16,

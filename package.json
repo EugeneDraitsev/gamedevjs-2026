@@ -19,6 +19,7 @@
     "@threlte/core": "^8.5.9",
     "@threlte/extras": "^9.14.6",
     "@threlte/rapier": "^3.4.2",
+    "@xyflow/svelte": "^1.5.2",
     "svelte-tweakpane-ui": "^1.5.16",
     "three": "^0.183.2"
   },
