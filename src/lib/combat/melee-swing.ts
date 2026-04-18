@@ -20,7 +20,7 @@ export const DEFAULT_SWING: SwingParams = {
   endAngle: 1.35,
   innerRadius: 0.55,
   reach: 2.35,
-  thickness: 0.4,
+  thickness: 0.52,
   activeStart: 0.12,
   activeEnd: 0.88,
   impulse: 5.2,

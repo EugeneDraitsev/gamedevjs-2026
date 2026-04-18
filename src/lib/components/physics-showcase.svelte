@@ -1407,16 +1407,13 @@
     position: Vec3,
     variant: DamagePopup["variant"]
   ) => {
-    damagePopups = [
-      ...damagePopups,
-      {
-        amount,
-        createdAt: performance.now(),
-        id: crypto.randomUUID(),
-        position,
-        variant,
-      },
-    ];
+    damagePopups.push({
+      amount,
+      createdAt: performance.now(),
+      id: crypto.randomUUID(),
+      position,
+      variant,
+    });
   };
 
   const getActiveHazard = (position: Vec3) =>
@@ -2046,7 +2043,7 @@
 
     if (newBursts.length > 0) {
       enemyShots = survivors;
-      deflectBursts = [...deflectBursts, ...newBursts];
+      deflectBursts.push(...newBursts);
     }
   };
 
@@ -2294,7 +2291,7 @@
       .filter((enemy): enemy is ActiveEnemy => Boolean(enemy));
 
     if (spawnedEnemyShots.length > 0) {
-      enemyShots = [...enemyShots, ...spawnedEnemyShots];
+      enemyShots.push(...spawnedEnemyShots);
     }
 
     if (spentProjectiles.size > 0) {
@@ -2319,7 +2316,6 @@
 
     if (clearedRoom) {
       clearedEnemyRoomIds = [...clearedEnemyRoomIds, currentRoom.id];
-      enemyShots = [];
       unlockingRoomId = currentRoom.id;
       unlockStartedAt = now;
       doorOpenAmount = 0;
@@ -2583,6 +2579,17 @@
 
       {#if doorOpenAmount < 0.999}
         {#each roomDoorSeals as seal (seal.id)}
+          <T.Group position={seal.position}>
+            <RigidBody type="fixed">
+              <Collider
+                shape="cuboid"
+                args={seal.args}
+                friction={0.92}
+                restitution={0.02}
+              />
+            </RigidBody>
+          </T.Group>
+
           <T.Group
             position={[
               seal.position[0],
@@ -2590,37 +2597,24 @@
               seal.position[2],
             ]}
           >
-            <RigidBody type="fixed">
-              <Collider
-                shape="cuboid"
+            <T.Mesh castShadow receiveShadow>
+              <T.BoxGeometry
                 args={[
-                  seal.args[0],
-                  Math.max(0.18, seal.args[1] * (1 - doorOpenAmount)),
-                  seal.args[2],
+                  seal.args[0] * 2,
+                  Math.max(0.18, seal.args[1] * (1 - doorOpenAmount)) * 2,
+                  seal.args[2] * 2,
                 ]}
-                friction={0.92}
-                restitution={0.02}
               />
-
-              <T.Mesh castShadow receiveShadow>
-                <T.BoxGeometry
-                  args={[
-                    seal.args[0] * 2,
-                    Math.max(0.18, seal.args[1] * (1 - doorOpenAmount)) * 2,
-                    seal.args[2] * 2,
-                  ]}
-                />
-                <T.MeshStandardMaterial
-                  color={seal.color}
-                  emissive={seal.color}
-                  emissiveIntensity={0.26}
-                  metalness={0.34}
-                  opacity={0.9 - doorOpenAmount * 0.35}
-                  roughness={0.28}
-                  transparent
-                />
-              </T.Mesh>
-            </RigidBody>
+              <T.MeshStandardMaterial
+                color={seal.color}
+                emissive={seal.color}
+                emissiveIntensity={0.26}
+                metalness={0.34}
+                opacity={0.9 - doorOpenAmount * 0.35}
+                roughness={0.28}
+                transparent
+              />
+            </T.Mesh>
           </T.Group>
         {/each}
       {/if}
@@ -2924,7 +2918,7 @@
       {/if}
 
       {#each activeEnemies as enemy (enemy.id)}
-        <T.Group position={enemy.position}>
+        <T.Group dispose={false} position={enemy.position}>
           {#if enemy.radius > 1}
             <T.Mesh
               position={[0, -enemy.radius + 0.1, 0]}

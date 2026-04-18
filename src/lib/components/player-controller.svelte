@@ -157,65 +157,63 @@
   let trailMesh = $state<Mesh>();
 
   const trailVertexShader = /* glsl */ `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
 
   const trailFragmentShader = /* glsl */ `
-    uniform float uProgress;
-    uniform float uIntensity;
-    uniform float uTailLength;
-    uniform vec3 uEdgeColor;
-    uniform vec3 uCoreColor;
-    uniform vec3 uBandCenters;
-    uniform vec3 uBandWidths;
-    uniform vec3 uBandAlphas;
-    varying vec2 vUv;
+      uniform float uProgress;
+      uniform float uIntensity;
+      uniform float uTailLength;
+      uniform vec3 uEdgeColor;
+      uniform vec3 uCoreColor;
+      uniform vec3 uBandCenters;
+      uniform vec3 uBandWidths;
+      uniform vec3 uBandAlphas;
+      varying vec2 vUv;
 
-    float bandFalloff(float y, float center, float width) {
-      float d = (y - center) / max(width, 0.001);
-      return exp(-d * d);
-    }
+      float bandFalloff(float y, float center, float width) {
+        float d = (y - center) / max(width, 0.001);
+        return exp(-d * d);
+      }
 
-    void main() {
-      float tailEdge = max(0.0, uProgress - uTailLength);
-      float edgeSoftness = 0.06;
+      void main() {
+        float edgeSoftness = mix(0.09, 0.03, clamp(uTailLength, 0.0, 1.0));
 
-      float tailFalloff =
-        smoothstep(tailEdge, tailEdge + edgeSoftness, vUv.x);
-      float leadFalloff =
-        1.0 -
-        smoothstep(uProgress - edgeSoftness, uProgress + edgeSoftness * 0.2, vUv.x);
-      float longitudinal = tailFalloff * leadFalloff;
+        float tailFalloff =
+          smoothstep(0.0, edgeSoftness, vUv.x);
+        float leadFalloff =
+          1.0 -
+          smoothstep(uProgress - edgeSoftness, uProgress + edgeSoftness * 0.2, vUv.x);
+        float longitudinal = tailFalloff * leadFalloff;
 
-      if (longitudinal <= 0.0015) discard;
+        if (longitudinal <= 0.0015) discard;
 
-      float crescentEnvelope = pow(longitudinal, 0.5);
-      float widthScale = 0.15 + 0.85 * crescentEnvelope;
+        float widthScale = 1.0;
 
-      float primary =
-        bandFalloff(vUv.y, uBandCenters.x, uBandWidths.x * widthScale) *
-        uBandAlphas.x;
-      float secondary =
-        bandFalloff(vUv.y, uBandCenters.y, uBandWidths.y * widthScale) *
-        uBandAlphas.y;
-      float tertiary =
-        bandFalloff(vUv.y, uBandCenters.z, uBandWidths.z * widthScale) *
-        uBandAlphas.z;
-      float bandMask = max(max(primary, secondary), tertiary);
+        float primary =
+          bandFalloff(vUv.y, uBandCenters.x, uBandWidths.x * widthScale) *
+          uBandAlphas.x;
+        float secondary =
+          bandFalloff(vUv.y, uBandCenters.y, uBandWidths.y * widthScale) *
+          uBandAlphas.y;
+        float tertiary =
+          bandFalloff(vUv.y, uBandCenters.z, uBandWidths.z * widthScale) *
+          uBandAlphas.z;
+        float bandMask = max(max(primary, secondary), tertiary);
 
-      float leadingGlow =
-        smoothstep(uProgress - 0.18, uProgress - 0.03, vUv.x);
-      float brightness = 0.85 + 0.6 * leadingGlow;
-      float alpha = longitudinal * bandMask * brightness * uIntensity;
+        float leadingGlow =
+          smoothstep(uProgress - 0.18, uProgress - 0.03, vUv.x);
+        float brightness = 0.85 + 0.6 * leadingGlow;
+        float alpha = longitudinal * bandMask * brightness * uIntensity;
 
-      vec3 color = mix(uEdgeColor, uCoreColor, leadingGlow * primary);
-      gl_FragColor = vec4(color * brightness, alpha);
-    }
-  `;
+        vec3 color = mix(uEdgeColor, uCoreColor, leadingGlow * primary);
+        gl_FragColor = vec4(color * brightness, alpha);
+      }
+    `;
 
   let {
     cameraMode = "follow",

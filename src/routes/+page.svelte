@@ -250,8 +250,22 @@
     margin: 0;
     font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
     background:
-      radial-gradient(circle at top, rgba(54, 113, 170, 0.45), transparent 42%),
-      linear-gradient(180deg, #030711 0%, #071424 48%, #0a1c2c 100%);
+      radial-gradient(
+        circle at 18% 16%,
+        rgba(76, 201, 240, 0.24),
+        transparent 24%
+      ),
+      radial-gradient(
+        circle at 78% 10%,
+        rgba(255, 209, 102, 0.18),
+        transparent 19%
+      ),
+      radial-gradient(
+        circle at 50% 100%,
+        rgba(255, 90, 95, 0.22),
+        transparent 34%
+      ),
+      linear-gradient(180deg, #040816 0%, #0b1827 52%, #170d10 100%);
   }
 
   :global(html) {
