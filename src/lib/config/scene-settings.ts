@@ -14,6 +14,24 @@ export interface SceneSettings {
   gravityY: number;
   jumpSpeed: number;
   lookHeight: number;
+  meleeArcSpan: number;
+  meleeBand1Alpha: number;
+  meleeBand1Center: number;
+  meleeBand1Width: number;
+  meleeBand2Alpha: number;
+  meleeBand2Center: number;
+  meleeBand2Width: number;
+  meleeBand3Alpha: number;
+  meleeBand3Center: number;
+  meleeBand3Width: number;
+  meleeCooldownMs: number;
+  meleeCoreColor: string;
+  meleeDurationMs: number;
+  meleeEdgeColor: string;
+  meleeHitboxPadding: number;
+  meleeReach: number;
+  meleeShowSword: boolean;
+  meleeTailLength: number;
   moveResponsiveness: number;
   moveSpeed: number;
   playerLinearDamping: number;
@@ -43,6 +61,24 @@ export const createSceneSettings = (): SceneSettings => ({
   gravityY: -16,
   jumpSpeed: 7.6,
   lookHeight: 0.4,
+  meleeArcSpan: 2.7,
+  meleeBand1Alpha: 1,
+  meleeBand1Center: 0.92,
+  meleeBand1Width: 0.06,
+  meleeBand2Alpha: 0.55,
+  meleeBand2Center: 0.74,
+  meleeBand2Width: 0.15,
+  meleeBand3Alpha: 0,
+  meleeBand3Center: 0.38,
+  meleeBand3Width: 0.15,
+  meleeCooldownMs: 340,
+  meleeCoreColor: "#48b7bc",
+  meleeDurationMs: 130,
+  meleeEdgeColor: "#7fd8ff",
+  meleeHitboxPadding: 0.7,
+  meleeReach: 1.65,
+  meleeShowSword: false,
+  meleeTailLength: 0.59,
   moveResponsiveness: 12,
   moveSpeed: 7,
   playerLinearDamping: 1.6,

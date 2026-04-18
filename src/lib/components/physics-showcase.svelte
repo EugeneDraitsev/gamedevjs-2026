@@ -18,7 +18,16 @@
   import bossFloorTextureUrl from "$lib/assets/boss-floor.svg";
   import lavaSurfaceTextureUrl from "$lib/assets/lava-surface.svg";
   import treasureFloorTextureUrl from "$lib/assets/treasure-floor.svg";
-  import PlayerController from "$lib/components/player-controller.svelte";
+  import {
+    DEFAULT_SWING,
+    isPointInSwing,
+    type SwingParams,
+    swingKnockbackDirection,
+  } from "$lib/combat/melee-swing";
+  import PlayerController, {
+    type MeleeFrame,
+    type MeleeTrailSettings,
+  } from "$lib/components/player-controller.svelte";
   import Projectile, {
     type ProjectileData,
   } from "$lib/components/projectile.svelte";
@@ -60,6 +69,11 @@
     gravityY?: number;
     jumpSpeed?: number;
     lookHeight?: number;
+    meleeCooldownMs?: number;
+    meleeHitboxPadding?: number;
+    meleeParams?: SwingParams;
+    meleeShowSword?: boolean;
+    meleeTrailSettings?: MeleeTrailSettings;
     moveResponsiveness?: number;
     moveSpeed?: number;
     onCollectArtifact?: (roomId: string, type: WeaponNodeType) => void;
@@ -132,6 +146,14 @@
     radius: number;
     ttlMs: number;
     velocity: Vec3;
+  }
+
+  interface DeflectBurst {
+    color: string;
+    createdAt: number;
+    id: string;
+    position: Vec3;
+    radius: number;
   }
 
   interface DoorMarker {
@@ -1055,6 +1077,13 @@
   let activeBeams = $state<ActiveBeam[]>([]);
   let damagePopups = $state<DamagePopup[]>([]);
   let enemyShots = $state<ActiveEnemyShot[]>([]);
+  let deflectBursts = $state<DeflectBurst[]>([]);
+  const deflectBurstDurationMs = 240;
+  const deflectBurstShardCount = 4;
+  const deflectBurstShardAngles = Array.from(
+    { length: deflectBurstShardCount },
+    (_unused, index) => (index / deflectBurstShardCount) * Math.PI * 2
+  );
   let clearedEnemyRoomIds = $state<string[]>([]);
   let releasedRoomIds = $state<string[]>([]);
   let playerHealth = $state(playerMaxHealth);
@@ -1078,6 +1107,11 @@
     gravityY = -9.81,
     jumpSpeed = 6.2,
     lookHeight = 0.4,
+    meleeCooldownMs,
+    meleeHitboxPadding = 0,
+    meleeParams,
+    meleeShowSword = true,
+    meleeTrailSettings,
     moveResponsiveness = 12,
     moveSpeed = 7.5,
     onCollectArtifact,
@@ -1123,6 +1157,8 @@
   let doorOpenAmount = $state(1);
   let lastPlayerPosition = $state<Vec3>([0, 1, 0]);
   const projectilePositions = new Map<string, Vec3>();
+  let currentMeleeFrame: MeleeFrame | null = null;
+  const meleeHitEnemies = new Map<number, Set<string>>();
 
   const roomList = $derived.by(() => Object.values(dungeon.rooms));
   const currentFloorPalette = $derived(floorThemes[floorTheme]);
@@ -1236,6 +1272,36 @@
       })
       .filter((popup): popup is ProjectedDamagePopup => Boolean(popup));
   });
+  const deflectBurstsRendered = $derived.by(() =>
+    deflectBursts.map((burst) => {
+      const age = Math.min(
+        1,
+        (animationNow - burst.createdAt) / deflectBurstDurationMs
+      );
+      const fade = 1 - age;
+      const travel = burst.radius * 2.6 * age;
+
+      return {
+        ...burst,
+        age,
+        fade,
+        shards: deflectBurstShardAngles.map((angle, shardIndex) => ({
+          angle,
+          position: [
+            Math.cos(angle) * travel,
+            age * burst.radius * 0.6 - age * age * burst.radius * 1.1,
+            Math.sin(angle) * travel,
+          ] as Vec3,
+          rotation: [
+            (shardIndex % 2 ? 1 : -1) * age * 4.5,
+            angle + age * 3.5,
+            0,
+          ] as Vec3,
+          scale: Math.max(0, 1 - age),
+        })),
+      };
+    })
+  );
   const currentRoomUnlocked = $derived(
     !isCurrentRoomCombat || releasedRoomSet.has(currentRoom.id)
   );
@@ -1928,6 +1994,133 @@
     crosshairY = y;
   };
 
+  const handleMeleeFrame = (frame: MeleeFrame) => {
+    if (frame.ended) {
+      meleeHitEnemies.delete(frame.swingId);
+      currentMeleeFrame = null;
+      return;
+    }
+
+    currentMeleeFrame = frame;
+
+    if (!meleeHitEnemies.has(frame.swingId)) {
+      meleeHitEnemies.set(frame.swingId, new Set());
+    }
+  };
+
+  const applyMeleeDeflects = (frame: MeleeFrame) => {
+    if (!(frame.active && enemyShots.length > 0)) {
+      return;
+    }
+
+    const baseConfig = meleeParams ?? DEFAULT_SWING;
+    const swingConfig: SwingParams = {
+      ...baseConfig,
+      reach: baseConfig.reach + meleeHitboxPadding,
+    };
+    const now = performance.now();
+    const survivors: ActiveEnemyShot[] = [];
+    const newBursts: DeflectBurst[] = [];
+
+    for (const shot of enemyShots) {
+      if (
+        isPointInSwing(
+          shot.position,
+          frame.t,
+          frame.center,
+          frame.facingYaw,
+          swingConfig
+        )
+      ) {
+        newBursts.push({
+          color: shot.color,
+          createdAt: now,
+          id: crypto.randomUUID(),
+          position: shot.position,
+          radius: shot.radius,
+        });
+      } else {
+        survivors.push(shot);
+      }
+    }
+
+    if (newBursts.length > 0) {
+      enemyShots = survivors;
+      deflectBursts = [...deflectBursts, ...newBursts];
+    }
+  };
+
+  const applyMeleeHitsToEnemies = (frame: MeleeFrame) => {
+    if (!frame.active) {
+      return;
+    }
+
+    const hitSet = meleeHitEnemies.get(frame.swingId);
+
+    if (!hitSet) {
+      return;
+    }
+
+    const baseConfig = meleeParams ?? DEFAULT_SWING;
+    const swingConfig: SwingParams = {
+      ...baseConfig,
+      damage: Math.max(1, Math.round(weaponBuild.damage * 0.5)),
+      reach: baseConfig.reach + meleeHitboxPadding,
+    };
+    const now = performance.now();
+
+    activeEnemies = activeEnemies
+      .map((enemy) => {
+        if (hitSet.has(enemy.id) || enemy.radius > 1) {
+          return enemy;
+        }
+
+        if (
+          !isPointInSwing(
+            enemy.position,
+            frame.t,
+            frame.center,
+            frame.facingYaw,
+            swingConfig
+          )
+        ) {
+          return enemy;
+        }
+
+        hitSet.add(enemy.id);
+
+        const damage = swingConfig.damage;
+        const [kx, kz] = swingKnockbackDirection(
+          enemy.position,
+          frame.center,
+          swingConfig
+        );
+        const kick = Math.min(10, swingConfig.impulse * 1.6);
+
+        popDamage(
+          damage,
+          [
+            enemy.position[0],
+            enemy.position[1] + enemy.radius + 0.34,
+            enemy.position[2],
+          ],
+          "enemy"
+        );
+
+        return {
+          ...enemy,
+          hp: enemy.hp - damage,
+          knockbackVelocity: [
+            Math.max(-10.5, Math.min(10.5, kx * kick)),
+            0,
+            Math.max(-10.5, Math.min(10.5, kz * kick)),
+          ] as Vec3,
+          lastHitAt: now,
+        };
+      })
+      .filter((enemy) => enemy.hp > 0);
+  };
+
   const handlePlayerPositionChange = (position: Vec3) => {
     lastPlayerPosition = position;
     const now = performance.now();
@@ -2191,9 +2384,16 @@
       damagePopups = damagePopups.filter(
         (popup) => time - popup.createdAt < damagePopupDurationMs
       );
+      deflectBursts = deflectBursts.filter(
+        (burst) => time - burst.createdAt < deflectBurstDurationMs
+      );
       if (lavaSurfaceTexture) {
         lavaSurfaceTexture.offset.x += delta * 0.18;
         lavaSurfaceTexture.offset.y -= delta * 0.08;
+      }
+      if (currentMeleeFrame) {
+        applyMeleeHitsToEnemies(currentMeleeFrame);
+        applyMeleeDeflects(currentMeleeFrame);
       }
       stepEnemies(delta);
       frameId = window.requestAnimationFrame(tick);
@@ -2816,6 +3016,32 @@
         </T.Group>
       {/each}
 
+      {#each deflectBurstsRendered as burst (burst.id)}
+        <T.Group position={burst.position}>
+          {#each burst.shards as shard, shardIndex (shardIndex)}
+            <T.Mesh
+              position={shard.position}
+              rotation={shard.rotation}
+              scale={[shard.scale, shard.scale, shard.scale]}
+            >
+              <T.BoxGeometry
+                args={[
+                  burst.radius * 0.55,
+                  burst.radius * 0.55,
+                  burst.radius * 0.55,
+                ]}
+              />
+              <T.MeshBasicMaterial
+                color={burst.color}
+                depthWrite={false}
+                opacity={burst.fade}
+                transparent
+              />
+            </T.Mesh>
+          {/each}
+        </T.Group>
+      {/each}
+
       {#each activeBeams as beam (beam.id)}
         <T.Group position={beam.position} rotation={[0, beam.rotationY, 0]}>
           {#if beam.curve > 0.25}
@@ -2885,7 +3111,13 @@
         {lookHeight}
         {moveResponsiveness}
         {moveSpeed}
+        {meleeCooldownMs}
+        {meleeHitboxPadding}
+        {meleeParams}
+        {meleeShowSword}
+        {meleeTrailSettings}
         moveSpeedFactor={lavaBrakeFactor}
+        onMeleeFrame={handleMeleeFrame}
         onMouseMove={handleMouseMove}
         onPositionChange={handlePlayerPositionChange}
         onShoot={spawnProjectile}

@@ -11,8 +11,9 @@
     "lint": "ultracite check",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check": "bun run lint && bun run typecheck",
-    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "fix": "ultracite fix"
+    "fix": "ultracite fix",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
@@ -33,6 +34,7 @@
     "svelte-check": "^4.4.6",
     "typescript": "^6.0.2",
     "ultracite": "7.5.9",
-    "vite": "^8.0.7"
+    "vite": "^8.0.7",
+    "vitest": "^3.1.0"
   }
 }

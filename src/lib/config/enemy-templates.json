@@ -34,8 +34,8 @@
     "preferredRange": 7.1,
     "shotColor": "#ffd6a0",
     "shotDamage": 1,
-    "shotIntervalMs": 1180,
-    "shotSpeed": 8.8
+    "shotIntervalMs": 2360,
+    "shotSpeed": 6.16
   },
   {
     "id": "coil-sentry",
@@ -50,8 +50,8 @@
     "preferredRange": 6.4,
     "shotColor": "#c8baff",
     "shotDamage": 1,
-    "shotIntervalMs": 820,
-    "shotSpeed": 10.4
+    "shotIntervalMs": 1640,
+    "shotSpeed": 7.28
   },
   {
     "id": "slag-brute",
@@ -77,14 +77,14 @@
     "preferredRange": 6.9,
     "shotColor": "#d9efff",
     "shotDamage": 1,
-    "shotIntervalMs": 720,
-    "shotSpeed": 12.6
+    "shotIntervalMs": 1440,
+    "shotSpeed": 8.82
   },
   {
     "id": "iron-warden",
     "label": "Iron Warden",
     "behavior": "shooter",
-    "hp": 240,
+    "hp": 360,
     "moveSpeed": 2.55,
     "radius": 1.18,
     "color": "#ffd166",
@@ -93,14 +93,14 @@
     "preferredRange": 5.2,
     "shotColor": "#fff0b0",
     "shotDamage": 2,
-    "shotIntervalMs": 560,
-    "shotSpeed": 13.2
+    "shotIntervalMs": 1120,
+    "shotSpeed": 9.24
   },
   {
     "id": "brass-overseer",
     "label": "Brass Overseer",
     "behavior": "shooter",
-    "hp": 320,
+    "hp": 480,
     "moveSpeed": 2.9,
     "radius": 1.34,
     "color": "#ffb347",
@@ -109,7 +109,7 @@
     "preferredRange": 4.8,
     "shotColor": "#fff2c0",
     "shotDamage": 2,
-    "shotIntervalMs": 420,
-    "shotSpeed": 14.8
+    "shotIntervalMs": 840,
+    "shotSpeed": 10.36
   }
 ]

@@ -3,6 +3,7 @@
   import {
     Button,
     Checkbox,
+    Color,
     Folder,
     List,
     Pane,
@@ -226,6 +227,134 @@
       min={0}
       max={0.2}
       step={0.001}
+    />
+  </Folder>
+
+  <Folder title="Melee" expanded={false}>
+    <Checkbox bind:value={settings.meleeShowSword} label="Show sword" />
+    <Slider
+      bind:value={settings.meleeDurationMs}
+      format={formatFloat}
+      label="Duration ms"
+      min={60}
+      max={600}
+      step={5}
+    />
+    <Slider
+      bind:value={settings.meleeCooldownMs}
+      format={formatFloat}
+      label="Cooldown ms"
+      min={100}
+      max={1200}
+      step={10}
+    />
+    <Slider
+      bind:value={settings.meleeArcSpan}
+      format={formatFloat}
+      label="Arc span (rad)"
+      min={0.6}
+      max={4}
+      step={0.05}
+    />
+    <Slider
+      bind:value={settings.meleeReach}
+      format={formatFloat}
+      label="Reach"
+      min={1}
+      max={4}
+      step={0.05}
+    />
+    <Slider
+      bind:value={settings.meleeHitboxPadding}
+      format={formatFloat}
+      label="Hitbox padding"
+      min={0}
+      max={1.5}
+      step={0.01}
+    />
+    <Separator />
+    <Slider
+      bind:value={settings.meleeTailLength}
+      format={formatFloat}
+      label="Tail length"
+      min={0.1}
+      max={1}
+      step={0.01}
+    />
+    <Color bind:value={settings.meleeEdgeColor} label="Edge color" />
+    <Color bind:value={settings.meleeCoreColor} label="Core color" />
+    <Separator />
+    <Slider
+      bind:value={settings.meleeBand1Alpha}
+      format={formatFloat}
+      label="Band 1 alpha"
+      min={0}
+      max={1}
+      step={0.01}
+    />
+    <Slider
+      bind:value={settings.meleeBand1Center}
+      format={formatFloat}
+      label="Band 1 pos"
+      min={0}
+      max={1}
+      step={0.01}
+    />
+    <Slider
+      bind:value={settings.meleeBand1Width}
+      format={formatFloat}
+      label="Band 1 width"
+      min={0.005}
+      max={0.5}
+      step={0.005}
+    />
+    <Slider
+      bind:value={settings.meleeBand2Alpha}
+      format={formatFloat}
+      label="Band 2 alpha"
+      min={0}
+      max={1}
+      step={0.01}
+    />
+    <Slider
+      bind:value={settings.meleeBand2Center}
+      format={formatFloat}
+      label="Band 2 pos"
+      min={0}
+      max={1}
+      step={0.01}
+    />
+    <Slider
+      bind:value={settings.meleeBand2Width}
+      format={formatFloat}
+      label="Band 2 width"
+      min={0.005}
+      max={0.5}
+      step={0.005}
+    />
+    <Slider
+      bind:value={settings.meleeBand3Alpha}
+      format={formatFloat}
+      label="Band 3 alpha"
+      min={0}
+      max={1}
+      step={0.01}
+    />
+    <Slider
+      bind:value={settings.meleeBand3Center}
+      format={formatFloat}
+      label="Band 3 pos"
+      min={0}
+      max={1}
+      step={0.01}
+    />
+    <Slider
+      bind:value={settings.meleeBand3Width}
+      format={formatFloat}
+      label="Band 3 width"
+      min={0.005}
+      max={0.5}
+      step={0.005}
     />
   </Folder>
 

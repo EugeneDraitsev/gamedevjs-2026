@@ -1,20 +1,70 @@
 <script lang="ts">
-  import type { RigidBody as RapierRigidBody } from "@dimforge/rapier3d-compat";
+  import type {
+    RigidBody as RapierRigidBody,
+    RigidBodyType,
+  } from "@dimforge/rapier3d-compat";
   import { T, useTask, useThrelte } from "@threlte/core";
   import { Collider, RigidBody, useRapier } from "@threlte/rapier";
   import { onMount } from "svelte";
   import {
+    AdditiveBlending,
+    BufferGeometry,
+    Color,
+    DoubleSide,
+    Float32BufferAttribute,
+    type Group,
     MathUtils,
+    type Mesh,
     PerspectiveCamera,
     Plane,
     Raycaster,
+    ShaderMaterial,
     Vector2,
     Vector3,
   } from "three";
   import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+  import {
+    buildSwingRibbonGeometryData,
+    DEFAULT_MELEE_COOLDOWN_MS,
+    DEFAULT_SWING,
+    isPointInSwing,
+    isSwingActive,
+    type SwingParams,
+    swingGroupRotationY,
+    swingKnockbackDirection,
+    swingProgress,
+    swingRibbonProgress,
+  } from "$lib/combat/melee-swing";
   import type { WeaponBuild } from "$lib/config/weapon-graph";
 
   type CameraMode = "follow" | "orbit";
+
+  export interface MeleeFrame {
+    active: boolean;
+    center: [number, number, number];
+    ended: boolean;
+    facingYaw: number;
+    swingId: number;
+    t: number;
+  }
+
+  export interface MeleeTrailSettings {
+    bandAlphas: [number, number, number];
+    bandCenters: [number, number, number];
+    bandWidths: [number, number, number];
+    coreColor: string;
+    edgeColor: string;
+    tailLength: number;
+  }
+
+  const DEFAULT_TRAIL_SETTINGS: MeleeTrailSettings = {
+    bandAlphas: [1, 0.55, 0],
+    bandCenters: [0.92, 0.74, 0.5],
+    bandWidths: [0.055, 0.025, 0.035],
+    coreColor: "#ffffff",
+    edgeColor: "#7fd8ff",
+    tailLength: 0.55,
+  };
 
   interface PlayerControllerProps {
     cameraMode?: CameraMode;
@@ -28,9 +78,15 @@
     impactVelocity?: [number, number, number] | null;
     jumpSpeed?: number;
     lookHeight?: number;
+    meleeCooldownMs?: number;
+    meleeHitboxPadding?: number;
+    meleeParams?: SwingParams;
+    meleeShowSword?: boolean;
+    meleeTrailSettings?: MeleeTrailSettings;
     moveResponsiveness?: number;
     moveSpeed?: number;
     moveSpeedFactor?: number;
+    onMeleeFrame?: (frame: MeleeFrame) => void;
     onMouseMove?: (x: number, y: number) => void;
     onPositionChange?: (position: [number, number, number]) => void;
     onShoot?: (projectile: {
@@ -73,15 +129,93 @@
   const projectileForwardOffset = 1.1;
   const projectileHeightOffset = 0.18;
   const shootCooldownMs = 180;
+  const meleeHeightOffset = 0.18;
+  const DYNAMIC_BODY_TYPE: RigidBodyType = 0 as RigidBodyType;
 
   let jumpRequested = false;
   let shootRequested = false;
   let shootingHeld = false;
+  let meleeRequested = false;
   let mouseScreenX = 0;
   let mouseScreenY = 0;
   let isGroundedState = $state(false);
   let rigidBody = $state<RapierRigidBody>();
   let lastShotAt = 0;
+  let swingId = 0;
+  let swingStartedAt = 0;
+  let swingActiveFlag = false;
+  let lastSwingStartedAt = -Number.POSITIVE_INFINITY;
+  const swingHitBodies = new Set<number>();
+  let swordGroup = $state<Group>();
+  let isSwingingVisual = $state(false);
+  let swingVisualT = $state(0);
+  let swingFacingYaw = $state(0);
+  let swingCenter = $state<[number, number, number]>([0, 0, 0]);
+  const trailFadeMs = 180;
+  let trailGeometry: BufferGeometry | undefined;
+  let trailMaterial: ShaderMaterial | undefined;
+  let trailMesh = $state<Mesh>();
+
+  const trailVertexShader = /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `;
+
+  const trailFragmentShader = /* glsl */ `
+    uniform float uProgress;
+    uniform float uIntensity;
+    uniform float uTailLength;
+    uniform vec3 uEdgeColor;
+    uniform vec3 uCoreColor;
+    uniform vec3 uBandCenters;
+    uniform vec3 uBandWidths;
+    uniform vec3 uBandAlphas;
+    varying vec2 vUv;
+
+    float bandFalloff(float y, float center, float width) {
+      float d = (y - center) / max(width, 0.001);
+      return exp(-d * d);
+    }
+
+    void main() {
+      float tailEdge = max(0.0, uProgress - uTailLength);
+      float edgeSoftness = 0.06;
+
+      float tailFalloff =
+        smoothstep(tailEdge, tailEdge + edgeSoftness, vUv.x);
+      float leadFalloff =
+        1.0 -
+        smoothstep(uProgress - edgeSoftness, uProgress + edgeSoftness * 0.2, vUv.x);
+      float longitudinal = tailFalloff * leadFalloff;
+
+      if (longitudinal <= 0.0015) discard;
+
+      float crescentEnvelope = pow(longitudinal, 0.5);
+      float widthScale = 0.15 + 0.85 * crescentEnvelope;
+
+      float primary =
+        bandFalloff(vUv.y, uBandCenters.x, uBandWidths.x * widthScale) *
+        uBandAlphas.x;
+      float secondary =
+        bandFalloff(vUv.y, uBandCenters.y, uBandWidths.y * widthScale) *
+        uBandAlphas.y;
+      float tertiary =
+        bandFalloff(vUv.y, uBandCenters.z, uBandWidths.z * widthScale) *
+        uBandAlphas.z;
+      float bandMask = max(max(primary, secondary), tertiary);
+
+      float leadingGlow =
+        smoothstep(uProgress - 0.18, uProgress - 0.03, vUv.x);
+      float brightness = 0.85 + 0.6 * leadingGlow;
+      float alpha = longitudinal * bandMask * brightness * uIntensity;
+
+      vec3 color = mix(uEdgeColor, uCoreColor, leadingGlow * primary);
+      gl_FragColor = vec4(color * brightness, alpha);
+    }
+  `;
 
   let {
     cameraMode = "follow",
@@ -98,6 +232,12 @@
     moveSpeedFactor = 1,
     impactNonce = 0,
     impactVelocity = null,
+    meleeCooldownMs = DEFAULT_MELEE_COOLDOWN_MS,
+    meleeHitboxPadding = 0,
+    meleeParams = DEFAULT_SWING,
+    meleeShowSword = true,
+    meleeTrailSettings = DEFAULT_TRAIL_SETTINGS,
+    onMeleeFrame,
     onMouseMove,
     onPositionChange,
     onShoot,
@@ -109,6 +249,120 @@
     weaponBuild,
   }: PlayerControllerProps = $props();
   let previousCameraMode: CameraMode | undefined;
+
+  const meleeHitboxParams = $derived<SwingParams>({
+    ...meleeParams,
+    reach: meleeParams.reach + meleeHitboxPadding,
+  });
+  const swingBladeLength = $derived(
+    meleeParams.reach - meleeParams.innerRadius
+  );
+  const swingBladeMidZ = $derived(
+    (meleeParams.innerRadius + meleeParams.reach) / 2
+  );
+  const swingActiveFlare = $derived(
+    isSwingActive(swingVisualT, meleeParams) ? 1 : 0.25
+  );
+  const swingLingerFade = $derived(
+    swingVisualT <= 1
+      ? 1
+      : Math.max(
+          0,
+          1 - ((swingVisualT - 1) * meleeParams.durationMs) / trailFadeMs
+        )
+  );
+  const swingLightRadial = $derived(
+    meleeParams.innerRadius +
+      (meleeParams.reach - meleeParams.innerRadius) * 0.7
+  );
+  const swingLightYaw = $derived(
+    swingGroupRotationY(Math.min(1, swingVisualT), swingFacingYaw, meleeParams)
+  );
+  $effect(() => {
+    const data = buildSwingRibbonGeometryData(meleeParams, 56);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new Float32BufferAttribute(data.positions, 3)
+    );
+    geometry.setAttribute("uv", new Float32BufferAttribute(data.uvs, 2));
+    geometry.setIndex(Array.from(data.indices));
+    geometry.computeBoundingSphere();
+
+    const material = new ShaderMaterial({
+      uniforms: {
+        uBandAlphas: {
+          value: new Vector3(...DEFAULT_TRAIL_SETTINGS.bandAlphas),
+        },
+        uBandCenters: {
+          value: new Vector3(...DEFAULT_TRAIL_SETTINGS.bandCenters),
+        },
+        uBandWidths: {
+          value: new Vector3(...DEFAULT_TRAIL_SETTINGS.bandWidths),
+        },
+        uCoreColor: { value: new Color(DEFAULT_TRAIL_SETTINGS.coreColor) },
+        uEdgeColor: { value: new Color(DEFAULT_TRAIL_SETTINGS.edgeColor) },
+        uIntensity: { value: 0 },
+        uProgress: { value: 0 },
+        uTailLength: { value: DEFAULT_TRAIL_SETTINGS.tailLength },
+      },
+      vertexShader: trailVertexShader,
+      fragmentShader: trailFragmentShader,
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      side: DoubleSide,
+    });
+
+    trailGeometry = geometry;
+    trailMaterial = material;
+
+    const mesh = trailMesh;
+
+    if (mesh) {
+      mesh.geometry = geometry;
+      mesh.material = material;
+    }
+
+    return () => {
+      geometry.dispose();
+      material.dispose();
+      trailGeometry = undefined;
+      trailMaterial = undefined;
+    };
+  });
+
+  $effect(() => {
+    const mesh = trailMesh;
+
+    if (!(mesh && trailGeometry && trailMaterial)) {
+      return;
+    }
+
+    mesh.geometry = trailGeometry;
+    mesh.material = trailMaterial;
+  });
+
+  $effect(() => {
+    const material = trailMaterial;
+
+    if (!material) {
+      return;
+    }
+
+    const centers = material.uniforms.uBandCenters.value as Vector3;
+    const widths = material.uniforms.uBandWidths.value as Vector3;
+    const alphas = material.uniforms.uBandAlphas.value as Vector3;
+    const edge = material.uniforms.uEdgeColor.value as Color;
+    const core = material.uniforms.uCoreColor.value as Color;
+
+    centers.set(...meleeTrailSettings.bandCenters);
+    widths.set(...meleeTrailSettings.bandWidths);
+    alphas.set(...meleeTrailSettings.bandAlphas);
+    edge.set(meleeTrailSettings.edgeColor);
+    core.set(meleeTrailSettings.coreColor);
+    material.uniforms.uTailLength.value = meleeTrailSettings.tailLength;
+  });
 
   const { camera } = useThrelte();
   const { rapier, world } = useRapier();
@@ -147,6 +401,7 @@
       jumpRequested = false;
       shootRequested = false;
       shootingHeld = false;
+      meleeRequested = false;
       pressed.clear();
     }
   });
@@ -246,42 +501,51 @@
     return hit !== null && hit.normal.y > groundedNormalThreshold;
   };
 
+  const handleOrbitKeyDown = (event: KeyboardEvent) => {
+    if (isOrbitInputKey(event.code)) {
+      orbitPressed.add(event.code);
+      event.preventDefault();
+    } else if (event.code === "Space") {
+      event.preventDefault();
+    }
+  };
+
+  const recordSingleShotPress = (event: KeyboardEvent) => {
+    if (event.repeat) {
+      return;
+    }
+
+    if (event.code === "Space") {
+      jumpRequested = true;
+    } else if (event.code === "KeyF") {
+      meleeRequested = true;
+    }
+  };
+
+  const isGameplayPreventDefaultCode = (code: string) =>
+    code === "Space" ||
+    code === "ArrowUp" ||
+    code === "ArrowDown" ||
+    code === "ArrowLeft" ||
+    code === "ArrowRight";
+
   onMount(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
-      if (controlsLocked) {
+      if (isEditableTarget(event.target) || controlsLocked) {
         return;
       }
 
       if (cameraMode === "orbit") {
-        if (isOrbitInputKey(event.code)) {
-          orbitPressed.add(event.code);
-          event.preventDefault();
-        } else if (event.code === "Space") {
-          event.preventDefault();
-        }
-
+        handleOrbitKeyDown(event);
         return;
       }
 
-      if (
-        event.code === "Space" ||
-        event.code === "ArrowUp" ||
-        event.code === "ArrowDown" ||
-        event.code === "ArrowLeft" ||
-        event.code === "ArrowRight"
-      ) {
+      if (isGameplayPreventDefaultCode(event.code)) {
         event.preventDefault();
       }
 
       pressed.add(event.code);
-
-      if (event.code === "Space" && !event.repeat) {
-        jumpRequested = true;
-      }
+      recordSingleShotPress(event);
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
@@ -298,6 +562,7 @@
       jumpRequested = false;
       shootRequested = false;
       shootingHeld = false;
+      meleeRequested = false;
       orbitPressed.clear();
       pressed.clear();
     };
@@ -315,6 +580,33 @@
       mouseScreenY = event.clientY;
       shootingHeld = true;
       shootRequested = true;
+    };
+
+    const handleRightMouseDown = (event: MouseEvent) => {
+      if (event.button !== 2 || cameraMode === "orbit" || controlsLocked) {
+        return;
+      }
+
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+      mouseScreenX = event.clientX;
+      mouseScreenY = event.clientY;
+      meleeRequested = true;
+    };
+
+    const handleContextMenu = (event: MouseEvent) => {
+      if (cameraMode === "orbit" || controlsLocked) {
+        return;
+      }
+
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
     };
 
     const handleMouseUp = (event: MouseEvent) => {
@@ -336,16 +628,20 @@
     window.addEventListener("keyup", handleKeyUp);
     window.addEventListener("blur", handleBlur);
     window.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mousedown", handleRightMouseDown);
     window.addEventListener("mouseup", handleMouseUp);
     window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("contextmenu", handleContextMenu);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleBlur);
       window.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mousedown", handleRightMouseDown);
       window.removeEventListener("mouseup", handleMouseUp);
       window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("contextmenu", handleContextMenu);
     };
   });
 
@@ -442,6 +738,220 @@
       cameraTarget.copy(smoothedAnchor).add(cameraOffset);
       activeCamera.position.copy(cameraTarget);
       activeCamera.lookAt(lookTarget);
+    }
+  };
+
+  const resolveFacingYaw = (
+    body: RapierRigidBody,
+    activeCamera: NonNullable<typeof camera.current>
+  ) => {
+    const translation = body.translation();
+
+    activeCamera.updateMatrixWorld();
+
+    mouseNdc.set(
+      (mouseScreenX / window.innerWidth) * 2 - 1,
+      -(mouseScreenY / window.innerHeight) * 2 + 1
+    );
+
+    groundPlane.constant = -(translation.y + projectileHeightOffset);
+    raycaster.setFromCamera(mouseNdc, activeCamera);
+    const hit = raycaster.ray.intersectPlane(groundPlane, groundHit);
+
+    let dirX: number;
+    let dirZ: number;
+
+    if (hit) {
+      dirX = groundHit.x - translation.x;
+      dirZ = groundHit.z - translation.z;
+    } else {
+      activeCamera.getWorldDirection(forwardDirection);
+      dirX = forwardDirection.x;
+      dirZ = forwardDirection.z;
+    }
+
+    if (dirX === 0 && dirZ === 0) {
+      return 0;
+    }
+
+    return Math.atan2(dirX, dirZ);
+  };
+
+  const startMeleeSwing = (
+    body: RapierRigidBody,
+    activeCamera: NonNullable<typeof camera.current>
+  ) => {
+    swingId += 1;
+    swingStartedAt = performance.now();
+    swingFacingYaw = resolveFacingYaw(body, activeCamera);
+    const translation = body.translation();
+    swingCenter = [translation.x, translation.y, translation.z];
+    swingActiveFlag = true;
+    isSwingingVisual = true;
+    swingVisualT = 0;
+    swingHitBodies.clear();
+
+    onMeleeFrame?.({
+      swingId,
+      t: 0,
+      active: false,
+      center: swingCenter,
+      facingYaw: swingFacingYaw,
+      ended: false,
+    });
+  };
+
+  const applySwingKnockbacks = (playerBody: RapierRigidBody, t: number) => {
+    if (!isSwingActive(t, meleeHitboxParams)) {
+      return;
+    }
+
+    const playerHandle = playerBody.handle;
+
+    world.forEachRigidBody((otherBody) => {
+      if (otherBody.handle === playerHandle) {
+        return;
+      }
+
+      if (otherBody.bodyType() !== DYNAMIC_BODY_TYPE) {
+        return;
+      }
+
+      if (swingHitBodies.has(otherBody.handle)) {
+        return;
+      }
+
+      const position = otherBody.translation();
+      const point: [number, number, number] = [
+        position.x,
+        position.y,
+        position.z,
+      ];
+
+      if (
+        !isPointInSwing(
+          point,
+          t,
+          swingCenter,
+          swingFacingYaw,
+          meleeHitboxParams
+        )
+      ) {
+        return;
+      }
+
+      const [kx, kz] = swingKnockbackDirection(
+        point,
+        swingCenter,
+        meleeHitboxParams
+      );
+      const mass = otherBody.mass() || 1;
+      const impulse = meleeHitboxParams.impulse * mass;
+
+      otherBody.applyImpulse(
+        {
+          x: kx * impulse,
+          y: meleeHitboxParams.lift * mass,
+          z: kz * impulse,
+        },
+        true
+      );
+      otherBody.wakeUp();
+
+      swingHitBodies.add(otherBody.handle);
+    });
+  };
+
+  const updateSwordVisual = (t: number) => {
+    const sword = swordGroup;
+
+    if (!sword) {
+      return;
+    }
+
+    sword.position.set(
+      swingCenter[0],
+      swingCenter[1] + meleeHeightOffset,
+      swingCenter[2]
+    );
+    sword.rotation.set(
+      0,
+      swingGroupRotationY(t, swingFacingYaw, meleeParams),
+      0
+    );
+  };
+
+  const updateMelee = (
+    body: RapierRigidBody,
+    activeCamera: NonNullable<typeof camera.current>
+  ) => {
+    const now = performance.now();
+    const cooldownReady = now - lastSwingStartedAt >= meleeCooldownMs;
+
+    if (
+      meleeRequested &&
+      !swingActiveFlag &&
+      cooldownReady &&
+      cameraMode !== "orbit" &&
+      !controlsLocked
+    ) {
+      lastSwingStartedAt = now;
+      startMeleeSwing(body, activeCamera);
+    }
+
+    meleeRequested = false;
+
+    if (!isSwingingVisual) {
+      return;
+    }
+
+    const elapsed = now - swingStartedAt;
+    const t = swingProgress(elapsed, meleeParams);
+    const translation = body.translation();
+
+    swingCenter = [translation.x, translation.y, translation.z];
+    swingVisualT = t;
+
+    const active = isSwingActive(t, meleeParams);
+
+    updateSwordVisual(t);
+
+    if (trailMaterial) {
+      const lingerElapsed = Math.max(0, elapsed - meleeParams.durationMs);
+      const intensity = Math.max(0, 1 - lingerElapsed / trailFadeMs);
+
+      trailMaterial.uniforms.uProgress.value = Math.min(
+        1,
+        swingRibbonProgress(t, meleeParams)
+      );
+      trailMaterial.uniforms.uIntensity.value = intensity;
+    }
+
+    if (swingActiveFlag) {
+      applySwingKnockbacks(body, t);
+
+      onMeleeFrame?.({
+        swingId,
+        t,
+        active,
+        center: swingCenter,
+        facingYaw: swingFacingYaw,
+        ended: false,
+      });
+
+      if (elapsed >= meleeParams.durationMs) {
+        swingActiveFlag = false;
+        onMeleeFrame?.({
+          swingId,
+          t: 1,
+          active: false,
+          center: swingCenter,
+          facingYaw: swingFacingYaw,
+          ended: true,
+        });
+      }
+    } else if (elapsed >= meleeParams.durationMs + trailFadeMs) {
+      isSwingingVisual = false;
     }
   };
 
@@ -579,6 +1089,7 @@
     updateCamera(activeCamera, delta);
     updateOrbitKeyboardCamera(activeCamera, delta);
     tryShoot(body, activeCamera);
+    updateMelee(body, activeCamera);
   });
 </script>
 
@@ -604,6 +1115,90 @@
     </T.Mesh>
   </RigidBody>
 </T.Group>
+
+{#if isSwingingVisual && meleeShowSword}
+  <T.Group bind:ref={swordGroup}>
+    <T.Mesh castShadow position={[0, 0, swingBladeMidZ]}>
+      <T.BoxGeometry args={[0.07, 0.12, swingBladeLength]} />
+      <T.MeshStandardMaterial
+        color="#f6fcff"
+        emissive="#7fd8ff"
+        emissiveIntensity={1.4 * swingActiveFlare + 0.4}
+        metalness={0.72}
+        roughness={0.18}
+      />
+    </T.Mesh>
+
+    <T.Mesh
+      castShadow
+      position={[0, 0.01, swingBladeMidZ]}
+      rotation={[0, 0, Math.PI / 4]}
+    >
+      <T.BoxGeometry args={[0.02, 0.02, swingBladeLength * 0.98]} />
+      <T.MeshStandardMaterial
+        color="#ffffff"
+        emissive="#bff3ff"
+        emissiveIntensity={2.2 * swingActiveFlare + 0.6}
+        metalness={0.88}
+        roughness={0.08}
+      />
+    </T.Mesh>
+
+    <T.Mesh castShadow position={[0, 0, meleeParams.innerRadius - 0.02]}>
+      <T.BoxGeometry args={[0.22, 0.22, 0.16]} />
+      <T.MeshStandardMaterial
+        color="#3b2a1c"
+        emissive="#ffb347"
+        emissiveIntensity={0.3}
+        metalness={0.45}
+        roughness={0.55}
+      />
+    </T.Mesh>
+
+    <T.PointLight
+      color="#8ce6ff"
+      decay={1.6}
+      distance={3.2}
+      intensity={2.4 * swingActiveFlare * swingLingerFade}
+      position={[0, 0, meleeParams.reach - 0.08]}
+    />
+
+    <T.Mesh position={[0, 0, meleeParams.reach]}>
+      <T.SphereGeometry args={[0.1, 12, 12]} />
+      <T.MeshBasicMaterial
+        color="#ffffff"
+        opacity={(0.45 * swingActiveFlare + 0.1) * swingLingerFade}
+        transparent
+      />
+    </T.Mesh>
+  </T.Group>
+{/if}
+
+<T.Mesh
+  bind:ref={trailMesh}
+  position={[
+    swingCenter[0],
+    swingCenter[1] + meleeHeightOffset + 0.05,
+    swingCenter[2],
+  ]}
+  rotation={[0, swingFacingYaw, 0]}
+  renderOrder={3}
+  frustumCulled={false}
+/>
+
+{#if isSwingingVisual}
+  <T.PointLight
+    color={meleeTrailSettings.edgeColor}
+    decay={1.6}
+    distance={6.5}
+    intensity={6 * swingLingerFade}
+    position={[
+      swingCenter[0] + Math.sin(swingLightYaw) * swingLightRadial,
+      swingCenter[1] + meleeHeightOffset + 0.12,
+      swingCenter[2] + Math.cos(swingLightYaw) * swingLightRadial,
+    ]}
+  />
+{/if}
 
 {#if showDebugGeometry}
   <T.Group position={lookTarget.toArray()}>

@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { Component } from "svelte";
   import { onMount } from "svelte";
+  import { DEFAULT_SWING, type SwingParams } from "$lib/combat/melee-swing";
   import PhysicsShowcase from "$lib/components/physics-showcase.svelte";
+  import type { MeleeTrailSettings } from "$lib/components/player-controller.svelte";
   import WeaponLabModal from "$lib/components/weapon-lab-modal.svelte";
   import { createDungeonLayout } from "$lib/config/dungeon-layout";
   import type { SceneSettings } from "$lib/config/scene-settings";
@@ -43,6 +45,34 @@
   let weaponEdges = $state.raw(defaultWeaponGraph.edges);
 
   const weaponPreview = $derived(computeWeaponBuild(weaponNodes, weaponEdges));
+
+  const swingParams = $derived<SwingParams>({
+    ...DEFAULT_SWING,
+    durationMs: settings.meleeDurationMs,
+    endAngle: settings.meleeArcSpan / 2,
+    reach: settings.meleeReach,
+    startAngle: -settings.meleeArcSpan / 2,
+  });
+  const trailSettings = $derived<MeleeTrailSettings>({
+    bandAlphas: [
+      settings.meleeBand1Alpha,
+      settings.meleeBand2Alpha,
+      settings.meleeBand3Alpha,
+    ],
+    bandCenters: [
+      settings.meleeBand1Center,
+      settings.meleeBand2Center,
+      settings.meleeBand3Center,
+    ],
+    bandWidths: [
+      settings.meleeBand1Width,
+      settings.meleeBand2Width,
+      settings.meleeBand3Width,
+    ],
+    coreColor: settings.meleeCoreColor,
+    edgeColor: settings.meleeEdgeColor,
+    tailLength: settings.meleeTailLength,
+  });
 
   const resetScene = () => {
     sceneResetKey += 1;
@@ -97,7 +127,7 @@
 
     return settings.cameraMode === "orbit"
       ? "Mouse to orbit, WASD to pan camera, E opens Weapon Lab"
-      : "Mouse aim, LMB shoot, WASD move, walk through doorways, grab treasure artifacts, Space jump, E opens Weapon Lab";
+      : "Mouse aim, LMB shoot, RMB/F melee, WASD move, walk through doorways, grab treasure artifacts, Space jump, E opens Weapon Lab";
   });
 
   onMount(() => {
@@ -165,6 +195,11 @@
       gravityY={settings.gravityY}
       jumpSpeed={settings.jumpSpeed}
       lookHeight={settings.lookHeight}
+      meleeCooldownMs={settings.meleeCooldownMs}
+      meleeHitboxPadding={settings.meleeHitboxPadding}
+      meleeParams={swingParams}
+      meleeShowSword={settings.meleeShowSword}
+      meleeTrailSettings={trailSettings}
       moveResponsiveness={settings.moveResponsiveness}
       moveSpeed={settings.moveSpeed}
       onCollectArtifact={collectArtifact}

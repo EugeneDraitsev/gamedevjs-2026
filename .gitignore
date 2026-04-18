@@ -16,6 +16,7 @@ Thumbs.db
 .idea/
 .vscode/
 .junie/
+.claude/
 *.swp
 *.swo
 
