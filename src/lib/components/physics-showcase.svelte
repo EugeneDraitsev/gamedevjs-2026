@@ -31,6 +31,7 @@
   import Projectile, {
     type ProjectileData,
   } from "$lib/components/projectile.svelte";
+  import SceneRendererConfig from "$lib/components/scene-renderer-config.svelte";
   import ShootingTarget from "$lib/components/shooting-target.svelte";
   import type {
     DungeonLayout,
@@ -2405,7 +2406,7 @@
 
 <div class="scene">
   <Canvas shadows={PCFShadowMap} dpr={2}>
-    <T.Color attach="background" args={['#040816']} />
+    <SceneRendererConfig />
     <T.Fog attach="fog" args={['#040816', 13, 24]} />
 
     <T.PerspectiveCamera
