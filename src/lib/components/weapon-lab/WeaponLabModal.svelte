@@ -147,9 +147,10 @@
           onAddModule={addNode}
         />
 
-        <WeaponLabCanvas bind:edges bind:nodes {resetLayout} {slotStates} />
-
-        <WeaponLabPreview {preview} />
+        <div class="workspace">
+          <WeaponLabCanvas bind:edges bind:nodes {resetLayout} {slotStates} />
+          <WeaponLabPreview {preview} />
+        </div>
       </div>
     </section>
   </div>
@@ -160,15 +161,18 @@
     position: fixed;
     inset: 0;
     z-index: 30;
-    padding: 1rem;
-    background: rgba(2, 7, 16, 0.68);
+    display: grid;
+    place-items: center;
+    padding: clamp(1rem, 3vw, 2.5rem);
+    background: rgba(2, 7, 16, 0.54);
     backdrop-filter: blur(12px);
   }
 
   .modal {
     display: grid;
     grid-template-rows: auto 1fr;
-    block-size: calc(100vh - 2rem);
+    inline-size: min(1380px, 100%);
+    max-block-size: min(88vh, 920px);
     overflow: hidden;
     color: #eff7ff;
     background:
@@ -211,7 +215,14 @@
 
   .layout {
     display: grid;
-    grid-template-columns: 19rem minmax(0, 1fr) 18rem;
+    grid-template-columns: 17rem minmax(0, 1fr);
+    min-block-size: 0;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    min-inline-size: 0;
     min-block-size: 0;
   }
 
@@ -221,14 +232,17 @@
     gap: 0.9rem;
     padding: 1rem;
     overflow: auto;
+  }
+
+  :global(.palette) {
     border-inline-end: 1px solid rgba(125, 211, 252, 0.08);
   }
 
   :global(.preview) {
-    border-inline: 1px solid rgba(125, 211, 252, 0.08);
+    background: rgba(5, 13, 22, 0.78);
+    border-top: 1px solid rgba(125, 211, 252, 0.08);
   }
 
-  :global(.palette-status),
   :global(.preview-card),
   :global(.palette-empty),
   :global(.rarity-group) {
@@ -236,7 +250,6 @@
     gap: 0.65rem;
   }
 
-  :global(.palette-status span),
   :global(.palette-empty span),
   :global(.preview-head span),
   :global(.preview span),
@@ -365,6 +378,8 @@
   }
 
   :global(.preview-card) {
+    grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
+    gap: 1rem;
     padding: 0.9rem;
     background: rgba(8, 18, 31, 0.82);
     border: 1px solid rgba(138, 198, 255, 0.12);
@@ -381,9 +396,20 @@
     stroke: rgba(138, 198, 255, 0.16);
   }
 
+  :global(.preview-visual),
+  :global(.preview-details) {
+    display: grid;
+    gap: 0.8rem;
+    min-inline-size: 0;
+  }
+
+  :global(.preview-head) {
+    justify-content: space-between;
+  }
+
   :global(.stat-grid) {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.55rem;
   }
 
@@ -392,6 +418,23 @@
   :global(.meta) {
     display: grid;
     gap: 0.3rem;
+  }
+
+  :global(.damage-bands) {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  :global(.damage-band-head) {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  :global(.damage-band-head strong) {
+    font-size: 0.95rem;
   }
 
   :global(.bar) {
@@ -413,7 +456,12 @@
 
   @media (max-width: 1100px) {
     .layout {
+      grid-template-rows: auto minmax(0, 1fr);
       grid-template-columns: 1fr;
+    }
+
+    .workspace {
+      grid-template-rows: minmax(24rem, 1fr) auto;
     }
 
     :global(.palette),
@@ -421,8 +469,28 @@
       border: 0;
     }
 
+    :global(.palette) {
+      border-bottom: 1px solid rgba(125, 211, 252, 0.08);
+    }
+
     :global(.flow-pane) {
       min-block-size: 26rem;
+    }
+
+    :global(.preview-card) {
+      grid-template-columns: 1fr;
+    }
+
+    :global(.stat-grid),
+    :global(.damage-bands) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 700px) {
+    :global(.stat-grid),
+    :global(.damage-bands) {
+      grid-template-columns: 1fr;
     }
   }
 </style>

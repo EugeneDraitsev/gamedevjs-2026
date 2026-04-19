@@ -18,8 +18,6 @@
     Vector3,
   } from "three";
   import {
-    DEFAULT_MELEE_COOLDOWN_MS,
-    DEFAULT_SWING,
     isPointInSwing,
     isSwingActive,
     type SwingParams,
@@ -33,16 +31,26 @@
   import {
     applyMeleeTrailSettings,
     createMeleeTrail,
-    DEFAULT_TRAIL_SETTINGS,
     lerpAngleShortest,
-    meleeHeightOffset,
     trailFadeMs,
   } from "$lib/components/game/player/melee-trail";
   import PlayerDebugMarkers from "$lib/components/game/player/PlayerDebugMarkers.svelte";
   import PlayerMeleeVisuals from "$lib/components/game/player/PlayerMeleeVisuals.svelte";
   import { getDesiredHorizontalVelocity as resolveHorizontalVelocity } from "$lib/game/player-controls";
-  import type { CameraMode, MeleeFrame, Vec3 } from "$lib/types/game";
+  import { getGameSceneContext } from "$lib/stores/scene-context";
+  import type { CameraMode, Vec3 } from "$lib/types/game";
   import type { PlayerControllerProps } from "$lib/types/game-components";
+
+  const scene = getGameSceneContext();
+  const { player, room, crosshair } = scene;
+  const settings = $derived(scene.settings);
+
+  let {
+    onMeleeFrame,
+    onPositionChange,
+    onShoot,
+    orbitControls,
+  }: PlayerControllerProps = $props();
 
   const pressed = new Set<string>();
   const orbitPressed = new Set<string>();
@@ -73,6 +81,7 @@
   const projectileHeightOffset = 0.18;
   const shootCooldownMs = 180;
   const DYNAMIC_BODY_TYPE: RigidBodyType = 0 as RigidBodyType;
+  const shellYawSmoothing = 14;
 
   let jumpRequested = false;
   let shootRequested = false;
@@ -90,51 +99,21 @@
   const swingHitBodies = new Set<number>();
   let shellGroup = $state<Group>();
   let shellYaw = 0;
-  const shellYawSmoothing = 14;
   let isSwingingVisual = $state(false);
   let swingVisualT = $state(0);
   let swingFacingYaw = $state(0);
   let swingCenter = $state<[number, number, number]>([0, 0, 0]);
   let trailGeometry = $state<BufferGeometry>();
   let trailMaterial = $state<ShaderMaterial>();
-
-  let {
-    cameraMode = "follow",
-    cameraSmoothing = 10,
-    controlsLocked = false,
-    followDistance = 10.8,
-    followPitch = 58,
-    followYaw = 0,
-    hitFlash = 0,
-    jumpSpeed = 6.2,
-    lookHeight = 0.4,
-    moveResponsiveness = 12,
-    moveSpeed = 7.5,
-    moveSpeedFactor = 1,
-    impactNonce = 0,
-    impactVelocity = null,
-    meleeCooldownMs = DEFAULT_MELEE_COOLDOWN_MS,
-    meleeHitboxPadding = 0,
-    meleeParams = DEFAULT_SWING,
-    meleeShowSword = true,
-    meleeSwordOpacity = 0.5,
-    meleeTrailSettings = DEFAULT_TRAIL_SETTINGS,
-    onMeleeFrame,
-    onMouseMove,
-    onPositionChange,
-    onShoot,
-    orbitControls,
-    playerLinearDamping = 1.6,
-    showDebugGeometry = false,
-    teleportNonce = 0,
-    teleportTarget = null,
-    weaponBuild,
-  }: PlayerControllerProps = $props();
   let previousCameraMode: CameraMode | undefined;
+
+  const meleeParams = $derived(scene.meleeParams);
+  const meleeCooldownMs = $derived(settings.meleeCooldownMs);
+  const meleeTrailSettings = $derived(scene.meleeTrailSettings);
 
   const meleeHitboxParams = $derived<SwingParams>({
     ...meleeParams,
-    reach: meleeParams.reach + meleeHitboxPadding,
+    reach: meleeParams.reach + settings.meleeHitboxPadding,
   });
   const swingBladeLength = $derived(
     (meleeParams.reach - meleeParams.innerRadius) * 0.8
@@ -163,6 +142,7 @@
   const swordRotationY = $derived(
     swingGroupRotationY(Math.min(1, swingVisualT), swingFacingYaw, meleeParams)
   );
+
   $effect(() => {
     const { geometry, material } = createMeleeTrail(meleeParams);
 
@@ -191,7 +171,7 @@
   const { pause, rapier, resume, world } = useRapier();
 
   $effect(() => {
-    if (controlsLocked) {
+    if (scene.controlsLocked) {
       pause();
     } else {
       resume();
@@ -199,36 +179,43 @@
   });
 
   $effect(() => {
-    rigidBody?.setLinearDamping(playerLinearDamping);
+    rigidBody?.setLinearDamping(settings.playerLinearDamping);
   });
 
   $effect(() => {
-    teleportNonce;
+    player.impactNonce;
     const body = rigidBody;
+    const impact = player.impactVelocity;
 
-    if (!(body && teleportTarget)) {
+    if (!(body && impact)) {
+      return;
+    }
+
+    body.applyImpulse({ x: impact[0], y: impact[1], z: impact[2] }, true);
+    body.wakeUp();
+  });
+
+  $effect(() => {
+    room.teleportNonce;
+    const body = rigidBody;
+    const target = room.teleportTarget;
+
+    if (!(body && target)) {
       return;
     }
 
     body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    body.setTranslation(
-      { x: teleportTarget[0], y: teleportTarget[1], z: teleportTarget[2] },
-      true
-    );
+    body.setTranslation({ x: target[0], y: target[1], z: target[2] }, true);
     body.wakeUp();
 
-    playerPosition.set(...teleportTarget);
-    smoothedAnchor.set(...teleportTarget);
-    cameraTarget.set(...teleportTarget);
-    lookTarget.set(
-      teleportTarget[0],
-      teleportTarget[1] + lookHeight,
-      teleportTarget[2]
-    );
+    playerPosition.set(...target);
+    smoothedAnchor.set(...target);
+    cameraTarget.set(...target);
+    lookTarget.set(target[0], target[1] + settings.lookHeight, target[2]);
   });
 
   $effect(() => {
-    if (cameraMode === "orbit" || controlsLocked) {
+    if (settings.cameraMode === "orbit" || scene.sceneControlsLocked) {
       jumpRequested = false;
       shootRequested = false;
       shootingHeld = false;
@@ -238,28 +225,9 @@
   });
 
   $effect(() => {
-    if (cameraMode !== "orbit" || controlsLocked) {
+    if (settings.cameraMode !== "orbit" || scene.sceneControlsLocked) {
       orbitPressed.clear();
     }
-  });
-
-  $effect(() => {
-    impactNonce;
-    const body = rigidBody;
-
-    if (!(body && impactVelocity)) {
-      return;
-    }
-
-    body.applyImpulse(
-      {
-        x: impactVelocity[0],
-        y: impactVelocity[1],
-        z: impactVelocity[2],
-      },
-      true
-    );
-    body.wakeUp();
   });
 
   const isGrounded = (body: RapierRigidBody) => {
@@ -325,10 +293,10 @@
     pressed.clear();
   };
 
-  onMount(() => {
-    return bindPlayerInput({
-      getCameraMode: () => cameraMode,
-      getControlsLocked: () => controlsLocked,
+  onMount(() =>
+    bindPlayerInput({
+      getCameraMode: () => settings.cameraMode,
+      getControlsLocked: () => scene.sceneControlsLocked,
       onJump: () => {
         jumpRequested = true;
       },
@@ -338,7 +306,7 @@
       onMouseMove: (x, y) => {
         mouseScreenX = x;
         mouseScreenY = y;
-        onMouseMove?.(x, y);
+        crosshair.set(x, y);
       },
       onReset: resetInputState,
       onShootPointerDown: (x, y) => {
@@ -353,8 +321,8 @@
       },
       orbitPressed,
       pressed,
-    });
-  });
+    })
+  );
 
   const getDesiredHorizontalVelocity = (
     velocity: ReturnType<RapierRigidBody["linvel"]>
@@ -362,8 +330,8 @@
     resolveHorizontalVelocity(
       pressed,
       moveDirection,
-      moveSpeed,
-      moveSpeedFactor,
+      settings.moveSpeed,
+      scene.moveSpeedFactor,
       velocity
     );
 
@@ -371,14 +339,14 @@
     const velocity = body.linvel();
     isGroundedState = isGrounded(body);
 
-    if (cameraMode !== "orbit" && !controlsLocked) {
-      const response = Math.min(1, delta * moveResponsiveness);
+    if (settings.cameraMode !== "orbit" && !scene.sceneControlsLocked) {
+      const response = Math.min(1, delta * settings.moveResponsiveness);
       const desiredVelocity = getDesiredHorizontalVelocity(velocity);
       let nextVelocityY = velocity.y;
 
       if (jumpRequested && isGroundedState) {
         body.wakeUp();
-        nextVelocityY = jumpSpeed;
+        nextVelocityY = settings.jumpSpeed;
       }
 
       jumpVelocity.set(
@@ -396,14 +364,14 @@
     activeCamera: NonNullable<typeof camera.current>,
     delta: number
   ) => {
-    const followFactor = Math.min(1, delta * cameraSmoothing);
+    const followFactor = Math.min(1, delta * settings.cameraSmoothing);
     smoothedAnchor.lerp(playerPosition, followFactor);
 
     lookTarget.copy(smoothedAnchor);
-    lookTarget.y += lookHeight;
+    lookTarget.y += settings.lookHeight;
 
     if (
-      cameraMode === "orbit" &&
+      settings.cameraMode === "orbit" &&
       previousCameraMode !== "orbit" &&
       orbitControls
     ) {
@@ -411,16 +379,16 @@
       orbitControls.update();
     }
 
-    previousCameraMode = cameraMode;
+    previousCameraMode = settings.cameraMode;
 
-    if (cameraMode === "follow") {
-      const pitch = MathUtils.degToRad(followPitch);
-      const yaw = MathUtils.degToRad(followYaw);
+    if (settings.cameraMode === "follow") {
+      const pitch = MathUtils.degToRad(settings.followPitch);
+      const yaw = MathUtils.degToRad(settings.followYaw);
 
       cameraOffset.set(
-        Math.sin(yaw) * Math.cos(pitch) * followDistance,
-        Math.sin(pitch) * followDistance,
-        Math.cos(yaw) * Math.cos(pitch) * followDistance
+        Math.sin(yaw) * Math.cos(pitch) * settings.followDistance,
+        Math.sin(pitch) * settings.followDistance,
+        Math.cos(yaw) * Math.cos(pitch) * settings.followDistance
       );
 
       cameraTarget.copy(smoothedAnchor).add(cameraOffset);
@@ -561,8 +529,8 @@
       meleeRequested &&
       !swingActiveFlag &&
       cooldownReady &&
-      cameraMode !== "orbit" &&
-      !controlsLocked
+      settings.cameraMode !== "orbit" &&
+      !scene.sceneControlsLocked
     ) {
       lastSwingStartedAt = now;
       startMeleeSwing(body, activeCamera);
@@ -626,7 +594,11 @@
     body: RapierRigidBody,
     activeCamera: NonNullable<typeof camera.current>
   ) => {
-    if (!shootRequested || cameraMode === "orbit" || controlsLocked) {
+    if (
+      !shootRequested ||
+      settings.cameraMode === "orbit" ||
+      scene.sceneControlsLocked
+    ) {
       shootRequested = false;
       return;
     }
@@ -666,8 +638,9 @@
     }
 
     forwardDirection.normalize();
-    const projectileSpeed = weaponBuild.speed;
-    const spawnOffset = projectileForwardOffset + weaponBuild.radius * 2.4;
+    const projectileSpeed = scene.weaponBuild.speed;
+    const spawnOffset =
+      projectileForwardOffset + scene.weaponBuild.radius * 2.4;
 
     shootSpawnPosition
       .set(translation.x, translation.y + projectileHeightOffset, translation.z)
@@ -695,7 +668,7 @@
     delta: number
   ) => {
     if (
-      cameraMode !== "orbit" ||
+      settings.cameraMode !== "orbit" ||
       !orbitControls ||
       orbitPressed.size === 0 ||
       !(activeCamera instanceof PerspectiveCamera)
@@ -745,6 +718,7 @@
     updateBodyMovement(body, delta);
 
     const translation = body.translation();
+
     playerPosition.set(translation.x, translation.y, translation.z);
     onPositionChange?.([translation.x, translation.y, translation.z]);
     groundProbePosition.set(
@@ -773,7 +747,7 @@
     bind:rigidBody
     ccd
     canSleep={false}
-    linearDamping={playerLinearDamping}
+    linearDamping={settings.playerLinearDamping}
     lockRotations
   >
     <Collider shape="ball" args={[0.55]} friction={1.4} restitution={0.08} />
@@ -781,14 +755,14 @@
 </T.Group>
 
 <T.Group bind:ref={shellGroup}>
-  <OrbKnight scale={0.55} autoRotate={false} {hitFlash} />
+  <OrbKnight scale={0.55} autoRotate={false} hitFlash={scene.playerHitFlash} />
 </T.Group>
 
 <PlayerMeleeVisuals
   {isSwingingVisual}
   {meleeParams}
-  {meleeShowSword}
-  {meleeSwordOpacity}
+  meleeShowSword={settings.meleeShowSword}
+  meleeSwordOpacity={settings.meleeSwordOpacity}
   {meleeTrailSettings}
   {swingActiveFlare}
   {swingBladeLength}
@@ -813,5 +787,5 @@
   ]}
   isGrounded={isGroundedState}
   lookTarget={[lookTarget.x, lookTarget.y, lookTarget.z]}
-  {showDebugGeometry}
+  showDebugGeometry={settings.showDebugGeometry}
 />

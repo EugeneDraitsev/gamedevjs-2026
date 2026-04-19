@@ -193,8 +193,10 @@ export interface SceneBossGearMount {
 
 export interface SceneOverlayProps {
   animationNow: number;
+  artifactPickupAt?: number;
   artifactPickupProgress: number;
   bossIntroProgress: number;
+  bossIntroStartedAt?: number;
   bossIntroTitle: string;
   cameraMode: CameraMode;
   controlsLocked: boolean;
@@ -202,6 +204,7 @@ export interface SceneOverlayProps {
   crosshairY: number;
   dungeonFloor: number;
   floorIntroProgress: number;
+  floorIntroStartedAt?: number;
   pickedArtifactTemplate: WeaponNodeTemplate | null;
   playerHitFlash: number;
   projectedDamagePopups: ProjectedDamagePopup[];

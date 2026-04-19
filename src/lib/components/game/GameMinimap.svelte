@@ -1,38 +1,33 @@
 <script lang="ts">
-  import { getGameSceneContext } from "$lib/components/game/scene/context";
   import { getRevealedDoors } from "$lib/game/scene-layout";
+  import { getGameSceneContext } from "$lib/stores/scene-context";
 
-  const {
-    currentRoom,
-    exploredRoomSet,
-    isRoomUnlocked,
-    minimapBounds,
-    roomList,
-  } = getGameSceneContext();
+  const scene = getGameSceneContext();
+  const { room: roomStore } = scene;
 </script>
 
 <div class="minimap">
   <div
     class="minimap-grid"
-    style:grid-template-columns={`repeat(${$minimapBounds.columns}, 1.09rem)`}
-    style:grid-template-rows={`repeat(${$minimapBounds.rows}, 1.09rem)`}
+    style:grid-template-columns={`repeat(${scene.minimapBounds.columns}, 1.09rem)`}
+    style:grid-template-rows={`repeat(${scene.minimapBounds.rows}, 1.09rem)`}
   >
-    {#each $roomList as room (room.id)}
-      {#if $exploredRoomSet.has(room.id)}
+    {#each scene.roomList as room (room.id)}
+      {#if roomStore.exploredSet.has(room.id)}
         <div
           class="minimap-room"
           class:boss={room.kind === "boss"}
           class:polygon={room.kind === "polygon"}
-          class:current={room.id === $currentRoom.id}
-          class:sealed={!isRoomUnlocked(room)}
+          class:current={room.id === scene.currentRoom.id}
+          class:sealed={!scene.isRoomUnlocked(room)}
           class:treasure={room.kind === "treasure"}
-          style:grid-column={room.grid[0] - $minimapBounds.minX + 1}
-          style:grid-row={room.grid[1] - $minimapBounds.minY + 1}
+          style:grid-column={room.grid[0] - scene.minimapBounds.minX + 1}
+          style:grid-row={room.grid[1] - scene.minimapBounds.minY + 1}
         >
           {#each getRevealedDoors(room) as direction}
             <span
               class={`door ${direction}`}
-              class:locked={!isRoomUnlocked(room)}
+              class:locked={!scene.isRoomUnlocked(room)}
             ></span>
           {/each}
         </div>

@@ -1,22 +1,17 @@
 <script lang="ts">
   import { T } from "@threlte/core";
-  import { getGameSceneContext } from "$lib/components/game/scene/context";
   import EnemyActor from "$lib/components/game/scene/EnemyActor.svelte";
+  import { getGameSceneContext } from "$lib/stores/scene-context";
 
-  const {
-    activeBeams,
-    activeEnemies,
-    animationNow,
-    deflectBurstsRendered,
-    enemyShots,
-  } = getGameSceneContext();
+  const scene = getGameSceneContext();
+  const { combat, timing } = scene;
 </script>
 
-{#each $activeEnemies as enemy (enemy.id)}
-  <EnemyActor animationNow={$animationNow} {enemy} />
+{#each combat.enemies as enemy (enemy.id)}
+  <EnemyActor animationNow={timing.now} {enemy} />
 {/each}
 
-{#each $enemyShots as shot (shot.id)}
+{#each combat.enemyShots as shot (shot.id)}
   <T.Group position={shot.position}>
     <T.Mesh castShadow>
       <T.SphereGeometry args={[shot.radius, 16, 16]} />
@@ -31,7 +26,7 @@
   </T.Group>
 {/each}
 
-{#each $deflectBurstsRendered as burst (burst.id)}
+{#each scene.deflectBurstsRendered as burst (burst.id)}
   <T.Group position={burst.position}>
     {#each burst.shards as shard, shardIndex (shardIndex)}
       <T.Mesh
@@ -57,7 +52,7 @@
   </T.Group>
 {/each}
 
-{#each $activeBeams as beam (beam.id)}
+{#each combat.beams as beam (beam.id)}
   <T.Group position={beam.position} rotation={[0, beam.rotationY, 0]}>
     {#if beam.curve > 0.25}
       {#each Array.from({ length: 6 }, (__unused, index) => index) as index}

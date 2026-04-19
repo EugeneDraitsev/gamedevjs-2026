@@ -105,6 +105,7 @@ export interface WeaponBuild {
   knockback: number;
   mass: number;
   massFactor: number;
+  meleeDamage: number;
   patternLabel: string;
   pelletCount: number;
   radius: number;
@@ -126,6 +127,7 @@ interface WeaponBuildDraft {
   drag: number;
   gravity: number;
   massFactor: number;
+  meleeDamageFactor: number;
   pelletCount: number;
   radiusFactor: number;
   rocketCadence: number;
@@ -582,6 +584,7 @@ const createWeaponBuildDraft = (): WeaponBuildDraft => ({
   drag: BASE_DRAG,
   gravity: 0,
   massFactor: 1,
+  meleeDamageFactor: 1,
   pelletCount: 1,
   radiusFactor: 1,
   rocketCadence: 0,
@@ -599,6 +602,7 @@ const modifierAppliers: Record<
     draft.damageProfile[0] += 0.7 + value * 0.75;
     draft.damageProfile[1] += value * 0.05;
     draft.damageProfile[2] -= 0.3 + value * 0.25;
+    draft.meleeDamageFactor *= 1.08 + value * 0.16;
   },
   "anvil-common": (draft, value) => {
     draft.massFactor *= 1.35 + value * 1.2;
@@ -609,6 +613,7 @@ const modifierAppliers: Record<
     draft.damageProfile[0] -= 0.14 + value * 0.12;
     draft.damageProfile[1] += 0.85 + value * 0.8;
     draft.damageProfile[2] -= 0.08 + value * 0.08;
+    draft.meleeDamageFactor *= 1.14 + value * 0.18;
   },
   "cluster-uncommon": (draft, value) => {
     const count = Math.round(value);
@@ -622,6 +627,7 @@ const modifierAppliers: Record<
     draft.damageProfile[0] -= 0.18 + value * 0.15;
     draft.damageProfile[1] += 0.2 + value * 0.25;
     draft.damageProfile[2] += 0.9 + value * 0.85;
+    draft.meleeDamageFactor *= 1.2 + value * 0.22;
     draft.speedFactor *= 1.03 + value * 0.12;
   },
   "crush-uncommon": (draft, value) => {
@@ -725,6 +731,7 @@ const finalizeDraft = (draft: WeaponBuildDraft) => {
     0.02,
     0.42
   );
+  draft.meleeDamageFactor = clamp(draft.meleeDamageFactor, 0.5, 4);
   draft.ttlMs = clamp(draft.ttlMs, 900, 3600);
   draft.damageProfile[0] = clamp(draft.damageProfile[0], 0.3, 2.4);
   draft.damageProfile[1] = clamp(draft.damageProfile[1], 0.3, 2.4);
@@ -789,6 +796,10 @@ export const computeWeaponBuild = (
   finalizeDraft(draft);
 
   const damage = Math.round(BASE_DAMAGE * draft.damageFactor);
+  const meleeDamage = Math.max(
+    1,
+    Math.round(damage * 0.5 * draft.meleeDamageFactor)
+  );
   const speed = BASE_SPEED * draft.speedFactor;
   const mass = BASE_MASS * draft.massFactor;
   const radius = BASE_RADIUS * draft.radiusFactor;
@@ -854,6 +865,7 @@ export const computeWeaponBuild = (
     knockback,
     mass,
     massFactor: draft.massFactor,
+    meleeDamage,
     rocketCadence: draft.rocketCadence,
     rocketTurn: draft.rocketTurn,
     patternLabel,

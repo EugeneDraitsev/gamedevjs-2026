@@ -4,55 +4,60 @@
   import FloorIntroOverlay from "$lib/components/game/overlays/FloorIntroOverlay.svelte";
   import SceneCrosshair from "$lib/components/game/overlays/SceneCrosshair.svelte";
   import SceneDamagePopups from "$lib/components/game/overlays/SceneDamagePopups.svelte";
-  import { getGameSceneContext } from "$lib/components/game/scene/context";
+  import type { SceneOverlayProps } from "$lib/types/game";
 
-  const {
-    animationNow,
-    artifactPickupProgress,
-    bossIntroProgress,
-    bossIntroTitle,
-    cameraMode,
-    crosshairX,
-    crosshairY,
-    dungeonFloor,
-    floorIntroProgress,
-    pickedArtifactTemplate,
-    playerHitFlash,
-    projectedDamagePopups,
-    sceneControlsLocked,
-  } = getGameSceneContext();
+  let { overlays }: { overlays: SceneOverlayProps } = $props();
 </script>
 
-<SceneCrosshair
-  cameraMode={$cameraMode}
-  controlsLocked={$sceneControlsLocked}
-  crosshairX={$crosshairX}
-  crosshairY={$crosshairY}
-/>
+<div class="scene-overlays">
+  <SceneCrosshair
+    cameraMode={overlays.cameraMode}
+    controlsLocked={overlays.controlsLocked}
+    crosshairX={overlays.crosshairX}
+    crosshairY={overlays.crosshairY}
+  />
 
-<div class="damage-flash" style:opacity={$playerHitFlash * 0.66}></div>
+  <div
+    class="damage-flash"
+    style:opacity={overlays.playerHitFlash * 0.66}
+  ></div>
 
-<SceneDamagePopups
-  animationNow={$animationNow}
-  projectedDamagePopups={$projectedDamagePopups}
-/>
+  <SceneDamagePopups
+    animationNow={overlays.animationNow}
+    projectedDamagePopups={overlays.projectedDamagePopups}
+  />
 
-<BossIntroOverlay
-  bossIntroProgress={$bossIntroProgress}
-  bossIntroTitle={$bossIntroTitle}
-/>
+  {#key `${overlays.bossIntroStartedAt ?? 0}:${overlays.bossIntroTitle}`}
+    <BossIntroOverlay
+      bossIntroProgress={overlays.bossIntroProgress}
+      bossIntroTitle={overlays.bossIntroTitle}
+    />
+  {/key}
 
-<FloorIntroOverlay
-  dungeonFloor={$dungeonFloor}
-  floorIntroProgress={$floorIntroProgress}
-/>
+  {#key `${overlays.dungeonFloor}:${overlays.floorIntroStartedAt ?? 0}`}
+    <FloorIntroOverlay
+      dungeonFloor={overlays.dungeonFloor}
+      floorIntroProgress={overlays.floorIntroProgress}
+    />
+  {/key}
 
-<ArtifactPickupOverlay
-  artifactPickupProgress={$artifactPickupProgress}
-  pickedArtifactTemplate={$pickedArtifactTemplate}
-/>
+  {#key `${overlays.artifactPickupAt ?? 0}:${overlays.pickedArtifactTemplate?.type ?? ""}`}
+    <ArtifactPickupOverlay
+      artifactPickupProgress={overlays.artifactPickupProgress}
+      pickedArtifactTemplate={overlays.pickedArtifactTemplate}
+    />
+  {/key}
+</div>
 
 <style>
+  .scene-overlays {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    pointer-events: none;
+    isolation: isolate;
+  }
+
   .damage-flash {
     position: fixed;
     inset: 0;

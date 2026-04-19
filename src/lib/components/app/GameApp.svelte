@@ -211,42 +211,13 @@
 <main class="stage">
   {#key sceneResetKey}
     <GameScene
-      ambientLightIntensity={settings.ambientLightIntensity}
-      cameraFov={settings.cameraFov}
-      cameraMode={settings.cameraMode}
-      cameraSmoothing={settings.cameraSmoothing}
       collectedArtifactRoomIds={collectedArtifactRooms}
       {controlsLocked}
       {dungeon}
-      floorTheme={settings.floorTheme}
-      followDistance={settings.followDistance}
-      followPitch={settings.followPitch}
-      followYaw={settings.followYaw}
-      gravityY={settings.gravityY}
-      jumpSpeed={settings.jumpSpeed}
-      lookHeight={settings.lookHeight}
-      meleeCooldownMs={settings.meleeCooldownMs}
-      meleeHitboxPadding={settings.meleeHitboxPadding}
       meleeParams={swingParams}
-      meleeShowSword={settings.meleeShowSword}
-      meleeSwordOpacity={settings.meleeSwordOpacity}
       meleeTrailSettings={trailSettings}
-      moveResponsiveness={settings.moveResponsiveness}
-      moveSpeed={settings.moveSpeed}
       onCollectArtifact={collectArtifact}
-      playerLinearDamping={settings.playerLinearDamping}
-      shadowBias={settings.shadowBias}
-      shadowFar={settings.shadowFar}
-      shadowFrustum={settings.shadowFrustum}
-      shadowMapSize={settings.shadowMapSize}
-      shadowNormalBias={settings.shadowNormalBias}
-      showDebugGeometry={settings.showDebugGeometry}
-      showPhysicsDebug={settings.showPhysicsDebug}
-      sunIntensity={settings.sunIntensity}
-      sunPositionX={settings.sunPositionX}
-      sunPositionY={settings.sunPositionY}
-      sunPositionZ={settings.sunPositionZ}
-      wallTheme={settings.wallTheme}
+      {settings}
       weaponBuild={weaponPreview}
     />
   {/key}

@@ -22,15 +22,6 @@
 </script>
 
 <aside class="palette">
-  <div class="palette-status">
-    <strong>Module Locker</strong>
-    <span
-      >{availableModules.length}
-      loose, {modifierCount}/{modifierLimit}
-      mounted</span
-    >
-  </div>
-
   {#if groupedTemplates.length === 0}
     <div class="palette-empty">
       <strong>No loose modules</strong>

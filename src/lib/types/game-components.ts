@@ -3,7 +3,7 @@ import type { OrbitControls as OrbitControlsInstance } from "three/examples/jsm/
 import type { SwingParams } from "$lib/combat/melee-swing";
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
 import type { RoomTemplate } from "$lib/config/room-templates";
-import type { FloorTheme, WallTheme } from "$lib/config/scene-settings";
+import type { SceneSettings } from "$lib/config/scene-settings";
 import type {
   WeaponBuild,
   WeaponNodeTemplate,
@@ -13,7 +13,6 @@ import type {
   ActiveBeam,
   ActiveEnemy,
   ActiveEnemyShot,
-  CameraMode,
   DoorMarker,
   DoorSeal,
   MeleeFrame,
@@ -29,42 +28,13 @@ import type {
 } from "$lib/types/game";
 
 export interface GameSceneProps {
-  ambientLightIntensity?: number;
-  cameraFov?: number;
-  cameraMode?: CameraMode;
-  cameraSmoothing?: number;
   collectedArtifactRoomIds?: string[];
   controlsLocked?: boolean;
   dungeon: DungeonLayout;
-  floorTheme?: FloorTheme;
-  followDistance?: number;
-  followPitch?: number;
-  followYaw?: number;
-  gravityY?: number;
-  jumpSpeed?: number;
-  lookHeight?: number;
-  meleeCooldownMs?: number;
-  meleeHitboxPadding?: number;
-  meleeParams?: SwingParams;
-  meleeShowSword?: boolean;
-  meleeSwordOpacity?: number;
-  meleeTrailSettings?: MeleeTrailSettings;
-  moveResponsiveness?: number;
-  moveSpeed?: number;
+  meleeParams: SwingParams;
+  meleeTrailSettings: MeleeTrailSettings;
   onCollectArtifact?: (roomId: string, type: WeaponNodeType) => void;
-  playerLinearDamping?: number;
-  shadowBias?: number;
-  shadowFar?: number;
-  shadowFrustum?: number;
-  shadowMapSize?: number;
-  shadowNormalBias?: number;
-  showDebugGeometry?: boolean;
-  showPhysicsDebug?: boolean;
-  sunIntensity?: number;
-  sunPositionX?: number;
-  sunPositionY?: number;
-  sunPositionZ?: number;
-  wallTheme?: WallTheme;
+  settings: SceneSettings;
   weaponBuild: WeaponBuild;
 }
 
@@ -111,36 +81,10 @@ export interface GameHudProps {
 }
 
 export interface PlayerControllerProps {
-  cameraMode?: CameraMode;
-  cameraSmoothing?: number;
-  controlsLocked?: boolean;
-  followDistance?: number;
-  followPitch?: number;
-  followYaw?: number;
-  hitFlash?: number;
-  impactNonce?: number;
-  impactVelocity?: Vec3 | null;
-  jumpSpeed?: number;
-  lookHeight?: number;
-  meleeCooldownMs?: number;
-  meleeHitboxPadding?: number;
-  meleeParams?: SwingParams;
-  meleeShowSword?: boolean;
-  meleeSwordOpacity?: number;
-  meleeTrailSettings?: MeleeTrailSettings;
-  moveResponsiveness?: number;
-  moveSpeed?: number;
-  moveSpeedFactor?: number;
   onMeleeFrame?: (frame: MeleeFrame) => void;
-  onMouseMove?: (x: number, y: number) => void;
   onPositionChange?: (position: Vec3) => void;
   onShoot?: (projectile: { position: Vec3; velocity: Vec3 }) => void;
   orbitControls?: OrbitControlsInstance;
-  playerLinearDamping?: number;
-  showDebugGeometry?: boolean;
-  teleportNonce?: number;
-  teleportTarget?: Vec3 | null;
-  weaponBuild: WeaponBuild;
 }
 
 export interface PlayerMeleeVisualsProps {
