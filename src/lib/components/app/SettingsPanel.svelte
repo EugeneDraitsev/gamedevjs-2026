@@ -18,6 +18,25 @@
     onResetDefaults,
     settings = $bindable(),
   }: SettingsPanelProps = $props();
+
+  let confirmAction = $state<"main-menu" | "reset" | null>(null);
+
+  const handleDangerAction = (
+    action: "main-menu" | "reset",
+    callback: (() => void) | undefined
+  ) => {
+    if (!callback) {
+      return;
+    }
+
+    if (confirmAction === action) {
+      confirmAction = null;
+      callback();
+      return;
+    }
+
+    confirmAction = action;
+  };
 </script>
 
 <section class="panel">
@@ -54,12 +73,24 @@
       {onOpenMainMenu ? "Return to Run" : "Back"}
     </button>
     {#if onOpenMainMenu}
-      <button type="button" class="menu-button" onclick={onOpenMainMenu}>
-        Back to Main Menu
+      <button
+        type="button"
+        class="menu-button"
+        class:confirming={confirmAction === "main-menu"}
+        onclick={() => handleDangerAction("main-menu", onOpenMainMenu)}
+      >
+        {confirmAction === "main-menu"
+          ? "Click Again: Main Menu"
+          : "Back to Main Menu"}
       </button>
     {/if}
-    <button type="button" class="menu-button subtle" onclick={onResetDefaults}>
-      Reset Defaults
+    <button
+      type="button"
+      class="menu-button subtle"
+      class:confirming={confirmAction === "reset"}
+      onclick={() => handleDangerAction("reset", onResetDefaults)}
+    >
+      {confirmAction === "reset" ? "Click Again: Reset" : "Reset Defaults"}
     </button>
   </div>
 </section>
@@ -176,6 +207,10 @@
 
   .menu-button.primary {
     color: rgba(255, 243, 209, 0.92);
+  }
+
+  .menu-button.confirming {
+    color: #fff3d1;
   }
 
   .menu-button.subtle {

@@ -842,7 +842,7 @@ export const getTransition = (room: DungeonRoom, position: Vec3) => {
 
   if (
     room.exits.east &&
-    x > roomTransitionInsetX &&
+    x >= roomTransitionInsetX &&
     Math.abs(z) < doorwayHalfSpan
   ) {
     return {
@@ -853,7 +853,7 @@ export const getTransition = (room: DungeonRoom, position: Vec3) => {
 
   if (
     room.exits.west &&
-    x < -roomTransitionInsetX &&
+    x <= -roomTransitionInsetX &&
     Math.abs(z) < doorwayHalfSpan
   ) {
     return {
@@ -864,7 +864,7 @@ export const getTransition = (room: DungeonRoom, position: Vec3) => {
 
   if (
     room.exits.north &&
-    z < -roomTransitionInsetZ &&
+    z <= -roomTransitionInsetZ &&
     Math.abs(x) < doorwayHalfSpan
   ) {
     return {
@@ -875,7 +875,7 @@ export const getTransition = (room: DungeonRoom, position: Vec3) => {
 
   if (
     room.exits.south &&
-    z > roomTransitionInsetZ &&
+    z >= roomTransitionInsetZ &&
     Math.abs(x) < doorwayHalfSpan
   ) {
     return {

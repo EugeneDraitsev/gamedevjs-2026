@@ -17,9 +17,12 @@
   import {
     computeWeaponBuild,
     createDefaultWeaponGraph,
+    type WeaponFlowEdge,
+    type WeaponFlowNode,
     type WeaponNodeType,
   } from "$lib/config/weapon-graph";
   import { isEditableTarget } from "$lib/game/dom";
+  import { loadRunSave, saveRunSave } from "$lib/game/run-save";
   import type { MeleeTrailSettings } from "$lib/types/game";
 
   interface GameAppProps {
@@ -40,6 +43,7 @@
   let weaponLabOpen = $state(false);
   let collectedArtifactRooms = $state<string[]>([]);
   let floorIndex = $state(1);
+  let runReady = $state(page.url.searchParams.get("continue") !== "1");
 
   const startingDungeon = $derived.by(() =>
     createDungeonLayout(`${seed}-f1`, 1)
@@ -51,8 +55,8 @@
 
   const defaultWeaponGraph = createDefaultWeaponGraph();
 
-  let weaponNodes = $state.raw(defaultWeaponGraph.nodes);
-  let weaponEdges = $state.raw(defaultWeaponGraph.edges);
+  let weaponNodes = $state.raw<WeaponFlowNode[]>(defaultWeaponGraph.nodes);
+  let weaponEdges = $state.raw<WeaponFlowEdge[]>(defaultWeaponGraph.edges);
 
   const weaponPreview = $derived(computeWeaponBuild(weaponNodes, weaponEdges));
   const controlsLocked = $derived(settingsOpen || weaponLabOpen);
@@ -150,11 +154,37 @@
   });
 
   $effect(() => {
+    if (!runReady) {
+      return;
+    }
+
+    saveRunSave(seed, {
+      collectedArtifactRooms,
+      floorIndex,
+      looseModules,
+      weaponEdges,
+      weaponNodes,
+    });
+  });
+
+  $effect(() => {
     seed;
     looseModules = [...startingDungeon.initialModules];
   });
 
   onMount(() => {
+    const savedRun = loadRunSave(seed);
+
+    if (page.url.searchParams.get("continue") === "1" && savedRun) {
+      collectedArtifactRooms = savedRun.collectedArtifactRooms;
+      floorIndex = savedRun.floorIndex;
+      looseModules = savedRun.looseModules;
+      weaponEdges = savedRun.weaponEdges;
+      weaponNodes = savedRun.weaponNodes;
+    }
+
+    runReady = true;
+
     let isActive = true;
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -209,18 +239,20 @@
 </svelte:head>
 
 <main class="stage">
-  {#key sceneResetKey}
-    <GameScene
-      collectedArtifactRoomIds={collectedArtifactRooms}
-      {controlsLocked}
-      {dungeon}
-      meleeParams={swingParams}
-      meleeTrailSettings={trailSettings}
-      onCollectArtifact={collectArtifact}
-      {settings}
-      weaponBuild={weaponPreview}
-    />
-  {/key}
+  {#if runReady}
+    {#key sceneResetKey}
+      <GameScene
+        collectedArtifactRoomIds={collectedArtifactRooms}
+        {controlsLocked}
+        {dungeon}
+        meleeParams={swingParams}
+        meleeTrailSettings={trailSettings}
+        onCollectArtifact={collectArtifact}
+        {settings}
+        weaponBuild={weaponPreview}
+      />
+    {/key}
+  {/if}
 
   {#if debugEnabled && DebugPane}
     <DebugPane

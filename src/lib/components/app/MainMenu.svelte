@@ -4,13 +4,20 @@
   interface MainMenuProps {
     canResume: boolean;
     floorIndex: number;
+    onContinue?: () => void;
     onOpenSettings: () => void;
     onPlay: () => void;
     seed: string;
   }
 
-  let { canResume, floorIndex, onOpenSettings, onPlay, seed }: MainMenuProps =
-    $props();
+  let {
+    canResume,
+    floorIndex,
+    onContinue,
+    onOpenSettings,
+    onPlay,
+    seed,
+  }: MainMenuProps = $props();
 </script>
 
 <section class="main-menu">
@@ -29,12 +36,18 @@
     <p class="menu-tagline">Descend into the sealed engine below.</p>
 
     <nav class="menu-actions" aria-label="Main menu">
-      <button
-        type="button"
-        class="menu-action menu-action-primary"
-        onclick={onPlay}
-      >
-        {canResume ? "Continue" : "New Game"}
+      {#if canResume && onContinue}
+        <button
+          type="button"
+          class="menu-action menu-action-primary"
+          onclick={onContinue}
+        >
+          Continue Run
+          <small>Floor {floorIndex}</small>
+        </button>
+      {/if}
+      <button type="button" class="menu-action" onclick={onPlay}>
+        New Game
       </button>
       <button type="button" class="menu-action" onclick={onOpenSettings}>
         Settings
@@ -165,7 +178,9 @@
 
   .menu-action {
     position: relative;
-    display: block;
+    display: grid;
+    gap: 0.16rem;
+    justify-items: start;
     min-inline-size: 9.5rem;
     min-block-size: 2rem;
     padding: 0.08rem 0.9rem 0.45rem 0.1rem;
@@ -217,6 +232,14 @@
 
   .menu-action-primary {
     color: rgba(255, 243, 209, 0.92);
+  }
+
+  .menu-action small {
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: rgba(221, 205, 171, 0.56);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
   }
 
   @media (max-width: 1100px), (max-height: 860px) {

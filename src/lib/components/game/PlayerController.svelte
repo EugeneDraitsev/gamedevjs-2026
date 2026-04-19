@@ -37,6 +37,7 @@
   import PlayerDebugMarkers from "$lib/components/game/player/PlayerDebugMarkers.svelte";
   import PlayerMeleeVisuals from "$lib/components/game/player/PlayerMeleeVisuals.svelte";
   import { getDesiredHorizontalVelocity as resolveHorizontalVelocity } from "$lib/game/player-controls";
+  import { clampToRoom } from "$lib/game/scene-layout";
   import { getGameSceneContext } from "$lib/stores/scene-context";
   import type { CameraMode, Vec3 } from "$lib/types/game";
   import type { PlayerControllerProps } from "$lib/types/game-components";
@@ -82,6 +83,8 @@
   const shootCooldownMs = 180;
   const DYNAMIC_BODY_TYPE: RigidBodyType = 0 as RigidBodyType;
   const shellYawSmoothing = 14;
+  const playerBodyRadius = 0.55;
+  const wallUnstuckInset = 0.08;
 
   let jumpRequested = false;
   let shootRequested = false;
@@ -707,6 +710,53 @@
     orbitControls.update();
   };
 
+  const keepBodyInRoom = (body: RapierRigidBody) => {
+    const translation = body.translation();
+    const clamped = clampToRoom(
+      [translation.x, translation.y, translation.z],
+      playerBodyRadius
+    );
+
+    if (
+      clamped[0] === translation.x &&
+      clamped[1] === translation.y &&
+      clamped[2] === translation.z
+    ) {
+      return;
+    }
+
+    const velocity = body.linvel();
+    const hitMinX = clamped[0] !== translation.x && translation.x < clamped[0];
+    const hitMaxX = clamped[0] !== translation.x && translation.x > clamped[0];
+    const hitMinZ = clamped[2] !== translation.z && translation.z < clamped[2];
+    const hitMaxZ = clamped[2] !== translation.z && translation.z > clamped[2];
+    let nextVelocityX = velocity.x;
+    let nextVelocityZ = velocity.z;
+
+    if (hitMinX) {
+      nextVelocityX = Math.max(0, velocity.x);
+    } else if (hitMaxX) {
+      nextVelocityX = Math.min(0, velocity.x);
+    }
+
+    if (hitMinZ) {
+      nextVelocityZ = Math.max(0, velocity.z);
+    } else if (hitMaxZ) {
+      nextVelocityZ = Math.min(0, velocity.z);
+    }
+
+    body.setTranslation({ x: clamped[0], y: clamped[1], z: clamped[2] }, true);
+    body.setLinvel(
+      {
+        x: nextVelocityX,
+        y: velocity.y,
+        z: nextVelocityZ,
+      },
+      true
+    );
+    body.wakeUp();
+  };
+
   useTask((delta) => {
     const body = rigidBody;
     const activeCamera = camera.current;
@@ -716,6 +766,7 @@
     }
 
     updateBodyMovement(body, delta);
+    keepBodyInRoom(body);
 
     const translation = body.translation();
 
@@ -735,8 +786,17 @@
     if (shellGroup) {
       const aimYaw = resolveFacingYaw(body, activeCamera);
       const yawAlpha = Math.min(1, delta * shellYawSmoothing);
+      const visualPosition = clampToRoom(
+        [translation.x, translation.y, translation.z],
+        playerBodyRadius + wallUnstuckInset
+      );
+
       shellYaw = lerpAngleShortest(shellYaw, aimYaw, yawAlpha);
-      shellGroup.position.set(translation.x, translation.y, translation.z);
+      shellGroup.position.set(
+        visualPosition[0],
+        visualPosition[1],
+        visualPosition[2]
+      );
       shellGroup.rotation.set(0, shellYaw, 0);
     }
   });
