@@ -6,6 +6,7 @@
   import { T, useTask, useThrelte } from "@threlte/core";
   import { Collider, RigidBody, useRapier } from "@threlte/rapier";
   import { onMount } from "svelte";
+  import OrbKnight from "$lib/components/game/OrbKnight.svelte";
   import {
     AdditiveBlending,
     BufferGeometry,
@@ -137,10 +138,19 @@
   let lastSwingStartedAt = -Number.POSITIVE_INFINITY;
   const swingHitBodies = new Set<number>();
   let swordGroup = $state<Group>();
+  let shellGroup = $state<Group>();
+  let shellYaw = 0;
+  const shellYawSmoothing = 14;
   let isSwingingVisual = $state(false);
   let swingVisualT = $state(0);
   let swingFacingYaw = $state(0);
   let swingCenter = $state<[number, number, number]>([0, 0, 0]);
+
+  const lerpAngleShortest = (from: number, to: number, alpha: number) => {
+    const TAU = Math.PI * 2;
+    const diff = (((to - from) % TAU) + TAU + Math.PI) % TAU - Math.PI;
+    return from + diff * alpha;
+  };
   const trailFadeMs = 180;
   let trailGeometry: BufferGeometry | undefined;
   let trailMaterial: ShaderMaterial | undefined;
@@ -1032,6 +1042,14 @@
     updateOrbitKeyboardCamera(activeCamera, delta);
     tryShoot(body, activeCamera);
     updateMelee(body, activeCamera);
+
+    if (shellGroup) {
+      const aimYaw = resolveFacingYaw(body, activeCamera);
+      const yawAlpha = Math.min(1, delta * shellYawSmoothing);
+      shellYaw = lerpAngleShortest(shellYaw, aimYaw, yawAlpha);
+      shellGroup.position.set(translation.x, translation.y, translation.z);
+      shellGroup.rotation.set(0, shellYaw, 0);
+    }
   });
 </script>
 
@@ -1044,81 +1062,89 @@
     lockRotations
   >
     <Collider shape="ball" args={[0.55]} friction={1.4} restitution={0.08} />
-
-    <T.Mesh castShadow>
-      <T.SphereGeometry args={[0.55, 32, 32]} />
-      <T.MeshStandardMaterial
-        color={hitFlash > 0.05 ? "#ff8b8b" : "#f9c74f"}
-        emissive="#ff7b7b"
-        emissiveIntensity={hitFlash * 0.55}
-        metalness={0.18}
-        roughness={0.22}
-      />
-    </T.Mesh>
   </RigidBody>
+</T.Group>
+
+<T.Group bind:ref={shellGroup}>
+  <OrbKnight scale={0.55} autoRotate={false} {hitFlash} />
 </T.Group>
 
 {#if isSwingingVisual && meleeShowSword}
   <T.Group bind:ref={swordGroup}>
-    <T.Mesh castShadow position={[0, 0, swingBladeMidZ]}>
-      <T.BoxGeometry args={[0.07, 0.12, swingBladeLength]} />
+    <T.Mesh
+      castShadow
+      position={[0, 0, meleeParams.innerRadius - 0.18]}
+      rotation={[Math.PI / 2, 0, 0]}
+    >
+      <T.CylinderGeometry args={[0.045, 0.045, 0.36, 16]} />
       <T.MeshStandardMaterial
-        color="#f6fcff"
-        emissive="#7fd8ff"
-        emissiveIntensity={1.4 * swingActiveFlare + 0.4}
-        metalness={0.72}
+        color="#18120d"
+        metalness={0.8}
         opacity={meleeSwordOpacity}
-        roughness={0.18}
+        roughness={0.45}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh castShadow position={[0, 0, meleeParams.innerRadius]}>
+      <T.CylinderGeometry args={[0.035, 0.035, 0.46, 16]} />
+      <T.MeshStandardMaterial
+        color="#c08a2f"
+        metalness={1}
+        opacity={meleeSwordOpacity}
+        roughness={0.3}
         transparent
       />
     </T.Mesh>
 
     <T.Mesh
-      castShadow
-      position={[0, 0.01, swingBladeMidZ]}
-      rotation={[0, 0, Math.PI / 4]}
+      position={[0, 0, swingBladeMidZ]}
+      rotation={[Math.PI / 2, 0, 0]}
     >
-      <T.BoxGeometry args={[0.02, 0.02, swingBladeLength * 0.98]} />
-      <T.MeshStandardMaterial
-        color="#ffffff"
-        emissive="#bff3ff"
-        emissiveIntensity={2.2 * swingActiveFlare + 0.6}
-        metalness={0.88}
+      <T.CylinderGeometry args={[0.026, 0.055, swingBladeLength, 20]} />
+      <T.MeshBasicMaterial
+        color="#eaffff"
         opacity={meleeSwordOpacity}
-        roughness={0.08}
+        toneMapped={false}
         transparent
       />
     </T.Mesh>
 
-    <T.Mesh castShadow position={[0, 0, meleeParams.innerRadius - 0.02]}>
-      <T.BoxGeometry args={[0.22, 0.22, 0.16]} />
-      <T.MeshStandardMaterial
-        color="#3b2a1c"
-        emissive="#ffb347"
-        emissiveIntensity={0.3}
-        metalness={0.45}
+    <T.Mesh
+      position={[0, 0, swingBladeMidZ]}
+      rotation={[Math.PI / 2, 0, 0]}
+    >
+      <T.CylinderGeometry args={[0.09, 0.13, swingBladeLength + 0.03, 24]} />
+      <T.MeshBasicMaterial
+        blending={AdditiveBlending}
+        color="#56efff"
+        depthWrite={false}
+        opacity={0.28 * meleeSwordOpacity * (0.5 + swingActiveFlare * 0.6)}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh
+      position={[0, 0, meleeParams.reach + 0.08]}
+      rotation={[Math.PI / 2, 0, 0]}
+    >
+      <T.ConeGeometry args={[0.055, 0.16, 20]} />
+      <T.MeshBasicMaterial
+        color="#eaffff"
         opacity={meleeSwordOpacity}
-        roughness={0.55}
+        toneMapped={false}
         transparent
       />
     </T.Mesh>
 
     <T.PointLight
-      color="#8ce6ff"
-      decay={1.6}
-      distance={3.2}
-      intensity={2.4 * meleeSwordOpacity * swingActiveFlare * swingLingerFade}
-      position={[0, 0, meleeParams.reach - 0.08]}
+      color="#62f4ff"
+      decay={1.8}
+      distance={3.1}
+      intensity={2.1 * meleeSwordOpacity * swingActiveFlare * swingLingerFade}
+      position={[0, 0, meleeParams.reach - 0.1]}
     />
-
-    <T.Mesh position={[0, 0, meleeParams.reach]}>
-      <T.SphereGeometry args={[0.1, 12, 12]} />
-      <T.MeshBasicMaterial
-        color="#ffffff"
-        opacity={meleeSwordOpacity * (0.45 * swingActiveFlare + 0.1) * swingLingerFade}
-        transparent
-      />
-    </T.Mesh>
   </T.Group>
 {/if}
 
