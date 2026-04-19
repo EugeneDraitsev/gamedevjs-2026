@@ -20,7 +20,7 @@
     type WeaponNodeType,
   } from "$lib/config/weapon-graph";
   import { isEditableTarget } from "$lib/game/dom";
-  import type { MeleeTrailSettings } from "$lib/game/types";
+  import type { MeleeTrailSettings } from "$lib/types/game";
 
   interface GameAppProps {
     seed: string;

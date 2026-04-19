@@ -1,15 +1,10 @@
 <script lang="ts">
   import orbKnightIconUrl from "$lib/assets/orb-knight-icon.svg";
+  import { getGameSceneContext } from "$lib/components/game/scene/context";
   import { playerMaxHealth } from "$lib/game/scene-layout";
 
-  interface GameHudProps {
-    playerHealth: number;
-    playerHealthRatio: number;
-    playerRecoverRatio: number;
-  }
-
-  let { playerHealth, playerHealthRatio, playerRecoverRatio }: GameHudProps =
-    $props();
+  const { playerHealth, playerHealthRatio, playerRecoverRatio } =
+    getGameSceneContext();
 </script>
 
 <div class="hud">
@@ -17,13 +12,13 @@
     <img class="hud-icon" src={orbKnightIconUrl} alt="" aria-hidden="true">
     <div
       class="hud-bar"
-      aria-label={`Health ${playerHealth}/${playerMaxHealth}`}
+      aria-label={`Health ${$playerHealth}/${playerMaxHealth}`}
     >
       <div
         class="hud-recover"
-        style:width={`${playerRecoverRatio * 100}%`}
+        style:width={`${$playerRecoverRatio * 100}%`}
       ></div>
-      <div class="hud-fill" style:width={`${playerHealthRatio * 100}%`}></div>
+      <div class="hud-fill" style:width={`${$playerHealthRatio * 100}%`}></div>
     </div>
   </div>
 </div>

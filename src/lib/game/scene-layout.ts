@@ -22,7 +22,7 @@ import type {
   SceneWallPalette,
   StaticWall,
   Vec3,
-} from "$lib/game/types";
+} from "$lib/types/game";
 
 export const doorwayHalfSpan = 1.2;
 export const floorHalfDepth = 9.1;

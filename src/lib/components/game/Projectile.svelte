@@ -4,18 +4,9 @@
   import { Collider, RigidBody } from "@threlte/rapier";
   import { onMount } from "svelte";
   import { Vector3 } from "three";
-  import {
-    getDamageAtDistance,
-    type WeaponBuild,
-  } from "$lib/config/weapon-graph";
-  import type { ProjectileData, Vec3 } from "$lib/game/types";
-
-  interface ProjectileProps {
-    data: ProjectileData;
-    enemyTargets?: Vec3[];
-    onExpire?: (id: string) => void;
-    onMove?: (id: string, position: Vec3) => void;
-  }
+  import { getDamageAtDistance } from "$lib/config/weapon-graph";
+  import type { Vec3 } from "$lib/types/game";
+  import type { ProjectileProps } from "$lib/types/game-components";
 
   const projectileVelocity = new Vector3();
   const fallbackImpulse = new Vector3();

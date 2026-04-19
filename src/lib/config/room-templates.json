@@ -3,6 +3,7 @@
     "id": "polygon-training",
     "kind": "polygon",
     "label": "Polygon",
+    "environment": "training-range",
     "layout": "floor",
     "spawnPattern": "none",
     "enemyCount": 0
@@ -146,6 +147,7 @@
     "id": "treasure-artifact",
     "kind": "treasure",
     "label": "Treasure",
+    "environment": "treasure-gears",
     "layout": "gear-floor",
     "spawnPattern": "none",
     "enemyCount": 0
@@ -154,6 +156,7 @@
     "id": "boss-warden",
     "kind": "boss",
     "label": "Foundry",
+    "environment": "boss-gears",
     "layout": "boss-foundry",
     "spawnPattern": "boss",
     "enemyTemplateId": "iron-warden",
@@ -163,6 +166,7 @@
     "id": "boss-smelter",
     "kind": "boss",
     "label": "Crucible",
+    "environment": "boss-gears",
     "layout": "boss-crucible",
     "spawnPattern": "boss",
     "enemyTemplateId": "brass-overseer",

@@ -200,15 +200,11 @@ export interface SceneOverlayProps {
   controlsLocked: boolean;
   crosshairX: number;
   crosshairY: number;
-  currentArtifactTemplate: WeaponNodeTemplate | null;
   dungeonFloor: number;
   floorIntroProgress: number;
   pickedArtifactTemplate: WeaponNodeTemplate | null;
   playerHitFlash: number;
   projectedDamagePopups: ProjectedDamagePopup[];
-  roomTransitionProgress: number;
-  roomTransitionSubtitle: string;
-  roomTransitionTitle: string;
 }
 
 export interface RoomEnemyContext {

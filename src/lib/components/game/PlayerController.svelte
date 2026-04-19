@@ -7,24 +7,17 @@
   import { Collider, RigidBody, useRapier } from "@threlte/rapier";
   import { onMount } from "svelte";
   import {
-    AdditiveBlending,
-    BufferGeometry,
-    Color,
-    DoubleSide,
-    Float32BufferAttribute,
+    type BufferGeometry,
     type Group,
     MathUtils,
-    type Mesh,
     PerspectiveCamera,
     Plane,
     Raycaster,
-    ShaderMaterial,
+    type ShaderMaterial,
     Vector2,
     Vector3,
   } from "three";
-  import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
   import {
-    buildSwingRibbonGeometryData,
     DEFAULT_MELEE_COOLDOWN_MS,
     DEFAULT_SWING,
     isPointInSwing,
@@ -36,61 +29,20 @@
     swingRibbonProgress,
   } from "$lib/combat/melee-swing";
   import OrbKnight from "$lib/components/game/OrbKnight.svelte";
-  import type { WeaponBuild } from "$lib/config/weapon-graph";
-  import { isEditableTarget } from "$lib/game/dom";
+  import { bindPlayerInput } from "$lib/components/game/player/input";
   import {
-    handleOrbitKeyDown,
-    isGameplayPreventDefaultCode,
-    getDesiredHorizontalVelocity as resolveHorizontalVelocity,
-  } from "$lib/game/player-controls";
-  import type {
-    CameraMode,
-    MeleeFrame,
-    MeleeTrailSettings,
-    Vec3,
-  } from "$lib/game/types";
-
-  const DEFAULT_TRAIL_SETTINGS: MeleeTrailSettings = {
-    bandAlphas: [1, 0.55, 0],
-    bandCenters: [0.92, 0.74, 0.5],
-    bandWidths: [0.055, 0.025, 0.035],
-    coreColor: "#ffffff",
-    edgeColor: "#7fd8ff",
-    tailLength: 0.55,
-  };
-
-  interface PlayerControllerProps {
-    cameraMode?: CameraMode;
-    cameraSmoothing?: number;
-    controlsLocked?: boolean;
-    followDistance?: number;
-    followPitch?: number;
-    followYaw?: number;
-    hitFlash?: number;
-    impactNonce?: number;
-    impactVelocity?: Vec3 | null;
-    jumpSpeed?: number;
-    lookHeight?: number;
-    meleeCooldownMs?: number;
-    meleeHitboxPadding?: number;
-    meleeParams?: SwingParams;
-    meleeShowSword?: boolean;
-    meleeSwordOpacity?: number;
-    meleeTrailSettings?: MeleeTrailSettings;
-    moveResponsiveness?: number;
-    moveSpeed?: number;
-    moveSpeedFactor?: number;
-    onMeleeFrame?: (frame: MeleeFrame) => void;
-    onMouseMove?: (x: number, y: number) => void;
-    onPositionChange?: (position: Vec3) => void;
-    onShoot?: (projectile: { position: Vec3; velocity: Vec3 }) => void;
-    orbitControls?: OrbitControls;
-    playerLinearDamping?: number;
-    showDebugGeometry?: boolean;
-    teleportNonce?: number;
-    teleportTarget?: Vec3 | null;
-    weaponBuild: WeaponBuild;
-  }
+    applyMeleeTrailSettings,
+    createMeleeTrail,
+    DEFAULT_TRAIL_SETTINGS,
+    lerpAngleShortest,
+    meleeHeightOffset,
+    trailFadeMs,
+  } from "$lib/components/game/player/melee-trail";
+  import PlayerDebugMarkers from "$lib/components/game/player/PlayerDebugMarkers.svelte";
+  import PlayerMeleeVisuals from "$lib/components/game/player/PlayerMeleeVisuals.svelte";
+  import { getDesiredHorizontalVelocity as resolveHorizontalVelocity } from "$lib/game/player-controls";
+  import type { CameraMode, MeleeFrame, Vec3 } from "$lib/types/game";
+  import type { PlayerControllerProps } from "$lib/types/game-components";
 
   const pressed = new Set<string>();
   const orbitPressed = new Set<string>();
@@ -120,7 +72,6 @@
   const projectileForwardOffset = 1.1;
   const projectileHeightOffset = 0.18;
   const shootCooldownMs = 180;
-  const meleeHeightOffset = 0.18;
   const DYNAMIC_BODY_TYPE: RigidBodyType = 0 as RigidBodyType;
 
   let jumpRequested = false;
@@ -137,7 +88,6 @@
   let swingActiveFlag = false;
   let lastSwingStartedAt = -Number.POSITIVE_INFINITY;
   const swingHitBodies = new Set<number>();
-  let swordGroup = $state<Group>();
   let shellGroup = $state<Group>();
   let shellYaw = 0;
   const shellYawSmoothing = 14;
@@ -145,75 +95,8 @@
   let swingVisualT = $state(0);
   let swingFacingYaw = $state(0);
   let swingCenter = $state<[number, number, number]>([0, 0, 0]);
-
-  const lerpAngleShortest = (from: number, to: number, alpha: number) => {
-    const TAU = Math.PI * 2;
-    const diff = ((((to - from) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
-    return from + diff * alpha;
-  };
-  const trailFadeMs = 180;
-  let trailGeometry: BufferGeometry | undefined;
-  let trailMaterial: ShaderMaterial | undefined;
-  let trailMesh = $state<Mesh>();
-
-  const trailVertexShader = /* glsl */ `
-                        varying vec2 vUv;
-                        void main() {
-                          vUv = uv;
-                          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                        }
-                      `;
-
-  const trailFragmentShader = /* glsl */ `
-                        uniform float uProgress;
-                        uniform float uIntensity;
-                        uniform float uTailLength;
-                        uniform vec3 uEdgeColor;
-                        uniform vec3 uCoreColor;
-                        uniform vec3 uBandCenters;
-                        uniform vec3 uBandWidths;
-                        uniform vec3 uBandAlphas;
-                        varying vec2 vUv;
-
-                        float bandFalloff(float y, float center, float width) {
-                          float d = (y - center) / max(width, 0.001);
-                          return exp(-d * d);
-                        }
-
-                        void main() {
-                          float edgeSoftness = mix(0.09, 0.03, clamp(uTailLength, 0.0, 1.0));
-
-                          float tailFalloff =
-                            smoothstep(0.0, edgeSoftness, vUv.x);
-                          float leadFalloff =
-                            1.0 -
-                            smoothstep(uProgress - edgeSoftness, uProgress + edgeSoftness * 0.2, vUv.x);
-                          float longitudinal = tailFalloff * leadFalloff;
-
-                          if (longitudinal <= 0.0015) discard;
-
-                          float widthScale = 1.0;
-
-                          float primary =
-                            bandFalloff(vUv.y, uBandCenters.x, uBandWidths.x * widthScale) *
-                            uBandAlphas.x;
-                          float secondary =
-                            bandFalloff(vUv.y, uBandCenters.y, uBandWidths.y * widthScale) *
-                            uBandAlphas.y;
-                          float tertiary =
-                            bandFalloff(vUv.y, uBandCenters.z, uBandWidths.z * widthScale) *
-                            uBandAlphas.z;
-                          float bandMask = max(max(primary, secondary), tertiary);
-
-                          float leadingGlow =
-                            smoothstep(uProgress - 0.18, uProgress - 0.03, vUv.x);
-                          float brightness = 0.85 + 0.6 * leadingGlow;
-                          float alpha = longitudinal * bandMask * brightness * uIntensity;
-
-                          vec3 color = mix(uEdgeColor, uCoreColor, leadingGlow * primary);
-                          gl_FragColor = vec4(color * brightness, alpha);
-                        }
-                      `;
+  let trailGeometry = $state<BufferGeometry>();
+  let trailMaterial = $state<ShaderMaterial>();
 
   let {
     cameraMode = "follow",
@@ -277,54 +160,14 @@
     meleeParams.innerRadius +
       (meleeParams.reach - meleeParams.innerRadius) * 0.7
   );
-  const swingLightYaw = $derived(
+  const swordRotationY = $derived(
     swingGroupRotationY(Math.min(1, swingVisualT), swingFacingYaw, meleeParams)
   );
   $effect(() => {
-    const data = buildSwingRibbonGeometryData(meleeParams, 56);
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new Float32BufferAttribute(data.positions, 3)
-    );
-    geometry.setAttribute("uv", new Float32BufferAttribute(data.uvs, 2));
-    geometry.setIndex(Array.from(data.indices));
-    geometry.computeBoundingSphere();
-
-    const material = new ShaderMaterial({
-      uniforms: {
-        uBandAlphas: {
-          value: new Vector3(...DEFAULT_TRAIL_SETTINGS.bandAlphas),
-        },
-        uBandCenters: {
-          value: new Vector3(...DEFAULT_TRAIL_SETTINGS.bandCenters),
-        },
-        uBandWidths: {
-          value: new Vector3(...DEFAULT_TRAIL_SETTINGS.bandWidths),
-        },
-        uCoreColor: { value: new Color(DEFAULT_TRAIL_SETTINGS.coreColor) },
-        uEdgeColor: { value: new Color(DEFAULT_TRAIL_SETTINGS.edgeColor) },
-        uIntensity: { value: 0 },
-        uProgress: { value: 0 },
-        uTailLength: { value: DEFAULT_TRAIL_SETTINGS.tailLength },
-      },
-      vertexShader: trailVertexShader,
-      fragmentShader: trailFragmentShader,
-      transparent: true,
-      depthWrite: false,
-      blending: AdditiveBlending,
-      side: DoubleSide,
-    });
+    const { geometry, material } = createMeleeTrail(meleeParams);
 
     trailGeometry = geometry;
     trailMaterial = material;
-
-    const mesh = trailMesh;
-
-    if (mesh) {
-      mesh.geometry = geometry;
-      mesh.material = material;
-    }
 
     return () => {
       geometry.dispose();
@@ -335,35 +178,13 @@
   });
 
   $effect(() => {
-    const mesh = trailMesh;
-
-    if (!(mesh && trailGeometry && trailMaterial)) {
-      return;
-    }
-
-    mesh.geometry = trailGeometry;
-    mesh.material = trailMaterial;
-  });
-
-  $effect(() => {
     const material = trailMaterial;
 
     if (!material) {
       return;
     }
 
-    const centers = material.uniforms.uBandCenters.value as Vector3;
-    const widths = material.uniforms.uBandWidths.value as Vector3;
-    const alphas = material.uniforms.uBandAlphas.value as Vector3;
-    const edge = material.uniforms.uEdgeColor.value as Color;
-    const core = material.uniforms.uCoreColor.value as Color;
-
-    centers.set(...meleeTrailSettings.bandCenters);
-    widths.set(...meleeTrailSettings.bandWidths);
-    alphas.set(...meleeTrailSettings.bandAlphas);
-    edge.set(meleeTrailSettings.edgeColor);
-    core.set(meleeTrailSettings.coreColor);
-    material.uniforms.uTailLength.value = meleeTrailSettings.tailLength;
+    applyMeleeTrailSettings(material, meleeTrailSettings);
   });
 
   const { camera } = useThrelte();
@@ -495,132 +316,44 @@
     return hit !== null && hit.normal.y > groundedNormalThreshold;
   };
 
-  const recordSingleShotPress = (event: KeyboardEvent) => {
-    if (event.repeat) {
-      return;
-    }
-
-    if (event.code === "Space") {
-      jumpRequested = true;
-    } else if (event.code === "KeyF") {
-      meleeRequested = true;
-    }
+  const resetInputState = () => {
+    jumpRequested = false;
+    shootRequested = false;
+    shootingHeld = false;
+    meleeRequested = false;
+    orbitPressed.clear();
+    pressed.clear();
   };
 
   onMount(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isEditableTarget(event.target) || controlsLocked) {
-        return;
-      }
-
-      if (cameraMode === "orbit") {
-        handleOrbitKeyDown(event, orbitPressed);
-        return;
-      }
-
-      if (isGameplayPreventDefaultCode(event.code)) {
-        event.preventDefault();
-      }
-
-      pressed.add(event.code);
-      recordSingleShotPress(event);
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      orbitPressed.delete(event.code);
-
-      if (cameraMode === "orbit" || controlsLocked) {
-        return;
-      }
-
-      pressed.delete(event.code);
-    };
-
-    const handleBlur = () => {
-      jumpRequested = false;
-      shootRequested = false;
-      shootingHeld = false;
-      meleeRequested = false;
-      orbitPressed.clear();
-      pressed.clear();
-    };
-
-    const handleMouseDown = (event: MouseEvent) => {
-      if (event.button !== 0 || cameraMode === "orbit" || controlsLocked) {
-        return;
-      }
-
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
-      mouseScreenX = event.clientX;
-      mouseScreenY = event.clientY;
-      shootingHeld = true;
-      shootRequested = true;
-    };
-
-    const handleRightMouseDown = (event: MouseEvent) => {
-      if (event.button !== 2 || cameraMode === "orbit" || controlsLocked) {
-        return;
-      }
-
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
-      event.preventDefault();
-      mouseScreenX = event.clientX;
-      mouseScreenY = event.clientY;
-      meleeRequested = true;
-    };
-
-    const handleContextMenu = (event: MouseEvent) => {
-      if (cameraMode === "orbit" || controlsLocked) {
-        return;
-      }
-
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
-      event.preventDefault();
-    };
-
-    const handleMouseUp = (event: MouseEvent) => {
-      if (event.button !== 0) {
-        return;
-      }
-
-      shootingHeld = false;
-      shootRequested = false;
-    };
-
-    const handleMouseMove = (event: MouseEvent) => {
-      mouseScreenX = event.clientX;
-      mouseScreenY = event.clientY;
-      onMouseMove?.(event.clientX, event.clientY);
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("blur", handleBlur);
-    window.addEventListener("mousedown", handleMouseDown);
-    window.addEventListener("mousedown", handleRightMouseDown);
-    window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("contextmenu", handleContextMenu);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("blur", handleBlur);
-      window.removeEventListener("mousedown", handleMouseDown);
-      window.removeEventListener("mousedown", handleRightMouseDown);
-      window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("contextmenu", handleContextMenu);
-    };
+    return bindPlayerInput({
+      getCameraMode: () => cameraMode,
+      getControlsLocked: () => controlsLocked,
+      onJump: () => {
+        jumpRequested = true;
+      },
+      onMeleeRequest: () => {
+        meleeRequested = true;
+      },
+      onMouseMove: (x, y) => {
+        mouseScreenX = x;
+        mouseScreenY = y;
+        onMouseMove?.(x, y);
+      },
+      onReset: resetInputState,
+      onShootPointerDown: (x, y) => {
+        mouseScreenX = x;
+        mouseScreenY = y;
+        shootingHeld = true;
+        shootRequested = true;
+      },
+      onShootPointerUp: () => {
+        shootingHeld = false;
+        shootRequested = false;
+      },
+      orbitPressed,
+      pressed,
+    });
   });
 
   const getDesiredHorizontalVelocity = (
@@ -817,25 +550,6 @@
     });
   };
 
-  const updateSwordVisual = (t: number) => {
-    const sword = swordGroup;
-
-    if (!sword) {
-      return;
-    }
-
-    sword.position.set(
-      swingCenter[0],
-      swingCenter[1] + meleeHeightOffset,
-      swingCenter[2]
-    );
-    sword.rotation.set(
-      0,
-      swingGroupRotationY(t, swingFacingYaw, meleeParams),
-      0
-    );
-  };
-
   const updateMelee = (
     body: RapierRigidBody,
     activeCamera: NonNullable<typeof camera.current>
@@ -868,8 +582,6 @@
     swingVisualT = t;
 
     const active = isSwingActive(t, meleeParams);
-
-    updateSwordVisual(t);
 
     if (trailMaterial) {
       const lingerElapsed = Math.max(0, elapsed - meleeParams.durationMs);
@@ -1072,121 +784,34 @@
   <OrbKnight scale={0.55} autoRotate={false} {hitFlash} />
 </T.Group>
 
-{#if isSwingingVisual && meleeShowSword}
-  <T.Group bind:ref={swordGroup}>
-    <T.Mesh
-      castShadow
-      position={[0, 0, meleeParams.innerRadius - 0.18]}
-      rotation={[Math.PI / 2, 0, 0]}
-    >
-      <T.CylinderGeometry args={[0.045, 0.045, 0.36, 16]} />
-      <T.MeshStandardMaterial
-        color="#18120d"
-        metalness={0.8}
-        opacity={meleeSwordOpacity}
-        roughness={0.45}
-        transparent
-      />
-    </T.Mesh>
-
-    <T.Mesh castShadow position={[0, 0, meleeParams.innerRadius]}>
-      <T.CylinderGeometry args={[0.035, 0.035, 0.46, 16]} />
-      <T.MeshStandardMaterial
-        color="#c08a2f"
-        metalness={1}
-        opacity={meleeSwordOpacity}
-        roughness={0.3}
-        transparent
-      />
-    </T.Mesh>
-
-    <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
-      <T.CylinderGeometry args={[0.026, 0.055, swingBladeLength, 20]} />
-      <T.MeshBasicMaterial
-        color="#eaffff"
-        opacity={meleeSwordOpacity}
-        toneMapped={false}
-        transparent
-      />
-    </T.Mesh>
-
-    <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
-      <T.CylinderGeometry args={[0.09, 0.13, swingBladeLength + 0.03, 24]} />
-      <T.MeshBasicMaterial
-        blending={AdditiveBlending}
-        color="#56efff"
-        depthWrite={false}
-        opacity={0.28 * meleeSwordOpacity * (0.5 + swingActiveFlare * 0.6)}
-        toneMapped={false}
-        transparent
-      />
-    </T.Mesh>
-
-    <T.Mesh position={[0, 0, swingBladeTipZ]} rotation={[Math.PI / 2, 0, 0]}>
-      <T.ConeGeometry args={[0.055, 0.16, 20]} />
-      <T.MeshBasicMaterial
-        color="#eaffff"
-        opacity={meleeSwordOpacity}
-        toneMapped={false}
-        transparent
-      />
-    </T.Mesh>
-
-    <T.PointLight
-      color="#62f4ff"
-      decay={1.8}
-      distance={3.1}
-      intensity={2.1 * meleeSwordOpacity * swingActiveFlare * swingLingerFade}
-      position={[0, 0, swingBladeTipZ - 0.14]}
-    />
-  </T.Group>
-{/if}
-
-<T.Mesh
-  bind:ref={trailMesh}
-  position={[
-    swingCenter[0],
-    swingCenter[1] + meleeHeightOffset + 0.05,
-    swingCenter[2],
-  ]}
-  rotation={[0, swingFacingYaw, 0]}
-  renderOrder={3}
-  frustumCulled={false}
+<PlayerMeleeVisuals
+  {isSwingingVisual}
+  {meleeParams}
+  {meleeShowSword}
+  {meleeSwordOpacity}
+  {meleeTrailSettings}
+  {swingActiveFlare}
+  {swingBladeLength}
+  {swingBladeMidZ}
+  {swingBladeTipZ}
+  {swingCenter}
+  {swingFacingYaw}
+  {swingLightRadial}
+  {swingLingerFade}
+  {swordRotationY}
+  {trailGeometry}
+  {trailMaterial}
 />
 
-{#if isSwingingVisual}
-  <T.PointLight
-    color={meleeTrailSettings.edgeColor}
-    decay={1.6}
-    distance={6.5}
-    intensity={6 * swingLingerFade}
-    position={[
-      swingCenter[0] + Math.sin(swingLightYaw) * swingLightRadial,
-      swingCenter[1] + meleeHeightOffset + 0.12,
-      swingCenter[2] + Math.cos(swingLightYaw) * swingLightRadial,
-    ]}
-  />
-{/if}
-
-{#if showDebugGeometry}
-  <T.Group position={lookTarget.toArray()}>
-    <T.Mesh>
-      <T.SphereGeometry args={[0.12, 16, 16]} />
-      <T.MeshBasicMaterial color="#8ac6ff" />
-    </T.Mesh>
-  </T.Group>
-
-  <T.Group position={cameraTarget.toArray()}>
-    <T.Mesh>
-      <T.SphereGeometry args={[0.16, 16, 16]} />
-      <T.MeshBasicMaterial color="#f72585" />
-    </T.Mesh>
-  </T.Group>
-
-  <T.Group position={groundProbePosition.toArray()}>
-    <T.Mesh>
-      <T.CylinderGeometry args={[0.035, 0.035, groundProbeLength, 10]} />
-      <T.MeshBasicMaterial color={isGroundedState ? "#78f0a4" : "#ffd166"} />
-    </T.Mesh>
-  </T.Group>
-{/if}
+<PlayerDebugMarkers
+  cameraTarget={[cameraTarget.x, cameraTarget.y, cameraTarget.z]}
+  {groundProbeLength}
+  groundProbePosition={[
+    groundProbePosition.x,
+    groundProbePosition.y,
+    groundProbePosition.z,
+  ]}
+  isGrounded={isGroundedState}
+  lookTarget={[lookTarget.x, lookTarget.y, lookTarget.z]}
+  {showDebugGeometry}
+/>

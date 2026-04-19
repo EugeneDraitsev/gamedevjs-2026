@@ -8,7 +8,7 @@ import type {
   ProjectedDamagePopup,
   RenderedDeflectBurst,
   Vec3,
-} from "$lib/game/types";
+} from "$lib/types/game";
 
 export const deflectBurstDurationMs = 240;
 
