@@ -396,7 +396,9 @@
     renderDeflectBursts(deflectBursts, animationNow)
   );
   const sceneUiVisible = $derived(
-    animationNow > 0 && currentRoomId !== "" && Boolean(sceneCamera)
+    floorIntroStartedAt > 0 &&
+      animationNow >= floorIntroStartedAt &&
+      currentRoomId !== ""
   );
   const currentRoomUnlocked = $derived(
     !isCurrentRoomCombat || releasedRoomSet.has(currentRoom.id)
