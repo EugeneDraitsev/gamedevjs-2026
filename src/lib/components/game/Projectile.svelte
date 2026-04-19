@@ -8,19 +8,13 @@
     getDamageAtDistance,
     type WeaponBuild,
   } from "$lib/config/weapon-graph";
-
-  export interface ProjectileData {
-    build: WeaponBuild;
-    id: string;
-    position: [number, number, number];
-    velocity: [number, number, number];
-  }
+  import type { ProjectileData, Vec3 } from "$lib/game/types";
 
   interface ProjectileProps {
     data: ProjectileData;
-    enemyTargets?: [number, number, number][];
+    enemyTargets?: Vec3[];
     onExpire?: (id: string) => void;
-    onMove?: (id: string, position: [number, number, number]) => void;
+    onMove?: (id: string, position: Vec3) => void;
   }
 
   const projectileVelocity = new Vector3();

@@ -6,6 +6,21 @@
   },
   "overrides": [
     {
+      "includes": ["src/lib/components/**/*.svelte"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": {
+              "level": "error",
+              "options": {
+                "filenameCases": ["PascalCase"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/app.d.ts"],
       "linter": {
         "rules": {

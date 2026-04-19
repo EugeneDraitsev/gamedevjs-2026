@@ -5,7 +5,7 @@
     Position,
     useSvelteFlow,
   } from "@xyflow/svelte";
-  import WeaponModIcon from "$lib/components/weapon-mod-icon.svelte";
+  import WeaponModIcon from "$lib/components/weapon-lab/WeaponModIcon.svelte";
   import {
     type WeaponFlowNode,
     weaponRarityColors,

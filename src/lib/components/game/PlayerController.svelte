@@ -36,26 +36,18 @@
     swingRibbonProgress,
   } from "$lib/combat/melee-swing";
   import type { WeaponBuild } from "$lib/config/weapon-graph";
-
-  type CameraMode = "follow" | "orbit";
-
-  export interface MeleeFrame {
-    active: boolean;
-    center: [number, number, number];
-    ended: boolean;
-    facingYaw: number;
-    swingId: number;
-    t: number;
-  }
-
-  export interface MeleeTrailSettings {
-    bandAlphas: [number, number, number];
-    bandCenters: [number, number, number];
-    bandWidths: [number, number, number];
-    coreColor: string;
-    edgeColor: string;
-    tailLength: number;
-  }
+  import { isEditableTarget } from "$lib/game/dom";
+  import {
+    handleOrbitKeyDown,
+    isGameplayPreventDefaultCode,
+    getDesiredHorizontalVelocity as resolveHorizontalVelocity,
+  } from "$lib/game/player-controls";
+  import type {
+    CameraMode,
+    MeleeFrame,
+    MeleeTrailSettings,
+    Vec3,
+  } from "$lib/game/types";
 
   const DEFAULT_TRAIL_SETTINGS: MeleeTrailSettings = {
     bandAlphas: [1, 0.55, 0],
@@ -75,29 +67,27 @@
     followYaw?: number;
     hitFlash?: number;
     impactNonce?: number;
-    impactVelocity?: [number, number, number] | null;
+    impactVelocity?: Vec3 | null;
     jumpSpeed?: number;
     lookHeight?: number;
     meleeCooldownMs?: number;
     meleeHitboxPadding?: number;
     meleeParams?: SwingParams;
     meleeShowSword?: boolean;
+    meleeSwordOpacity?: number;
     meleeTrailSettings?: MeleeTrailSettings;
     moveResponsiveness?: number;
     moveSpeed?: number;
     moveSpeedFactor?: number;
     onMeleeFrame?: (frame: MeleeFrame) => void;
     onMouseMove?: (x: number, y: number) => void;
-    onPositionChange?: (position: [number, number, number]) => void;
-    onShoot?: (projectile: {
-      position: [number, number, number];
-      velocity: [number, number, number];
-    }) => void;
+    onPositionChange?: (position: Vec3) => void;
+    onShoot?: (projectile: { position: Vec3; velocity: Vec3 }) => void;
     orbitControls?: OrbitControls;
     playerLinearDamping?: number;
     showDebugGeometry?: boolean;
     teleportNonce?: number;
-    teleportTarget?: [number, number, number] | null;
+    teleportTarget?: Vec3 | null;
     weaponBuild: WeaponBuild;
   }
 
@@ -157,63 +147,63 @@
   let trailMesh = $state<Mesh>();
 
   const trailVertexShader = /* glsl */ `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `;
+                      varying vec2 vUv;
+                      void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                      }
+                    `;
 
   const trailFragmentShader = /* glsl */ `
-      uniform float uProgress;
-      uniform float uIntensity;
-      uniform float uTailLength;
-      uniform vec3 uEdgeColor;
-      uniform vec3 uCoreColor;
-      uniform vec3 uBandCenters;
-      uniform vec3 uBandWidths;
-      uniform vec3 uBandAlphas;
-      varying vec2 vUv;
+                      uniform float uProgress;
+                      uniform float uIntensity;
+                      uniform float uTailLength;
+                      uniform vec3 uEdgeColor;
+                      uniform vec3 uCoreColor;
+                      uniform vec3 uBandCenters;
+                      uniform vec3 uBandWidths;
+                      uniform vec3 uBandAlphas;
+                      varying vec2 vUv;
 
-      float bandFalloff(float y, float center, float width) {
-        float d = (y - center) / max(width, 0.001);
-        return exp(-d * d);
-      }
+                      float bandFalloff(float y, float center, float width) {
+                        float d = (y - center) / max(width, 0.001);
+                        return exp(-d * d);
+                      }
 
-      void main() {
-        float edgeSoftness = mix(0.09, 0.03, clamp(uTailLength, 0.0, 1.0));
+                      void main() {
+                        float edgeSoftness = mix(0.09, 0.03, clamp(uTailLength, 0.0, 1.0));
 
-        float tailFalloff =
-          smoothstep(0.0, edgeSoftness, vUv.x);
-        float leadFalloff =
-          1.0 -
-          smoothstep(uProgress - edgeSoftness, uProgress + edgeSoftness * 0.2, vUv.x);
-        float longitudinal = tailFalloff * leadFalloff;
+                        float tailFalloff =
+                          smoothstep(0.0, edgeSoftness, vUv.x);
+                        float leadFalloff =
+                          1.0 -
+                          smoothstep(uProgress - edgeSoftness, uProgress + edgeSoftness * 0.2, vUv.x);
+                        float longitudinal = tailFalloff * leadFalloff;
 
-        if (longitudinal <= 0.0015) discard;
+                        if (longitudinal <= 0.0015) discard;
 
-        float widthScale = 1.0;
+                        float widthScale = 1.0;
 
-        float primary =
-          bandFalloff(vUv.y, uBandCenters.x, uBandWidths.x * widthScale) *
-          uBandAlphas.x;
-        float secondary =
-          bandFalloff(vUv.y, uBandCenters.y, uBandWidths.y * widthScale) *
-          uBandAlphas.y;
-        float tertiary =
-          bandFalloff(vUv.y, uBandCenters.z, uBandWidths.z * widthScale) *
-          uBandAlphas.z;
-        float bandMask = max(max(primary, secondary), tertiary);
+                        float primary =
+                          bandFalloff(vUv.y, uBandCenters.x, uBandWidths.x * widthScale) *
+                          uBandAlphas.x;
+                        float secondary =
+                          bandFalloff(vUv.y, uBandCenters.y, uBandWidths.y * widthScale) *
+                          uBandAlphas.y;
+                        float tertiary =
+                          bandFalloff(vUv.y, uBandCenters.z, uBandWidths.z * widthScale) *
+                          uBandAlphas.z;
+                        float bandMask = max(max(primary, secondary), tertiary);
 
-        float leadingGlow =
-          smoothstep(uProgress - 0.18, uProgress - 0.03, vUv.x);
-        float brightness = 0.85 + 0.6 * leadingGlow;
-        float alpha = longitudinal * bandMask * brightness * uIntensity;
+                        float leadingGlow =
+                          smoothstep(uProgress - 0.18, uProgress - 0.03, vUv.x);
+                        float brightness = 0.85 + 0.6 * leadingGlow;
+                        float alpha = longitudinal * bandMask * brightness * uIntensity;
 
-        vec3 color = mix(uEdgeColor, uCoreColor, leadingGlow * primary);
-        gl_FragColor = vec4(color * brightness, alpha);
-      }
-    `;
+                        vec3 color = mix(uEdgeColor, uCoreColor, leadingGlow * primary);
+                        gl_FragColor = vec4(color * brightness, alpha);
+                      }
+                    `;
 
   let {
     cameraMode = "follow",
@@ -234,6 +224,7 @@
     meleeHitboxPadding = 0,
     meleeParams = DEFAULT_SWING,
     meleeShowSword = true,
+    meleeSwordOpacity = 0.5,
     meleeTrailSettings = DEFAULT_TRAIL_SETTINGS,
     onMeleeFrame,
     onMouseMove,
@@ -363,7 +354,15 @@
   });
 
   const { camera } = useThrelte();
-  const { rapier, world } = useRapier();
+  const { pause, rapier, resume, world } = useRapier();
+
+  $effect(() => {
+    if (controlsLocked) {
+      pause();
+    } else {
+      resume();
+    }
+  });
 
   $effect(() => {
     rigidBody?.setLinearDamping(playerLinearDamping);
@@ -429,22 +428,6 @@
     body.wakeUp();
   });
 
-  const isEditableTarget = (target: EventTarget | null) => {
-    if (!(target instanceof HTMLElement)) {
-      return false;
-    }
-
-    return Boolean(
-      target.isContentEditable ||
-        target.closest(
-          "input, textarea, select, button, [contenteditable='true']"
-        )
-    );
-  };
-
-  const isOrbitInputKey = (code: string) =>
-    code === "KeyW" || code === "KeyA" || code === "KeyS" || code === "KeyD";
-
   const isGrounded = (body: RapierRigidBody) => {
     const playerCollider = body.collider(0);
 
@@ -499,15 +482,6 @@
     return hit !== null && hit.normal.y > groundedNormalThreshold;
   };
 
-  const handleOrbitKeyDown = (event: KeyboardEvent) => {
-    if (isOrbitInputKey(event.code)) {
-      orbitPressed.add(event.code);
-      event.preventDefault();
-    } else if (event.code === "Space") {
-      event.preventDefault();
-    }
-  };
-
   const recordSingleShotPress = (event: KeyboardEvent) => {
     if (event.repeat) {
       return;
@@ -520,13 +494,6 @@
     }
   };
 
-  const isGameplayPreventDefaultCode = (code: string) =>
-    code === "Space" ||
-    code === "ArrowUp" ||
-    code === "ArrowDown" ||
-    code === "ArrowLeft" ||
-    code === "ArrowRight";
-
   onMount(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target) || controlsLocked) {
@@ -534,7 +501,7 @@
       }
 
       if (cameraMode === "orbit") {
-        handleOrbitKeyDown(event);
+        handleOrbitKeyDown(event, orbitPressed);
         return;
       }
 
@@ -643,39 +610,16 @@
     };
   });
 
-  const readMovementInput = () => {
-    moveDirection.set(0, 0, 0);
-
-    if (pressed.has("KeyW") || pressed.has("ArrowUp")) {
-      moveDirection.z -= 1;
-    }
-    if (pressed.has("KeyS") || pressed.has("ArrowDown")) {
-      moveDirection.z += 1;
-    }
-    if (pressed.has("KeyA") || pressed.has("ArrowLeft")) {
-      moveDirection.x -= 1;
-    }
-    if (pressed.has("KeyD") || pressed.has("ArrowRight")) {
-      moveDirection.x += 1;
-    }
-
-    return moveDirection.lengthSq() > 0;
-  };
-
   const getDesiredHorizontalVelocity = (
     velocity: ReturnType<RapierRigidBody["linvel"]>
-  ) => {
-    const hasInput = readMovementInput();
-
-    if (hasInput) {
-      moveDirection.normalize();
-    }
-
-    return {
-      x: hasInput ? moveDirection.x * moveSpeed * moveSpeedFactor : velocity.x,
-      z: hasInput ? moveDirection.z * moveSpeed * moveSpeedFactor : velocity.z,
-    };
-  };
+  ) =>
+    resolveHorizontalVelocity(
+      pressed,
+      moveDirection,
+      moveSpeed,
+      moveSpeedFactor,
+      velocity
+    );
 
   const updateBodyMovement = (body: RapierRigidBody, delta: number) => {
     const velocity = body.linvel();
@@ -1123,7 +1067,9 @@
         emissive="#7fd8ff"
         emissiveIntensity={1.4 * swingActiveFlare + 0.4}
         metalness={0.72}
+        opacity={meleeSwordOpacity}
         roughness={0.18}
+        transparent
       />
     </T.Mesh>
 
@@ -1138,7 +1084,9 @@
         emissive="#bff3ff"
         emissiveIntensity={2.2 * swingActiveFlare + 0.6}
         metalness={0.88}
+        opacity={meleeSwordOpacity}
         roughness={0.08}
+        transparent
       />
     </T.Mesh>
 
@@ -1149,7 +1097,9 @@
         emissive="#ffb347"
         emissiveIntensity={0.3}
         metalness={0.45}
+        opacity={meleeSwordOpacity}
         roughness={0.55}
+        transparent
       />
     </T.Mesh>
 
@@ -1157,7 +1107,7 @@
       color="#8ce6ff"
       decay={1.6}
       distance={3.2}
-      intensity={2.4 * swingActiveFlare * swingLingerFade}
+      intensity={2.4 * meleeSwordOpacity * swingActiveFlare * swingLingerFade}
       position={[0, 0, meleeParams.reach - 0.08]}
     />
 
@@ -1165,7 +1115,7 @@
       <T.SphereGeometry args={[0.1, 12, 12]} />
       <T.MeshBasicMaterial
         color="#ffffff"
-        opacity={(0.45 * swingActiveFlare + 0.1) * swingLingerFade}
+        opacity={meleeSwordOpacity * (0.45 * swingActiveFlare + 0.1) * swingLingerFade}
         transparent
       />
     </T.Mesh>

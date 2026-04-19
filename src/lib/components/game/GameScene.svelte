@@ -24,15 +24,13 @@
     type SwingParams,
     swingKnockbackDirection,
   } from "$lib/combat/melee-swing";
-  import PlayerController, {
-    type MeleeFrame,
-    type MeleeTrailSettings,
-  } from "$lib/components/player-controller.svelte";
-  import Projectile, {
-    type ProjectileData,
-  } from "$lib/components/projectile.svelte";
-  import SceneRendererConfig from "$lib/components/scene-renderer-config.svelte";
-  import ShootingTarget from "$lib/components/shooting-target.svelte";
+  import GameHud from "$lib/components/game/GameHud.svelte";
+  import GameMinimap from "$lib/components/game/GameMinimap.svelte";
+  import GameSceneOverlays from "$lib/components/game/GameSceneOverlays.svelte";
+  import PlayerController from "$lib/components/game/PlayerController.svelte";
+  import Projectile from "$lib/components/game/Projectile.svelte";
+  import SceneRendererConfig from "$lib/components/game/SceneRendererConfig.svelte";
+  import ShootingTarget from "$lib/components/game/ShootingTarget.svelte";
   import type {
     DungeonLayout,
     DungeonRoom,
@@ -51,11 +49,55 @@
     type WeaponBuild,
     type WeaponNodeType,
   } from "$lib/config/weapon-graph";
+  import {
+    artifactPickupDurationMs,
+    beamDurationMs,
+    bossGearMounts,
+    bossIntroDurationMs,
+    clampToRoom,
+    createDoorMarkers,
+    createDoorSeals,
+    createRoomEnemies,
+    createRoomWalls,
+    damagePopupDurationMs,
+    doorOpenDelayMs,
+    doorOpenDurationMs,
+    enemyShotRadius,
+    enemyShotTtlMs,
+    floorHalfDepth,
+    floorHalfWidth,
+    floorIntroDurationMs,
+    floorThemes,
+    floorTiles,
+    gearTeeth,
+    getEntryDirectionFromTarget,
+    getRevealedDoors,
+    getRoomHazards,
+    getRoomPlatforms,
+    getTransition,
+    hazardTickMs,
+    playerMaxHealth,
+    playerRadius,
+    roomTeleportZ,
+    treasureGearMounts,
+    wallHalfDepth,
+    wallThemes,
+  } from "$lib/game/scene-layout";
+  import {
+    deflectBurstDurationMs,
+    getMinimapBounds,
+    projectDamagePopups,
+    renderDeflectBursts,
+  } from "$lib/game/scene-ui";
+  import type {
+    CameraMode,
+    MeleeFrame,
+    MeleeTrailSettings,
+    ProjectileData,
+    Vec3,
+  } from "$lib/game/types";
 
-  type Vec3 = [number, number, number];
-  type CameraMode = "follow" | "orbit";
-
-  interface PhysicsShowcaseProps {
+  interface GameSceneProps {
     ambientLightIntensity?: number;
     cameraFov?: number;
     cameraMode?: CameraMode;
@@ -74,6 +116,7 @@
     meleeHitboxPadding?: number;
     meleeParams?: SwingParams;
     meleeShowSword?: boolean;
+    meleeSwordOpacity?: number;
     meleeTrailSettings?: MeleeTrailSettings;
     moveResponsiveness?: number;
     moveSpeed?: number;
@@ -92,14 +135,6 @@
     sunPositionZ?: number;
     wallTheme?: WallTheme;
     weaponBuild: WeaponBuild;
-  }
-
-  interface StaticWall {
-    args: Vec3;
-    color: string;
-    id: string;
-    opacity?: number;
-    position: Vec3;
   }
 
   interface ActiveProjectile extends ProjectileData {
@@ -157,21 +192,6 @@
     radius: number;
   }
 
-  interface DoorMarker {
-    args: Vec3;
-    boss: boolean;
-    color: string;
-    id: string;
-    position: Vec3;
-  }
-
-  interface DoorSeal {
-    args: Vec3;
-    color: string;
-    id: string;
-    position: Vec3;
-  }
-
   interface DamagePopup {
     amount: number;
     createdAt: number;
@@ -180,897 +200,10 @@
     variant: "enemy" | "player";
   }
 
-  interface ProjectedDamagePopup extends DamagePopup {
-    x: number;
-    y: number;
-  }
-
-  interface FloorTile {
-    even: boolean;
-    position: Vec3;
-  }
-
-  interface RoomHazard {
-    args: Vec3;
-    color: string;
-    damage: number;
-    id: string;
-    position: Vec3;
-  }
-
-  interface RoomPlatform {
-    args: Vec3;
-    color: string;
-    id: string;
-    position: Vec3;
-    shape?: "box" | "hex";
-  }
-
-  const doorwayHalfSpan = 1.2;
-  const floorHalfDepth = 9.1;
-  const floorHalfWidth = 10.4;
-  const roomTransitionInsetX = 9.1;
-  const roomTransitionInsetZ = 7.3;
-  const roomTeleportX = 8;
-  const roomTeleportZ = 6.6;
-  const wallHalfHeight = 2.8;
-  const wallThickness = 0.25;
-  const wallHalfWidth = 9.9;
-  const wallHalfDepth = 8.1;
-  const wallY = 2.45;
-  const wallSegmentHalfDepth = (wallHalfDepth - doorwayHalfSpan) * 0.5;
-  const wallSegmentHalfWidth = (wallHalfWidth - doorwayHalfSpan) * 0.5;
-  const wallSegmentOffsetDepth = doorwayHalfSpan + wallSegmentHalfDepth;
-  const wallSegmentOffsetWidth = doorwayHalfSpan + wallSegmentHalfWidth;
-  const enemyFloorY = 0.62;
-  const enemyShotRadius = 0.18;
-  const enemyShotTtlMs = 2200;
-  const damagePopupDurationMs = 760;
-  const artifactPickupDurationMs = 1450;
-  const bossIntroDurationMs = 1800;
-  const floorIntroDurationMs = 2400;
-  const beamDurationMs = 120;
-  const doorOpenDelayMs = 1150;
-  const doorOpenDurationMs = 460;
-  const hazardTickMs = 420;
-  const playerMaxHealth = 6;
-  const playerRadius = 0.55;
-  const floorTiles: FloorTile[] = Array.from({ length: 18 }, (_, row) =>
-    Array.from({ length: 20 }, (_, column) => ({
-      even: (row + column) % 2 === 0,
-      position: [column - 9.5, 0.01, row - 8.5] as Vec3,
-    }))
-  ).flat();
-  const floorThemes = {
-    check: {
-      even: "#284457",
-      odd: "#173142",
-      trim: "#38556f",
-    },
-    ember: {
-      even: "#4a3f55",
-      odd: "#2a2435",
-      trim: "#725b68",
-    },
-    steel: {
-      even: "#37556d",
-      odd: "#21384c",
-      trim: "#4d6d84",
-    },
-  } satisfies Record<FloorTheme, { even: string; odd: string; trim: string }>;
-  const wallThemes = {
-    aqua: {
-      horizontal: "#58a6c9",
-      vertical: "#2a7ea8",
-    },
-    brass: {
-      horizontal: "#b58a51",
-      vertical: "#7f6037",
-    },
-    foundry: {
-      horizontal: "#8e5258",
-      vertical: "#6f3138",
-    },
-  } satisfies Record<WallTheme, { horizontal: string; vertical: string }>;
-  const gearTeeth = Array.from({ length: 10 }, (_, index) => {
-    const rotation = (index / 10) * Math.PI * 2;
-
-    return {
-      rotation,
-      x: Math.cos(rotation),
-      y: Math.sin(rotation),
-    };
-  });
-  const treasureGearMounts = [
-    {
-      panel: [3.2, 3.2, 0.24] as Vec3,
-      position: [-6.2, 3.1, -7.72] as Vec3,
-      size: 1.28,
-    },
-    {
-      panel: [3.2, 3.2, 0.24] as Vec3,
-      position: [6.2, 3.1, -7.72] as Vec3,
-      size: 1.28,
-    },
-    {
-      panel: [2.6, 2.6, 0.24] as Vec3,
-      position: [-4.5, 2.3, 7.72] as Vec3,
-      size: 0.94,
-    },
-    {
-      panel: [2.6, 2.6, 0.24] as Vec3,
-      position: [4.5, 2.3, 7.72] as Vec3,
-      size: 0.94,
-    },
-  ];
-  const bossGearMounts = [
-    { color: "#ffd166", position: [-5.4, 3.3, -7.72] as Vec3, size: 1.56 },
-    { color: "#ffd166", position: [5.4, 3.3, -7.72] as Vec3, size: 1.56 },
-    { color: "#ff9f68", position: [0, 2.55, -7.68] as Vec3, size: 2.05 },
-  ];
   let bossDoorTexture = $state<Texture | null>(null);
   let bossFloorTexture = $state<Texture | null>(null);
   let lavaSurfaceTexture = $state<Texture | null>(null);
   let treasureFloorTexture = $state<Texture | null>(null);
-  const popupProjection = new Vector3();
-
-  const clampToRoom = (position: Vec3, radius: number): Vec3 => [
-    Math.max(
-      -floorHalfWidth + radius,
-      Math.min(floorHalfWidth - radius, position[0])
-    ),
-    position[1],
-    Math.max(
-      -floorHalfDepth + radius,
-      Math.min(floorHalfDepth - radius, position[2])
-    ),
-  ];
-
-  const getRoomPlatforms = (layout: RoomTemplate["layout"]): RoomPlatform[] => {
-    if (layout === "catwalk") {
-      return [
-        {
-          args: [1.1, 0.18, 4.5],
-          color: "#38556f",
-          id: "catwalk-center",
-          position: [0, 0.18, 0],
-        },
-        {
-          args: [0.9, 0.16, 3.6],
-          color: "#31495f",
-          id: "catwalk-left",
-          position: [-3.8, 0.16, -0.4],
-        },
-        {
-          args: [0.9, 0.16, 3.6],
-          color: "#31495f",
-          id: "catwalk-right",
-          position: [3.8, 0.16, 0.4],
-        },
-      ];
-    }
-
-    if (layout === "lava-lane") {
-      return [
-        {
-          args: [0.72, 0.18, 0.72],
-          color: "#476a7d",
-          id: "lane-step-left",
-          position: [-4.2, 0.18, 0],
-        },
-        {
-          args: [0.72, 0.18, 0.72],
-          color: "#476a7d",
-          id: "lane-step-right",
-          position: [4.2, 0.18, 0],
-        },
-      ];
-    }
-
-    if (layout === "lava-ring") {
-      return [
-        {
-          args: [0.8, 0.18, 0.8],
-          color: "#476a7d",
-          id: "ring-step-north",
-          position: [0, 0.18, -2.8],
-        },
-        {
-          args: [0.8, 0.18, 0.8],
-          color: "#476a7d",
-          id: "ring-step-south",
-          position: [0, 0.18, 2.8],
-        },
-        {
-          args: [0.8, 0.18, 0.8],
-          color: "#476a7d",
-          id: "ring-step-west",
-          position: [-2.8, 0.18, 0],
-        },
-        {
-          args: [0.8, 0.18, 0.8],
-          color: "#476a7d",
-          id: "ring-step-east",
-          position: [2.8, 0.18, 0],
-        },
-      ];
-    }
-
-    if (layout === "lava-bridge") {
-      return [
-        {
-          args: [0.78, 0.18, 0.78],
-          color: "#4c6d80",
-          id: "bridge-pad-west",
-          position: [-4.8, 0.18, 0],
-        },
-        {
-          args: [0.78, 0.18, 0.78],
-          color: "#4c6d80",
-          id: "bridge-pad-mid",
-          position: [0, 0.18, 0],
-        },
-        {
-          args: [0.78, 0.18, 0.78],
-          color: "#4c6d80",
-          id: "bridge-pad-east",
-          position: [4.8, 0.18, 0],
-        },
-      ];
-    }
-
-    if (layout === "lava-cross") {
-      return [
-        {
-          args: [0.88, 0.18, 0.88],
-          color: "#4c6d80",
-          id: "cross-pad-center",
-          position: [0, 0.18, 0],
-        },
-        {
-          args: [0.88, 0.18, 0.88],
-          color: "#4c6d80",
-          id: "cross-pad-nw",
-          position: [-4.6, 0.18, -3.3],
-        },
-        {
-          args: [0.88, 0.18, 0.88],
-          color: "#4c6d80",
-          id: "cross-pad-ne",
-          position: [4.6, 0.18, -3.3],
-        },
-        {
-          args: [0.88, 0.18, 0.88],
-          color: "#4c6d80",
-          id: "cross-pad-sw",
-          position: [-4.6, 0.18, 3.3],
-        },
-        {
-          args: [0.88, 0.18, 0.88],
-          color: "#4c6d80",
-          id: "cross-pad-se",
-          position: [4.6, 0.18, 3.3],
-        },
-      ];
-    }
-
-    if (layout === "zigzag") {
-      return [
-        {
-          args: [1.05, 0.18, 0.7],
-          color: "#38556f",
-          id: "zigzag-0",
-          position: [-4.6, 0.18, -2.6],
-        },
-        {
-          args: [1.05, 0.18, 0.7],
-          color: "#38556f",
-          id: "zigzag-1",
-          position: [-1.6, 0.18, -0.9],
-        },
-        {
-          args: [1.05, 0.18, 0.7],
-          color: "#38556f",
-          id: "zigzag-2",
-          position: [1.3, 0.18, 0.9],
-        },
-        {
-          args: [1.05, 0.18, 0.7],
-          color: "#38556f",
-          id: "zigzag-3",
-          position: [4.3, 0.18, 2.6],
-        },
-      ];
-    }
-
-    if (layout === "lava-gauntlet") {
-      return [
-        {
-          args: [1.1, 0.18, 0.78],
-          color: "#476a7d",
-          id: "gauntlet-0",
-          position: [-5.2, 0.18, -2.9],
-        },
-        {
-          args: [0.92, 0.18, 0.7],
-          color: "#476a7d",
-          id: "gauntlet-1",
-          position: [-1.9, 0.18, -0.9],
-        },
-        {
-          args: [0.96, 0.18, 0.7],
-          color: "#476a7d",
-          id: "gauntlet-2",
-          position: [1.4, 0.18, 0.9],
-        },
-        {
-          args: [1.1, 0.18, 0.78],
-          color: "#476a7d",
-          id: "gauntlet-3",
-          position: [5.1, 0.18, 2.9],
-        },
-      ];
-    }
-
-    if (layout === "blocks") {
-      return [
-        {
-          args: [1.25, 0.55, 1.25],
-          color: "#46667c",
-          id: "blocks-left",
-          position: [-4.8, 0.55, -2.4],
-        },
-        {
-          args: [1.55, 0.95, 1.55],
-          color: "#355268",
-          id: "blocks-mid",
-          position: [0, 0.95, 0],
-        },
-        {
-          args: [1.2, 0.7, 1.2],
-          color: "#46667c",
-          id: "blocks-right",
-          position: [4.8, 0.7, 2.8],
-        },
-      ];
-    }
-
-    if (layout === "hexes") {
-      return [
-        {
-          args: [1.08, 0.46, 1.08],
-          color: "#55738a",
-          id: "hex-north",
-          position: [0, 0.46, -3.2],
-          shape: "hex",
-        },
-        {
-          args: [1.16, 0.72, 1.16],
-          color: "#3f627a",
-          id: "hex-center",
-          position: [-3.2, 0.72, 0.2],
-          shape: "hex",
-        },
-        {
-          args: [1.16, 0.72, 1.16],
-          color: "#3f627a",
-          id: "hex-east",
-          position: [3.2, 0.72, 0.2],
-          shape: "hex",
-        },
-        {
-          args: [1.08, 0.46, 1.08],
-          color: "#55738a",
-          id: "hex-south",
-          position: [0, 0.46, 3.4],
-          shape: "hex",
-        },
-      ];
-    }
-
-    if (layout === "boss-foundry") {
-      return [
-        {
-          args: [2.2, 0.2, 1.2],
-          color: "#2f4559",
-          id: "boss-dais",
-          position: [0, 0.2, -5.4],
-        },
-      ];
-    }
-
-    if (layout === "boss-crucible") {
-      return [
-        {
-          args: [1.8, 0.2, 1],
-          color: "#425a6a",
-          id: "crucible-dais",
-          position: [0, 0.2, -5.1],
-        },
-        {
-          args: [1.15, 0.18, 2.2],
-          color: "#31495f",
-          id: "crucible-left",
-          position: [-4.1, 0.18, 1.6],
-        },
-        {
-          args: [1.15, 0.18, 2.2],
-          color: "#31495f",
-          id: "crucible-right",
-          position: [4.1, 0.18, 1.6],
-        },
-      ];
-    }
-
-    return [];
-  };
-
-  const getRoomHazards = (layout: RoomTemplate["layout"]): RoomHazard[] => {
-    if (layout === "lava-lane") {
-      return [
-        {
-          args: [6.5, 0.03, 1.7],
-          color: "#ff7b54",
-          damage: 1,
-          id: "lava-lane-main",
-          position: [0, 0.03, 0],
-        },
-      ];
-    }
-
-    if (layout === "lava-bridge") {
-      return [
-        {
-          args: [2.7, 0.03, 5.1],
-          color: "#ff7b54",
-          damage: 1,
-          id: "lava-bridge-left",
-          position: [-2.35, 0.03, 0],
-        },
-        {
-          args: [2.7, 0.03, 5.1],
-          color: "#ff8f5e",
-          damage: 1,
-          id: "lava-bridge-right",
-          position: [2.35, 0.03, 0],
-        },
-      ];
-    }
-
-    if (layout === "lava-cross") {
-      return [
-        {
-          args: [5.6, 0.03, 1.55],
-          color: "#ff7b54",
-          damage: 1,
-          id: "lava-cross-horizontal",
-          position: [0, 0.03, 0],
-        },
-        {
-          args: [1.55, 0.03, 4.9],
-          color: "#ff8f5e",
-          damage: 1,
-          id: "lava-cross-vertical",
-          position: [0, 0.03, 0],
-        },
-      ];
-    }
-
-    if (layout === "lava-ring") {
-      return [
-        {
-          args: [4.4, 0.03, 0.95],
-          color: "#ff7b54",
-          damage: 1,
-          id: "lava-ring-horizontal",
-          position: [0, 0.03, 0],
-        },
-        {
-          args: [0.95, 0.03, 4.4],
-          color: "#ff8f5e",
-          damage: 1,
-          id: "lava-ring-vertical",
-          position: [0, 0.03, 0],
-        },
-      ];
-    }
-
-    if (layout === "boss-foundry") {
-      return [
-        {
-          args: [1.6, 0.03, 4.6],
-          color: "#ff8f5e",
-          damage: 1,
-          id: "boss-lava-left",
-          position: [-4.9, 0.03, -0.2],
-        },
-        {
-          args: [1.6, 0.03, 4.6],
-          color: "#ff8f5e",
-          damage: 1,
-          id: "boss-lava-right",
-          position: [4.9, 0.03, -0.2],
-        },
-      ];
-    }
-
-    if (layout === "lava-gauntlet") {
-      return [
-        {
-          args: [2.7, 0.03, 2.2],
-          color: "#ff7b54",
-          damage: 1,
-          id: "gauntlet-lava-left",
-          position: [-3.1, 0.03, -3.6],
-        },
-        {
-          args: [2.2, 0.03, 2.6],
-          color: "#ff8f5e",
-          damage: 1,
-          id: "gauntlet-lava-mid",
-          position: [0.3, 0.03, 0],
-        },
-        {
-          args: [2.8, 0.03, 2.2],
-          color: "#ff7b54",
-          damage: 1,
-          id: "gauntlet-lava-right",
-          position: [3.4, 0.03, 3.6],
-        },
-      ];
-    }
-
-    if (layout === "boss-crucible") {
-      return [
-        {
-          args: [1.9, 0.03, 5.2],
-          color: "#ff8f5e",
-          damage: 1,
-          id: "crucible-lava-left",
-          position: [-5.2, 0.03, -0.1],
-        },
-        {
-          args: [1.9, 0.03, 5.2],
-          color: "#ff8f5e",
-          damage: 1,
-          id: "crucible-lava-right",
-          position: [5.2, 0.03, -0.1],
-        },
-        {
-          args: [2.2, 0.03, 1.4],
-          color: "#ff7b54",
-          damage: 1,
-          id: "crucible-lava-center",
-          position: [0, 0.03, 1.9],
-        },
-      ];
-    }
-
-    return [];
-  };
-
-  const createEnemyPositions = (
-    pattern: RoomTemplate["spawnPattern"],
-    count: number
-  ): Vec3[] => {
-    if (pattern === "arc") {
-      return Array.from({ length: count }, (_, index) => {
-        const spread = count === 1 ? 0 : (index / (count - 1) - 0.5) * 6.8;
-
-        return [spread, enemyFloorY, -6.1 + Math.abs(spread) * 0.24];
-      });
-    }
-
-    if (pattern === "boss") {
-      return [[0, enemyFloorY, -5.6]];
-    }
-
-    if (pattern === "crossfire") {
-      const positions: Vec3[] = [
-        [-6.4, enemyFloorY, -4.8],
-        [6.4, enemyFloorY, -4.8],
-        [-6.4, enemyFloorY, 3.6],
-        [6.4, enemyFloorY, 3.6],
-      ];
-
-      return positions.slice(0, count);
-    }
-
-    if (pattern === "line") {
-      return Array.from({ length: count }, (_, index) => {
-        const spread =
-          count === 1
-            ? 0
-            : (index / (count - 1) - 0.5) * Math.min(7, count * 2.2);
-
-        return [spread, enemyFloorY, -5.4];
-      });
-    }
-
-    if (pattern === "pincer") {
-      const anchors: Vec3[] = [
-        [-5.6, enemyFloorY, -4.8],
-        [5.6, enemyFloorY, -4.8],
-        [-6.4, enemyFloorY, 0],
-        [6.4, enemyFloorY, 0],
-        [0, enemyFloorY, -6.2],
-      ];
-
-      return anchors.slice(0, count);
-    }
-
-    return [];
-  };
-
-  const pushSpawnsFromEntry = (
-    positions: Vec3[],
-    entryDirection: DungeonRoomDirection
-  ) =>
-    positions.map((position) => {
-      if (entryDirection === "south" && position[2] > -1.4) {
-        return [position[0], position[1], position[2] - 2.8] as Vec3;
-      }
-
-      if (entryDirection === "north" && position[2] < 1.4) {
-        return [position[0], position[1], position[2] + 2.8] as Vec3;
-      }
-
-      if (entryDirection === "west" && position[0] < 1.8) {
-        return [position[0] + 3.2, position[1], position[2]] as Vec3;
-      }
-
-      if (entryDirection === "east" && position[0] > -1.8) {
-        return [position[0] - 3.2, position[1], position[2]] as Vec3;
-      }
-
-      return position;
-    });
-
-  const createRoomWalls = (room: DungeonRoom): StaticWall[] => {
-    const walls: StaticWall[] = [];
-    let palette = currentWallPalette;
-
-    if (room.kind === "boss") {
-      palette = wallThemes.foundry;
-    } else if (room.kind === "treasure") {
-      palette = wallThemes.brass;
-    }
-    const pushHorizontalWall = (
-      id: string,
-      x: number,
-      z: number,
-      opacity = 1
-    ) => {
-      walls.push({
-        args: [wallSegmentHalfWidth, wallHalfHeight, wallThickness],
-        color: palette.horizontal,
-        id,
-        opacity,
-        position: [x, wallY, z],
-      });
-    };
-    const pushVerticalWall = (
-      id: string,
-      x: number,
-      z: number,
-      opacity = 1
-    ) => {
-      walls.push({
-        args: [wallThickness, wallHalfHeight, wallSegmentHalfDepth],
-        color: palette.vertical,
-        id,
-        opacity,
-        position: [x, wallY, z],
-      });
-    };
-
-    if (room.exits.north) {
-      pushHorizontalWall(
-        `${room.id}-north-west`,
-        -wallSegmentOffsetWidth,
-        -wallHalfDepth
-      );
-      pushHorizontalWall(
-        `${room.id}-north-east`,
-        wallSegmentOffsetWidth,
-        -wallHalfDepth
-      );
-    } else {
-      walls.push({
-        args: [wallHalfWidth, wallHalfHeight, wallThickness],
-        color: palette.horizontal,
-        id: `${room.id}-north`,
-        position: [0, wallY, -wallHalfDepth],
-      });
-    }
-
-    if (room.exits.south) {
-      pushHorizontalWall(
-        `${room.id}-south-west`,
-        -wallSegmentOffsetWidth,
-        wallHalfDepth,
-        0.2
-      );
-      pushHorizontalWall(
-        `${room.id}-south-east`,
-        wallSegmentOffsetWidth,
-        wallHalfDepth,
-        0.2
-      );
-    } else {
-      walls.push({
-        args: [wallHalfWidth, wallHalfHeight, wallThickness],
-        color: palette.horizontal,
-        id: `${room.id}-south`,
-        opacity: 0.2,
-        position: [0, wallY, wallHalfDepth],
-      });
-    }
-
-    if (room.exits.west) {
-      pushVerticalWall(
-        `${room.id}-west-north`,
-        -wallHalfWidth,
-        -wallSegmentOffsetDepth
-      );
-      pushVerticalWall(
-        `${room.id}-west-south`,
-        -wallHalfWidth,
-        wallSegmentOffsetDepth
-      );
-    } else {
-      walls.push({
-        args: [wallThickness, wallHalfHeight, wallHalfDepth],
-        color: palette.vertical,
-        id: `${room.id}-west`,
-        position: [-wallHalfWidth, wallY, 0],
-      });
-    }
-
-    if (room.exits.east) {
-      pushVerticalWall(
-        `${room.id}-east-north`,
-        wallHalfWidth,
-        -wallSegmentOffsetDepth
-      );
-      pushVerticalWall(
-        `${room.id}-east-south`,
-        wallHalfWidth,
-        wallSegmentOffsetDepth
-      );
-    } else {
-      walls.push({
-        args: [wallThickness, wallHalfHeight, wallHalfDepth],
-        color: palette.vertical,
-        id: `${room.id}-east`,
-        position: [wallHalfWidth, wallY, 0],
-      });
-    }
-
-    return walls;
-  };
-
-  const createDoorMarkers = (room: DungeonRoom): DoorMarker[] => {
-    const getDoorMarkerPosition = (direction: DungeonRoomDirection): Vec3 => {
-      if (direction === "north") {
-        return [0, 0.03, -7.6];
-      }
-
-      if (direction === "south") {
-        return [0, 0.03, 7.6];
-      }
-
-      if (direction === "west") {
-        return [-9.4, 0.03, 0];
-      }
-
-      return [9.4, 0.03, 0];
-    };
-
-    const getDoorColor = (targetRoom: DungeonRoom) => {
-      if (targetRoom.kind === "boss") {
-        return "#ffd166";
-      }
-
-      if (targetRoom.kind === "treasure") {
-        return "#57d6a5";
-      }
-
-      return "#8ac6ff";
-    };
-
-    return (Object.entries(room.exits) as [DungeonRoomDirection, string][])
-      .filter(([, target]) => Boolean(target))
-      .map(([direction, target]) => {
-        const targetRoom = dungeon.rooms[target];
-
-        return {
-          args:
-            direction === "east" || direction === "west"
-              ? [0.45, 0.05, 0.95]
-              : [0.95, 0.05, 0.45],
-          boss: targetRoom.kind === "boss",
-          color: getDoorColor(targetRoom),
-          id: `${room.id}-${direction}-door`,
-          position: getDoorMarkerPosition(direction),
-        };
-      });
-  };
-
-  const createDoorSeals = (room: DungeonRoom): DoorSeal[] =>
-    (Object.keys(room.exits) as DungeonRoomDirection[]).map((direction) => {
-      let position: Vec3;
-
-      if (direction === "north") {
-        position = [0, 2.1, -wallHalfDepth];
-      } else if (direction === "south") {
-        position = [0, 2.1, wallHalfDepth];
-      } else if (direction === "west") {
-        position = [-wallHalfWidth, 2.1, 0];
-      } else {
-        position = [wallHalfWidth, 2.1, 0];
-      }
-
-      return {
-        args:
-          direction === "east" || direction === "west"
-            ? [0.16, 2.2, doorwayHalfSpan]
-            : [doorwayHalfSpan, 2.2, 0.16],
-        color: "#9dd6ff",
-        id: `${room.id}-${direction}-seal`,
-        position,
-      };
-    });
-
-  const getTransition = (room: DungeonRoom, position: Vec3) => {
-    const [x, y, z] = position;
-
-    if (
-      room.exits.east &&
-      x > roomTransitionInsetX &&
-      Math.abs(z) < doorwayHalfSpan
-    ) {
-      return {
-        roomId: room.exits.east,
-        target: [-roomTeleportX, y, 0] as Vec3,
-      };
-    }
-
-    if (
-      room.exits.west &&
-      x < -roomTransitionInsetX &&
-      Math.abs(z) < doorwayHalfSpan
-    ) {
-      return { roomId: room.exits.west, target: [roomTeleportX, y, 0] as Vec3 };
-    }
-
-    if (
-      room.exits.north &&
-      z < -roomTransitionInsetZ &&
-      Math.abs(x) < doorwayHalfSpan
-    ) {
-      return {
-        roomId: room.exits.north,
-        target: [0, y, roomTeleportZ] as Vec3,
-      };
-    }
-
-    if (
-      room.exits.south &&
-      z > roomTransitionInsetZ &&
-      Math.abs(x) < doorwayHalfSpan
-    ) {
-      return {
-        roomId: room.exits.south,
-        target: [0, y, -roomTeleportZ] as Vec3,
-      };
-    }
-
-    return null;
-  };
-
-  const getRevealedDoors = (room: DungeonRoom) =>
-    Object.keys(room.exits) as DungeonRoomDirection[];
 
   let orbitControls = $state<OrbitControlsInstance>();
   let sceneCamera = $state<PerspectiveCamera>();
@@ -1079,12 +212,6 @@
   let damagePopups = $state<DamagePopup[]>([]);
   let enemyShots = $state<ActiveEnemyShot[]>([]);
   let deflectBursts = $state<DeflectBurst[]>([]);
-  const deflectBurstDurationMs = 240;
-  const deflectBurstShardCount = 4;
-  const deflectBurstShardAngles = Array.from(
-    { length: deflectBurstShardCount },
-    (_unused, index) => (index / deflectBurstShardCount) * Math.PI * 2
-  );
   let clearedEnemyRoomIds = $state<string[]>([]);
   let releasedRoomIds = $state<string[]>([]);
   let playerHealth = $state(playerMaxHealth);
@@ -1112,6 +239,7 @@
     meleeHitboxPadding = 0,
     meleeParams,
     meleeShowSword = true,
+    meleeSwordOpacity = 0.5,
     meleeTrailSettings,
     moveResponsiveness = 12,
     moveSpeed = 7.5,
@@ -1130,7 +258,7 @@
     sunPositionZ = 4,
     wallTheme = "aqua",
     weaponBuild,
-  }: PhysicsShowcaseProps = $props();
+  }: GameSceneProps = $props();
 
   let currentRoomId = $state("");
   let exploredRooms = $state<string[]>([]);
@@ -1144,6 +272,9 @@
   let enemyWakeUntil = $state(0);
   let pickedArtifactAt = $state(0);
   let pickedArtifactType = $state<WeaponNodeType | null>(null);
+  let roomTransitionStartedAt = $state(0);
+  let roomTransitionSubtitle = $state("");
+  let roomTransitionTitle = $state("");
   let playerImpactNonce = $state(0);
   let playerImpactVelocity = $state<Vec3 | null>(null);
   let playerShotCount = $state(0);
@@ -1179,8 +310,10 @@
   const roomHazards = $derived.by(() =>
     getRoomHazards(currentRoomTemplate.layout)
   );
-  const roomWalls = $derived.by(() => createRoomWalls(currentRoom));
-  const roomDoors = $derived.by(() => createDoorMarkers(currentRoom));
+  const roomWalls = $derived.by(() =>
+    createRoomWalls(currentRoom, currentWallPalette)
+  );
+  const roomDoors = $derived.by(() => createDoorMarkers(currentRoom, dungeon));
   const roomDoorSeals = $derived.by(() => createDoorSeals(currentRoom));
   const exploredRoomSet = $derived.by(() => new Set(exploredRooms));
   const clearedEnemyRoomSet = $derived.by(() => new Set(clearedEnemyRoomIds));
@@ -1188,20 +321,7 @@
   const collectedArtifactRoomSet = $derived.by(
     () => new Set(collectedArtifactRoomIds)
   );
-  const minimapBounds = $derived.by(() => {
-    const grids = roomList.map((room) => room.grid);
-    const minX = Math.min(...grids.map(([x]) => x));
-    const maxX = Math.max(...grids.map(([x]) => x));
-    const minY = Math.min(...grids.map(([, y]) => y));
-    const maxY = Math.max(...grids.map(([, y]) => y));
-
-    return {
-      columns: maxX - minX + 1,
-      minX,
-      minY,
-      rows: maxY - minY + 1,
-    };
-  });
+  const minimapBounds = $derived.by(() => getMinimapBounds(roomList));
   const currentArtifactType = $derived(
     currentRoom.artifactType &&
       !collectedArtifactRoomSet.has(currentRoom.id) &&
@@ -1231,6 +351,11 @@
         )
       : 0
   );
+  const bossIntroActive = $derived(
+    bossIntroStartedAt > 0 &&
+      animationNow < bossIntroStartedAt + bossIntroDurationMs
+  );
+  const sceneControlsLocked = $derived(controlsLocked || bossIntroActive);
   const floorIntroProgress = $derived(
     floorIntroStartedAt > 0
       ? Math.max(
@@ -1250,58 +375,25 @@
         )
       : 0
   );
+  const roomTransitionProgress = $derived(
+    roomTransitionStartedAt > 0
+      ? Math.max(0, 1 - (animationNow - roomTransitionStartedAt) / 900)
+      : 0
+  );
   const projectedDamagePopups = $derived.by(() => {
-    const camera = sceneCamera;
-
-    if (!(camera && typeof window !== "undefined")) {
+    if (!(sceneCamera && typeof window !== "undefined")) {
       return [];
     }
 
-    return damagePopups
-      .map((popup) => {
-        popupProjection.set(...popup.position).project(camera);
-
-        if (popupProjection.z < -1 || popupProjection.z > 1) {
-          return null;
-        }
-
-        return {
-          ...popup,
-          x: (popupProjection.x * 0.5 + 0.5) * window.innerWidth,
-          y: (-popupProjection.y * 0.5 + 0.5) * window.innerHeight,
-        };
-      })
-      .filter((popup): popup is ProjectedDamagePopup => Boolean(popup));
+    return projectDamagePopups(
+      damagePopups,
+      sceneCamera,
+      window.innerWidth,
+      window.innerHeight
+    );
   });
   const deflectBurstsRendered = $derived.by(() =>
-    deflectBursts.map((burst) => {
-      const age = Math.min(
-        1,
-        (animationNow - burst.createdAt) / deflectBurstDurationMs
-      );
-      const fade = 1 - age;
-      const travel = burst.radius * 2.6 * age;
-
-      return {
-        ...burst,
-        age,
-        fade,
-        shards: deflectBurstShardAngles.map((angle, shardIndex) => ({
-          angle,
-          position: [
-            Math.cos(angle) * travel,
-            age * burst.radius * 0.6 - age * age * burst.radius * 1.1,
-            Math.sin(angle) * travel,
-          ] as Vec3,
-          rotation: [
-            (shardIndex % 2 ? 1 : -1) * age * 4.5,
-            angle + age * 3.5,
-            0,
-          ] as Vec3,
-          scale: Math.max(0, 1 - age),
-        })),
-      };
-    })
+    renderDeflectBursts(deflectBursts, animationNow)
   );
   const currentRoomUnlocked = $derived(
     !isCurrentRoomCombat || releasedRoomSet.has(currentRoom.id)
@@ -1347,51 +439,6 @@
     getHazardBrakeFactor(lastPlayerPosition)
   );
 
-  const getEntryDirectionFromTarget = (target: Vec3): DungeonRoomDirection => {
-    if (Math.abs(target[0]) > Math.abs(target[2])) {
-      return target[0] < 0 ? "west" : "east";
-    }
-
-    return target[2] > 0 ? "south" : "north";
-  };
-
-  const createRoomEnemies = (room: DungeonRoom, template: RoomTemplate) => {
-    if (
-      template.spawnPattern === "none" ||
-      !template.enemyTemplateId ||
-      clearedEnemyRoomSet.has(room.id)
-    ) {
-      return [];
-    }
-
-    const enemyTemplate = enemyTemplateById[template.enemyTemplateId];
-    const positions = pushSpawnsFromEntry(
-      createEnemyPositions(template.spawnPattern, template.enemyCount),
-      currentEntryDirection
-    );
-
-    return positions.map((position, index) => ({
-      behavior: enemyTemplate.behavior,
-      color: enemyTemplate.color,
-      hp: enemyTemplate.hp,
-      id: `${room.id}-${template.id}-${index}`,
-      knockbackVelocity: [0, 0, 0] as Vec3,
-      lastHitAt: 0,
-      lastShotAt: performance.now() - index * 180,
-      maxHp: enemyTemplate.hp,
-      moveSpeed: enemyTemplate.moveSpeed,
-      position,
-      preferredRange: enemyTemplate.preferredRange,
-      radius: enemyTemplate.radius,
-      shotColor: enemyTemplate.shotColor,
-      shotDamage: enemyTemplate.shotDamage,
-      shotIntervalMs: enemyTemplate.shotIntervalMs,
-      shotSpeed: enemyTemplate.shotSpeed,
-      touchDamage: enemyTemplate.touchDamage,
-      touchIntervalMs: enemyTemplate.touchIntervalMs,
-    }));
-  };
-
   const pushPlayer = (vector: Vec3, strength: number, lift = 0.16) => {
     const distance = Math.hypot(vector[0], vector[2]) || 1;
 
@@ -1415,6 +462,46 @@
       position,
       variant,
     });
+  };
+
+  const resolveEnemyWallImpact = (
+    enemy: ActiveEnemy,
+    position: Vec3,
+    knockbackVelocity: Vec3,
+    hp: number,
+    now: number
+  ) => {
+    const clampedPosition = clampToRoom(position, enemy.radius);
+    const hitWallX = Math.abs(clampedPosition[0] - position[0]) > 0.001;
+    const hitWallZ = Math.abs(clampedPosition[2] - position[2]) > 0.001;
+    const wallImpactSpeed = Math.max(
+      hitWallX ? Math.abs(knockbackVelocity[0]) : 0,
+      hitWallZ ? Math.abs(knockbackVelocity[2]) : 0
+    );
+    const wallDamage = wallImpactSpeed >= 3.2 ? 1 : 0;
+
+    if (wallDamage > 0) {
+      popDamage(
+        wallDamage,
+        [
+          clampedPosition[0],
+          clampedPosition[1] + enemy.radius + 0.34,
+          clampedPosition[2],
+        ],
+        "enemy"
+      );
+    }
+
+    return {
+      hp: hp - wallDamage,
+      knockbackVelocity: [
+        hitWallX ? 0 : knockbackVelocity[0],
+        0,
+        hitWallZ ? 0 : knockbackVelocity[2],
+      ] as Vec3,
+      lastHitAt: wallDamage > 0 ? now : null,
+      position: clampedPosition,
+    };
   };
 
   const getActiveHazard = (position: Vec3) =>
@@ -1665,6 +752,22 @@
       return { enemy: null, playerDamage, shots };
     }
 
+    const wallImpact = resolveEnemyWallImpact(
+      enemy,
+      position,
+      knockbackVelocity,
+      hp,
+      now
+    );
+    hp = wallImpact.hp;
+    knockbackVelocity = wallImpact.knockbackVelocity;
+    lastHitAt = wallImpact.lastHitAt ?? lastHitAt;
+    position = wallImpact.position;
+
+    if (hp <= 0) {
+      return { enemy: null, playerDamage, shots };
+    }
+
     if (
       Math.hypot(
         lastPlayerPosition[0] - position[0],
@@ -1717,7 +820,7 @@
         knockbackVelocity,
         lastHitAt,
         lastShotAt,
-        position: clampToRoom(position, enemy.radius),
+        position,
       },
       playerDamage,
       shots,
@@ -1751,6 +854,9 @@
     bossIntroTitle = "";
     pickedArtifactAt = 0;
     pickedArtifactType = null;
+    roomTransitionStartedAt = 0;
+    roomTransitionSubtitle = "";
+    roomTransitionTitle = "";
     unlockingRoomId = "";
     unlockStartedAt = 0;
     doorOpenAmount = 1;
@@ -1760,7 +866,12 @@
 
   $effect(() => {
     currentRoom.id;
-    activeEnemies = createRoomEnemies(currentRoom, currentRoomTemplate);
+    activeEnemies = createRoomEnemies(
+      currentRoom,
+      currentRoomTemplate,
+      currentEntryDirection,
+      clearedEnemyRoomSet
+    );
     activeBeams = [];
     enemyShots = [];
     lastHazardAt = performance.now();
@@ -2158,7 +1269,6 @@
     playerImpactVelocity = null;
     projectiles = [];
     projectilePositions.clear();
-
     if (nextRoom.kind === "boss") {
       bossIntroStartedAt = now;
       bossIntroTitle =
@@ -2341,6 +1451,9 @@
       doorOpenAmount = 1;
       bossIntroStartedAt = 0;
       bossIntroTitle = "";
+      roomTransitionStartedAt = 0;
+      roomTransitionSubtitle = "";
+      roomTransitionTitle = "";
       teleportTarget = [0, 1.1, 0];
       teleportNonce += 1;
       return;
@@ -2371,6 +1484,13 @@
     let previousTime = performance.now();
 
     const tick = (time: number) => {
+      if (controlsLocked) {
+        previousTime = time;
+        animationNow = time;
+        frameId = window.requestAnimationFrame(tick);
+        return;
+      }
+
       const delta = Math.min(0.05, (time - previousTime) / 1000);
 
       previousTime = time;
@@ -2388,11 +1508,13 @@
         lavaSurfaceTexture.offset.x += delta * 0.18;
         lavaSurfaceTexture.offset.y -= delta * 0.08;
       }
-      if (currentMeleeFrame) {
+      if (!bossIntroActive && currentMeleeFrame) {
         applyMeleeHitsToEnemies(currentMeleeFrame);
         applyMeleeDeflects(currentMeleeFrame);
       }
-      stepEnemies(delta);
+      if (!bossIntroActive) {
+        stepEnemies(delta);
+      }
       frameId = window.requestAnimationFrame(tick);
     };
 
@@ -3095,7 +2217,7 @@
       <PlayerController
         {cameraMode}
         {cameraSmoothing}
-        {controlsLocked}
+        controlsLocked={sceneControlsLocked}
         {followDistance}
         {followPitch}
         {followYaw}
@@ -3110,6 +2232,7 @@
         {meleeHitboxPadding}
         {meleeParams}
         {meleeShowSword}
+        {meleeSwordOpacity}
         {meleeTrailSettings}
         moveSpeedFactor={lavaBrakeFactor}
         onMeleeFrame={handleMeleeFrame}
@@ -3135,163 +2258,36 @@
     </World>
   </Canvas>
 
-  {#if cameraMode === 'follow' && !controlsLocked}
-    <div
-      class="crosshair"
-      style:left="{crosshairX}px"
-      style:top="{crosshairY}px"
-    >
-      <div class="crosshair-dot"></div>
-      <div class="crosshair-ring"></div>
-    </div>
-  {/if}
+  <GameSceneOverlays
+    {animationNow}
+    {artifactPickupProgress}
+    {bossIntroProgress}
+    {bossIntroTitle}
+    {cameraMode}
+    controlsLocked={sceneControlsLocked}
+    {crosshairX}
+    {crosshairY}
+    {currentArtifactTemplate}
+    dungeonFloor={dungeon.floor}
+    {floorIntroProgress}
+    {pickedArtifactTemplate}
+    {playerHitFlash}
+    {projectedDamagePopups}
+    {roomTransitionProgress}
+    {roomTransitionSubtitle}
+    {roomTransitionTitle}
+  />
 
-  <div class="damage-flash" style:opacity={playerHitFlash * 0.66}></div>
+  <GameMinimap
+    {currentRoom}
+    {dungeon}
+    {exploredRoomSet}
+    {isRoomUnlocked}
+    {minimapBounds}
+    {roomList}
+  />
 
-  {#each projectedDamagePopups as popup (popup.id)}
-    <div
-      class="damage-popup-screen"
-      style:left={`${popup.x}px`}
-      style:top={`${popup.y}px`}
-    >
-      <div
-        class="damage-popup"
-        class:player={popup.variant === "player"}
-        style:opacity={Math.max(
-          0,
-          1 - (animationNow - popup.createdAt) / damagePopupDurationMs
-        )}
-        style:transform={`scale(${
-          0.9 + Math.min(0.35, (animationNow - popup.createdAt) / 240)
-        })`}
-      >
-        {popup.amount}
-      </div>
-    </div>
-  {/each}
-
-  {#if bossIntroProgress > 0}
-    <div class="boss-intro" style:opacity={bossIntroProgress}>
-      <div
-        class="boss-intro-card"
-        style:transform={`translateY(${(1 - bossIntroProgress) * 22}px) scale(${
-          1 + (1 - bossIntroProgress) * 0.08
-        })`}
-      >
-        <span>BOSS ENCOUNTER</span>
-        <strong>{bossIntroTitle}</strong>
-      </div>
-    </div>
-  {/if}
-
-  {#if floorIntroProgress > 0}
-    <div class="floor-intro" style:opacity={floorIntroProgress}>
-      <div
-        class="floor-intro-card"
-        style:transform={`translateY(${(1 - floorIntroProgress) * 16}px) scale(${
-          1 + (1 - floorIntroProgress) * 0.04
-        })`}
-      >
-        <span>Floor {dungeon.floor}</span>
-        <strong
-          >{dungeon.floor === 1 ? "Polygon Foundry" : "Brass Crucible"}</strong
-        >
-      </div>
-    </div>
-  {/if}
-
-  {#if currentArtifactTemplate}
-    <div class="artifact-hint" style:--accent={currentArtifactTemplate.accent}>
-      <span>Artifact Ready</span>
-      <strong>{currentArtifactTemplate.label}</strong>
-      <small>{currentArtifactTemplate.rarity}</small>
-    </div>
-  {/if}
-
-  {#if artifactPickupProgress > 0 && pickedArtifactTemplate}
-    <div class="artifact-pickup" style:opacity={artifactPickupProgress}>
-      <div
-        class="artifact-pickup-card"
-        style:--accent={pickedArtifactTemplate.accent}
-        style:transform={`translateY(${(1 - artifactPickupProgress) * 16}px) scale(${
-          1 + (1 - artifactPickupProgress) * 0.08
-        })`}
-      >
-        <span>Artifact Secured</span>
-        <strong>{pickedArtifactTemplate.label}</strong>
-        <small>{pickedArtifactTemplate.rarity}</small>
-      </div>
-    </div>
-  {/if}
-
-  <div class="minimap">
-    <div class="minimap-head">
-      <strong>Map</strong>
-      <span>{currentRoom.label}</span>
-    </div>
-
-    <div class="minimap-seed">seed {dungeon.seed}</div>
-
-    <div
-      class="minimap-grid"
-      style:grid-template-columns={`repeat(${minimapBounds.columns}, 1.05rem)`}
-      style:grid-template-rows={`repeat(${minimapBounds.rows}, 1.05rem)`}
-    >
-      {#each roomList as room (room.id)}
-        {#if exploredRoomSet.has(room.id)}
-          <div
-            class="minimap-room"
-            class:boss={room.kind === "boss"}
-            class:polygon={room.kind === "polygon"}
-            class:current={room.id === currentRoom.id}
-            class:sealed={!isRoomUnlocked(room)}
-            class:treasure={room.kind === "treasure"}
-            style:grid-column={room.grid[0] - minimapBounds.minX + 1}
-            style:grid-row={room.grid[1] - minimapBounds.minY + 1}
-          >
-            {#each getRevealedDoors(room) as direction}
-              <span
-                class={`door ${direction}`}
-                class:locked={!isRoomUnlocked(room)}
-              ></span>
-            {/each}
-          </div>
-        {/if}
-      {/each}
-    </div>
-  </div>
-
-  <div class="hud">
-    <div class="hud-card">
-      <div class="hud-label">
-        <strong>Hull</strong>
-        <span>{playerHealth}/{playerMaxHealth}</span>
-      </div>
-      <div class="hud-bar">
-        <div class="hud-fill" style:width={`${playerHealthRatio * 100}%`}></div>
-      </div>
-      <div class="hud-recover">
-        <div
-          class="hud-recover-fill"
-          style:width={`${playerRecoverRatio * 100}%`}
-        ></div>
-      </div>
-    </div>
-
-    {#if currentRoomTemplate.spawnPattern !== "none"}
-      <div class="hud-card">
-        <div class="hud-label">
-          <strong>Threat</strong>
-          <span>{activeEnemies.length} active</span>
-        </div>
-        <div class="hud-room">
-          {currentRoomTemplate.spawnPattern === "boss"
-            ? "boss chamber"
-            : `${currentRoomTemplate.spawnPattern} rush`}
-        </div>
-      </div>
-    {/if}
-  </div>
+  <GameHud {playerHealth} {playerHealthRatio} {playerRecoverRatio} />
 </div>
 
 <style>
@@ -3299,507 +2295,5 @@
     position: relative;
     inline-size: 100%;
     block-size: 100%;
-  }
-
-  .hud {
-    position: fixed;
-    bottom: 4.2rem;
-    left: 1rem;
-    z-index: 8;
-    display: grid;
-    gap: 0.55rem;
-  }
-
-  .hud-card {
-    display: grid;
-    gap: 0.38rem;
-    min-inline-size: 11rem;
-    padding: 0.72rem 0.78rem;
-    color: rgba(244, 249, 255, 0.92);
-    background:
-      linear-gradient(180deg, rgba(5, 12, 22, 0.86), rgba(8, 18, 31, 0.9)),
-      repeating-linear-gradient(
-        90deg,
-        transparent 0 12px,
-        rgba(255, 255, 255, 0.03) 12px 13px
-      );
-    border: 1px solid rgba(138, 198, 255, 0.16);
-    border-radius: 1rem;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      0 18px 34px rgba(0, 0, 0, 0.24);
-    backdrop-filter: blur(10px);
-  }
-
-  .hud-label {
-    display: flex;
-    gap: 0.8rem;
-    justify-content: space-between;
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-  }
-
-  .hud-label span,
-  .hud-room {
-    color: rgba(174, 197, 223, 0.76);
-  }
-
-  .hud-bar {
-    block-size: 0.56rem;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
-  }
-
-  .hud-fill {
-    block-size: 100%;
-    background: linear-gradient(90deg, #57d6a5, #ff6b6b);
-    border-radius: inherit;
-  }
-
-  .hud-recover {
-    block-size: 0.24rem;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 999px;
-  }
-
-  .hud-recover-fill {
-    block-size: 100%;
-    background: linear-gradient(90deg, #ffd166, #ff6b6b);
-    border-radius: inherit;
-  }
-
-  .hud-room {
-    font-size: 0.78rem;
-    text-transform: capitalize;
-  }
-
-  .minimap {
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
-    z-index: 8;
-    display: grid;
-    gap: 0.55rem;
-    padding: 0.8rem;
-    color: rgba(244, 249, 255, 0.92);
-    background:
-      linear-gradient(180deg, rgba(5, 12, 22, 0.86), rgba(8, 18, 31, 0.9)),
-      repeating-linear-gradient(
-        90deg,
-        transparent 0 12px,
-        rgba(255, 255, 255, 0.03) 12px 13px
-      );
-    border: 1px solid rgba(138, 198, 255, 0.16);
-    border-radius: 1rem;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      0 18px 34px rgba(0, 0, 0, 0.24);
-    backdrop-filter: blur(10px);
-  }
-
-  .minimap::before {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    content: "";
-    background:
-      radial-gradient(
-        circle at 14px 14px,
-        rgba(255, 255, 255, 0.16) 0 2px,
-        transparent 2px
-      ),
-      radial-gradient(
-        circle at calc(100% - 14px) 14px,
-        rgba(255, 255, 255, 0.16) 0 2px,
-        transparent 2px
-      ),
-      radial-gradient(
-        circle at 14px calc(100% - 14px),
-        rgba(255, 255, 255, 0.16) 0 2px,
-        transparent 2px
-      ),
-      radial-gradient(
-        circle at calc(100% - 14px) calc(100% - 14px),
-        rgba(255, 255, 255, 0.16) 0 2px,
-        transparent 2px
-      );
-  }
-
-  .minimap-head {
-    display: flex;
-    gap: 0.8rem;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .minimap-head strong,
-  .minimap-head span {
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-  }
-
-  .minimap-head span {
-    color: rgba(174, 197, 223, 0.68);
-  }
-
-  .minimap-seed {
-    font-size: 0.66rem;
-    font-weight: 700;
-    color: rgba(174, 197, 223, 0.56);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .minimap-grid {
-    display: grid;
-    gap: 0.55rem;
-    place-items: center;
-  }
-
-  .minimap-room {
-    position: relative;
-    inline-size: 1.05rem;
-    block-size: 1.05rem;
-    background: linear-gradient(
-      180deg,
-      rgba(120, 146, 177, 0.42),
-      rgba(76, 98, 124, 0.28)
-    );
-    border: 1px solid rgba(196, 216, 238, 0.42);
-    border-radius: 0.3rem;
-  }
-
-  .minimap-room.current {
-    background: linear-gradient(
-      180deg,
-      rgba(138, 198, 255, 0.92),
-      rgba(83, 151, 212, 0.72)
-    );
-    box-shadow: 0 0 0 2px rgba(138, 198, 255, 0.18);
-  }
-
-  .minimap-room.boss {
-    background: linear-gradient(
-      180deg,
-      rgba(255, 107, 107, 0.95),
-      rgba(166, 31, 31, 0.72)
-    );
-    border-color: rgba(255, 177, 177, 0.68);
-  }
-
-  .minimap-room.treasure {
-    background: linear-gradient(
-      180deg,
-      rgba(255, 209, 102, 0.95),
-      rgba(219, 159, 51, 0.72)
-    );
-    border-color: rgba(255, 233, 170, 0.68);
-  }
-
-  .minimap-room.polygon {
-    background: linear-gradient(
-      180deg,
-      rgba(104, 183, 255, 0.86),
-      rgba(58, 112, 178, 0.68)
-    );
-    border-color: rgba(196, 227, 255, 0.52);
-  }
-
-  .minimap-room.sealed {
-    box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.46);
-  }
-
-  .door {
-    position: absolute;
-    background: rgba(207, 226, 247, 0.76);
-    border-radius: 999px;
-  }
-
-  .door.locked {
-    background: rgba(255, 133, 133, 0.86);
-  }
-
-  .door.north,
-  .door.south {
-    left: 50%;
-    inline-size: 0.34rem;
-    block-size: 0.16rem;
-    translate: -50% 0;
-  }
-
-  .door.east,
-  .door.west {
-    top: 50%;
-    inline-size: 0.16rem;
-    block-size: 0.34rem;
-    translate: 0 -50%;
-  }
-
-  .door.north {
-    top: -0.26rem;
-  }
-
-  .door.south {
-    bottom: -0.26rem;
-  }
-
-  .door.east {
-    right: -0.26rem;
-  }
-
-  .door.west {
-    left: -0.26rem;
-  }
-
-  .crosshair {
-    position: fixed;
-    z-index: 10;
-    pointer-events: none;
-    translate: -50% -50%;
-  }
-
-  .crosshair-dot {
-    position: absolute;
-    inset-block-start: 50%;
-    inset-inline-start: 50%;
-    inline-size: 4px;
-    block-size: 4px;
-    background: rgba(138, 198, 255, 0.95);
-    border-radius: 50%;
-    box-shadow: 0 0 6px 2px rgba(138, 198, 255, 0.5);
-    translate: -50% -50%;
-  }
-
-  .crosshair-ring {
-    position: absolute;
-    inset-block-start: 50%;
-    inset-inline-start: 50%;
-    inline-size: 24px;
-    block-size: 24px;
-    border: 1.5px solid rgba(138, 198, 255, 0.6);
-    border-radius: 50%;
-    translate: -50% -50%;
-  }
-
-  .damage-flash {
-    position: fixed;
-    inset: 0;
-    z-index: 7;
-    pointer-events: none;
-    background:
-      radial-gradient(
-        circle at center,
-        rgba(255, 96, 96, 0.1) 0 26%,
-        rgba(255, 80, 80, 0.16) 44%,
-        rgba(255, 64, 64, 0.26) 76%,
-        rgba(104, 0, 0, 0.4) 100%
-      ),
-      linear-gradient(180deg, rgba(255, 88, 88, 0.34), transparent 42%);
-  }
-
-  .damage-popup-screen {
-    position: fixed;
-    z-index: 10;
-    pointer-events: none;
-    translate: -50% -50%;
-  }
-
-  .boss-intro {
-    position: fixed;
-    inset: 0;
-    z-index: 9;
-    display: grid;
-    place-items: center;
-    pointer-events: none;
-  }
-
-  .floor-intro {
-    position: fixed;
-    inset: 0;
-    z-index: 9;
-    display: grid;
-    place-items: center;
-    pointer-events: none;
-  }
-
-  .floor-intro-card {
-    display: grid;
-    gap: 0.45rem;
-    justify-items: center;
-    padding: 1.2rem 1.8rem 1rem;
-    color: rgba(255, 255, 255, 0.96);
-    text-align: center;
-    text-shadow:
-      0 0 18px rgba(255, 255, 255, 0.12),
-      0 3px 18px rgba(0, 0, 0, 0.34);
-  }
-
-  .floor-intro-card::after {
-    inline-size: min(24rem, 72vw);
-    block-size: 1px;
-    content: "";
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.86) 18%,
-      rgba(255, 255, 255, 0.86) 82%,
-      transparent
-    );
-    box-shadow: 0 0 14px rgba(255, 255, 255, 0.22);
-  }
-
-  .floor-intro-card span {
-    font-size: 0.84rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.22em;
-    opacity: 0.72;
-  }
-
-  .floor-intro-card strong {
-    font-size: clamp(2rem, 4vw, 3.2rem);
-    font-weight: 500;
-    letter-spacing: 0.04em;
-  }
-
-  .boss-intro-card {
-    display: grid;
-    gap: 0.4rem;
-    min-inline-size: 18rem;
-    padding: 1rem 1.4rem;
-    color: #fff2d0;
-    text-align: center;
-    background:
-      linear-gradient(180deg, rgba(52, 8, 12, 0.92), rgba(14, 4, 8, 0.9)),
-      repeating-linear-gradient(
-        90deg,
-        transparent 0 12px,
-        rgba(255, 255, 255, 0.03) 12px 13px
-      );
-    border: 1px solid rgba(255, 120, 120, 0.3);
-    border-radius: 1.2rem;
-    box-shadow:
-      0 0 0 1px rgba(255, 209, 102, 0.12),
-      0 20px 60px rgba(0, 0, 0, 0.4);
-  }
-
-  .boss-intro-card span {
-    font-size: 0.7rem;
-    font-weight: 800;
-    color: rgba(255, 176, 176, 0.82);
-    text-transform: uppercase;
-    letter-spacing: 0.28em;
-  }
-
-  .boss-intro-card strong {
-    font-size: 1.8rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .artifact-hint,
-  .artifact-pickup {
-    position: fixed;
-    z-index: 9;
-    display: grid;
-    pointer-events: none;
-  }
-
-  .artifact-hint {
-    top: 4.8rem;
-    left: 50%;
-    gap: 0.12rem;
-    justify-items: center;
-    translate: -50% 0;
-  }
-
-  .artifact-pickup {
-    inset: 0;
-    place-items: center;
-  }
-
-  .artifact-hint strong,
-  .artifact-pickup-card strong {
-    font-size: 1.2rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .artifact-hint span,
-  .artifact-hint small,
-  .artifact-pickup-card span,
-  .artifact-pickup-card small {
-    font-size: 0.68rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-  }
-
-  .artifact-hint span,
-  .artifact-pickup-card span {
-    color: rgba(223, 239, 255, 0.76);
-  }
-
-  .artifact-hint small,
-  .artifact-pickup-card small {
-    color: color-mix(in srgb, var(--accent, #8ac6ff) 78%, white);
-  }
-
-  .artifact-pickup-card {
-    display: grid;
-    gap: 0.28rem;
-    min-inline-size: 13rem;
-    padding: 0.72rem 1rem;
-    color: #eff7ff;
-    text-align: center;
-    background:
-      linear-gradient(180deg, rgba(9, 19, 31, 0.92), rgba(4, 10, 18, 0.92)),
-      repeating-linear-gradient(
-        90deg,
-        transparent 0 10px,
-        rgba(138, 198, 255, 0.03) 10px 11px
-      );
-    border: 1px solid
-      color-mix(in srgb, var(--accent) 36%, rgba(138, 198, 255, 0.2));
-    border-radius: 1rem;
-    box-shadow: 0 22px 56px rgba(0, 0, 0, 0.34);
-  }
-
-  .damage-popup {
-    min-inline-size: 1.6rem;
-    padding: 0.1rem 0.28rem;
-    font-size: 1rem;
-    font-weight: 900;
-    line-height: 1;
-    color: #ffe3b8;
-    text-align: center;
-    white-space: nowrap;
-    text-shadow:
-      0 0 10px rgba(255, 170, 73, 0.85),
-      0 2px 0 rgba(0, 0, 0, 0.4);
-    user-select: none;
-  }
-
-  .damage-popup.player {
-    color: #ff9f9f;
-    text-shadow:
-      0 0 10px rgba(255, 107, 107, 0.9),
-      0 2px 0 rgba(0, 0, 0, 0.4);
-  }
-
-  @media (max-width: 900px) {
-    .minimap {
-      top: auto;
-      right: 0.8rem;
-      bottom: 4rem;
-    }
   }
 </style>

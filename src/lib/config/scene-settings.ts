@@ -2,6 +2,8 @@ export type CameraMode = "follow" | "orbit";
 export type FloorTheme = "check" | "ember" | "steel";
 export type WallTheme = "aqua" | "brass" | "foundry";
 
+export const sceneSettingsStorageKey = "warden-trial-scene-settings";
+
 export interface SceneSettings {
   ambientLightIntensity: number;
   cameraFov: number;
@@ -31,6 +33,7 @@ export interface SceneSettings {
   meleeHitboxPadding: number;
   meleeReach: number;
   meleeShowSword: boolean;
+  meleeSwordOpacity: number;
   meleeTailLength: number;
   moveResponsiveness: number;
   moveSpeed: number;
@@ -77,7 +80,8 @@ export const createSceneSettings = (): SceneSettings => ({
   meleeEdgeColor: "#7fd8ff",
   meleeHitboxPadding: 0.7,
   meleeReach: 1.65,
-  meleeShowSword: false,
+  meleeShowSword: true,
+  meleeSwordOpacity: 0.5,
   meleeTailLength: 0.59,
   moveResponsiveness: 12,
   moveSpeed: 7,
@@ -95,3 +99,34 @@ export const createSceneSettings = (): SceneSettings => ({
   sunPositionZ: 7,
   wallTheme: "aqua",
 });
+
+export const loadSceneSettings = (): SceneSettings => {
+  const defaults = createSceneSettings();
+
+  if (typeof window === "undefined") {
+    return defaults;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(sceneSettingsStorageKey);
+
+    if (!raw) {
+      return defaults;
+    }
+
+    return { ...defaults, ...JSON.parse(raw) };
+  } catch {
+    return defaults;
+  }
+};
+
+export const saveSceneSettings = (settings: SceneSettings) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(
+    sceneSettingsStorageKey,
+    JSON.stringify(settings)
+  );
+};
