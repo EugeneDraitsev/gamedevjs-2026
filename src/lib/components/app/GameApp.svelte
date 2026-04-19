@@ -158,6 +158,17 @@
     let isActive = true;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "Escape") {
+        if (weaponLabOpen) {
+          weaponLabOpen = false;
+        } else {
+          settingsOpen = !settingsOpen;
+        }
+
+        event.preventDefault();
+        return;
+      }
+
       if (isEditableTarget(event.target)) {
         return;
       }
@@ -165,20 +176,7 @@
       if (event.code === "KeyE" && !event.repeat && !settingsOpen) {
         weaponLabOpen = !weaponLabOpen;
         event.preventDefault();
-        return;
       }
-
-      if (event.code !== "Escape") {
-        return;
-      }
-
-      if (weaponLabOpen) {
-        weaponLabOpen = false;
-      } else {
-        settingsOpen = !settingsOpen;
-      }
-
-      event.preventDefault();
     };
 
     window.addEventListener("keydown", handleKeyDown);

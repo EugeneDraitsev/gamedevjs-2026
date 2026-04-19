@@ -6,7 +6,6 @@
   import { T, useTask, useThrelte } from "@threlte/core";
   import { Collider, RigidBody, useRapier } from "@threlte/rapier";
   import { onMount } from "svelte";
-  import OrbKnight from "$lib/components/game/OrbKnight.svelte";
   import {
     AdditiveBlending,
     BufferGeometry,
@@ -36,6 +35,7 @@
     swingProgress,
     swingRibbonProgress,
   } from "$lib/combat/melee-swing";
+  import OrbKnight from "$lib/components/game/OrbKnight.svelte";
   import type { WeaponBuild } from "$lib/config/weapon-graph";
   import { isEditableTarget } from "$lib/game/dom";
   import {
@@ -148,7 +148,7 @@
 
   const lerpAngleShortest = (from: number, to: number, alpha: number) => {
     const TAU = Math.PI * 2;
-    const diff = (((to - from) % TAU) + TAU + Math.PI) % TAU - Math.PI;
+    const diff = ((((to - from) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
     return from + diff * alpha;
   };
   const trailFadeMs = 180;
@@ -157,63 +157,63 @@
   let trailMesh = $state<Mesh>();
 
   const trailVertexShader = /* glsl */ `
-                      varying vec2 vUv;
-                      void main() {
-                        vUv = uv;
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                      }
-                    `;
+                        varying vec2 vUv;
+                        void main() {
+                          vUv = uv;
+                          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                      `;
 
   const trailFragmentShader = /* glsl */ `
-                      uniform float uProgress;
-                      uniform float uIntensity;
-                      uniform float uTailLength;
-                      uniform vec3 uEdgeColor;
-                      uniform vec3 uCoreColor;
-                      uniform vec3 uBandCenters;
-                      uniform vec3 uBandWidths;
-                      uniform vec3 uBandAlphas;
-                      varying vec2 vUv;
+                        uniform float uProgress;
+                        uniform float uIntensity;
+                        uniform float uTailLength;
+                        uniform vec3 uEdgeColor;
+                        uniform vec3 uCoreColor;
+                        uniform vec3 uBandCenters;
+                        uniform vec3 uBandWidths;
+                        uniform vec3 uBandAlphas;
+                        varying vec2 vUv;
 
-                      float bandFalloff(float y, float center, float width) {
-                        float d = (y - center) / max(width, 0.001);
-                        return exp(-d * d);
-                      }
+                        float bandFalloff(float y, float center, float width) {
+                          float d = (y - center) / max(width, 0.001);
+                          return exp(-d * d);
+                        }
 
-                      void main() {
-                        float edgeSoftness = mix(0.09, 0.03, clamp(uTailLength, 0.0, 1.0));
+                        void main() {
+                          float edgeSoftness = mix(0.09, 0.03, clamp(uTailLength, 0.0, 1.0));
 
-                        float tailFalloff =
-                          smoothstep(0.0, edgeSoftness, vUv.x);
-                        float leadFalloff =
-                          1.0 -
-                          smoothstep(uProgress - edgeSoftness, uProgress + edgeSoftness * 0.2, vUv.x);
-                        float longitudinal = tailFalloff * leadFalloff;
+                          float tailFalloff =
+                            smoothstep(0.0, edgeSoftness, vUv.x);
+                          float leadFalloff =
+                            1.0 -
+                            smoothstep(uProgress - edgeSoftness, uProgress + edgeSoftness * 0.2, vUv.x);
+                          float longitudinal = tailFalloff * leadFalloff;
 
-                        if (longitudinal <= 0.0015) discard;
+                          if (longitudinal <= 0.0015) discard;
 
-                        float widthScale = 1.0;
+                          float widthScale = 1.0;
 
-                        float primary =
-                          bandFalloff(vUv.y, uBandCenters.x, uBandWidths.x * widthScale) *
-                          uBandAlphas.x;
-                        float secondary =
-                          bandFalloff(vUv.y, uBandCenters.y, uBandWidths.y * widthScale) *
-                          uBandAlphas.y;
-                        float tertiary =
-                          bandFalloff(vUv.y, uBandCenters.z, uBandWidths.z * widthScale) *
-                          uBandAlphas.z;
-                        float bandMask = max(max(primary, secondary), tertiary);
+                          float primary =
+                            bandFalloff(vUv.y, uBandCenters.x, uBandWidths.x * widthScale) *
+                            uBandAlphas.x;
+                          float secondary =
+                            bandFalloff(vUv.y, uBandCenters.y, uBandWidths.y * widthScale) *
+                            uBandAlphas.y;
+                          float tertiary =
+                            bandFalloff(vUv.y, uBandCenters.z, uBandWidths.z * widthScale) *
+                            uBandAlphas.z;
+                          float bandMask = max(max(primary, secondary), tertiary);
 
-                        float leadingGlow =
-                          smoothstep(uProgress - 0.18, uProgress - 0.03, vUv.x);
-                        float brightness = 0.85 + 0.6 * leadingGlow;
-                        float alpha = longitudinal * bandMask * brightness * uIntensity;
+                          float leadingGlow =
+                            smoothstep(uProgress - 0.18, uProgress - 0.03, vUv.x);
+                          float brightness = 0.85 + 0.6 * leadingGlow;
+                          float alpha = longitudinal * bandMask * brightness * uIntensity;
 
-                        vec3 color = mix(uEdgeColor, uCoreColor, leadingGlow * primary);
-                        gl_FragColor = vec4(color * brightness, alpha);
-                      }
-                    `;
+                          vec3 color = mix(uEdgeColor, uCoreColor, leadingGlow * primary);
+                          gl_FragColor = vec4(color * brightness, alpha);
+                        }
+                      `;
 
   let {
     cameraMode = "follow",
@@ -254,10 +254,13 @@
     reach: meleeParams.reach + meleeHitboxPadding,
   });
   const swingBladeLength = $derived(
-    meleeParams.reach - meleeParams.innerRadius
+    (meleeParams.reach - meleeParams.innerRadius) * 0.8
   );
   const swingBladeMidZ = $derived(
-    (meleeParams.innerRadius + meleeParams.reach) / 2
+    meleeParams.innerRadius + swingBladeLength / 2
+  );
+  const swingBladeTipZ = $derived(
+    meleeParams.innerRadius + swingBladeLength + 0.04
   );
   const swingActiveFlare = $derived(
     isSwingActive(swingVisualT, meleeParams) ? 1 : 0.25
@@ -1097,10 +1100,7 @@
       />
     </T.Mesh>
 
-    <T.Mesh
-      position={[0, 0, swingBladeMidZ]}
-      rotation={[Math.PI / 2, 0, 0]}
-    >
+    <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
       <T.CylinderGeometry args={[0.026, 0.055, swingBladeLength, 20]} />
       <T.MeshBasicMaterial
         color="#eaffff"
@@ -1110,10 +1110,7 @@
       />
     </T.Mesh>
 
-    <T.Mesh
-      position={[0, 0, swingBladeMidZ]}
-      rotation={[Math.PI / 2, 0, 0]}
-    >
+    <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
       <T.CylinderGeometry args={[0.09, 0.13, swingBladeLength + 0.03, 24]} />
       <T.MeshBasicMaterial
         blending={AdditiveBlending}
@@ -1125,10 +1122,7 @@
       />
     </T.Mesh>
 
-    <T.Mesh
-      position={[0, 0, meleeParams.reach + 0.08]}
-      rotation={[Math.PI / 2, 0, 0]}
-    >
+    <T.Mesh position={[0, 0, swingBladeTipZ]} rotation={[Math.PI / 2, 0, 0]}>
       <T.ConeGeometry args={[0.055, 0.16, 20]} />
       <T.MeshBasicMaterial
         color="#eaffff"
@@ -1143,7 +1137,7 @@
       decay={1.8}
       distance={3.1}
       intensity={2.1 * meleeSwordOpacity * swingActiveFlare * swingLingerFade}
-      position={[0, 0, meleeParams.reach - 0.1]}
+      position={[0, 0, swingBladeTipZ - 0.14]}
     />
   </T.Group>
 {/if}

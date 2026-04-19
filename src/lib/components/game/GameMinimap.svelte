@@ -57,7 +57,7 @@
     --map-fg: rgba(204, 212, 220, 0.34);
     --map-fg-strong: rgba(236, 224, 196, 0.72);
     position: fixed;
-    top: 1.15rem;
+    top: 1.45rem;
     right: 1.1rem;
     z-index: 8;
     padding: 0.32rem;

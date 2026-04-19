@@ -1,4 +1,5 @@
 <script lang="ts">
+  import orbKnightIconUrl from "$lib/assets/orb-knight-icon.svg";
   import { damagePopupDurationMs } from "$lib/game/scene-layout";
   import type { SceneOverlayProps } from "$lib/game/types";
 
@@ -72,9 +73,7 @@
       <span class="boss-intro-caption">Boss Encounter</span>
       <div class="boss-intro-strip">
         <div class="boss-intro-panel boss-intro-panel-player">
-          <div class="boss-intro-orb">
-            <div class="boss-intro-orb-core"></div>
-          </div>
+          <img class="boss-intro-orb" src={orbKnightIconUrl} alt="">
           <div class="boss-intro-blade"></div>
           <small>Core Unit</small>
         </div>
@@ -373,36 +372,10 @@
   }
 
   .boss-intro-orb {
+    display: block;
     inline-size: 5.3rem;
     block-size: 5.3rem;
-    background: radial-gradient(
-      circle at 35% 30%,
-      #fce0a4 0,
-      #d19a4e 42%,
-      #5a3b1c 72%,
-      #22140b 100%
-    );
-    border: 3px solid rgba(22, 15, 11, 0.98);
-    border-radius: 999px;
-    box-shadow:
-      inset -0.55rem -0.75rem 1rem rgba(0, 0, 0, 0.26),
-      0 0.55rem 1rem rgba(0, 0, 0, 0.18);
-  }
-
-  .boss-intro-orb::before {
-    position: absolute;
-    inset: 0.85rem 0.7rem;
-    content: "";
-    border: 1px solid rgba(22, 15, 11, 0.42);
-    border-radius: 999px;
-  }
-
-  .boss-intro-orb-core {
-    position: absolute;
-    inset: 1.55rem;
-    background: radial-gradient(circle, #fff4cb 0, #ffbe5f 58%, #7b3c17 100%);
-    border-radius: 999px;
-    box-shadow: 0 0 1rem rgba(255, 173, 84, 0.44);
+    filter: drop-shadow(0 0.55rem 1rem rgba(0, 0, 0, 0.18));
   }
 
   .boss-intro-blade {

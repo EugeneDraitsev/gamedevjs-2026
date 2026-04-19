@@ -1,0 +1,49 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+  fill="none"
+>
+  <defs>
+    <radialGradient id="shell" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(25 20) rotate(47) scale(30)">
+      <stop offset="0" stop-color="#ffe1a4" />
+      <stop offset=".38" stop-color="#b6812f" />
+      <stop offset=".78" stop-color="#5d3818" />
+      <stop offset="1" stop-color="#23140a" />
+    </radialGradient>
+    <radialGradient id="eye" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(40 35) rotate(145) scale(10)">
+      <stop offset="0" stop-color="#f6ffff" />
+      <stop offset=".5" stop-color="#95efff" />
+      <stop offset="1" stop-color="#164c61" />
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="24" fill="url(#shell)" />
+  <circle cx="32" cy="32" r="24" stroke="#1e1109" stroke-width="1.5" />
+  <path
+    d="M11.5 25.5C19 21 44.5 21 52.5 27"
+    stroke="#2d180c"
+    stroke-linecap="round"
+    stroke-width="2"
+  />
+  <path
+    d="M29.5 8.5C35.5 14 37.5 48.5 33.5 56"
+    stroke="#2b170b"
+    stroke-linecap="round"
+    stroke-width="1.6"
+  />
+  <circle cx="40" cy="35" r="9" fill="#1b120d" />
+  <circle cx="40" cy="35" r="7" fill="url(#eye)" />
+  <circle cx="40" cy="35" r="2.4" fill="#0f0b08" />
+  <circle cx="23.5" cy="23" r="1.6" fill="#d2a150" />
+  <circle cx="18" cy="39.5" r="1.3" fill="#d2a150" />
+  <circle cx="49" cy="27.5" r="1.2" fill="#d2a150" />
+  <circle cx="43.5" cy="45.5" r="1.1" fill="#d2a150" />
+  <ellipse
+    cx="24.5"
+    cy="20.5"
+    rx="8.5"
+    ry="6"
+    fill="#fff1c4"
+    opacity=".28"
+    transform="rotate(-20 24.5 20.5)"
+  />
+</svg>

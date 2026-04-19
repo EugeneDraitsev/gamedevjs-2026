@@ -395,6 +395,9 @@
   const deflectBurstsRendered = $derived.by(() =>
     renderDeflectBursts(deflectBursts, animationNow)
   );
+  const sceneUiVisible = $derived(
+    animationNow > 0 && currentRoomId !== "" && Boolean(sceneCamera)
+  );
   const currentRoomUnlocked = $derived(
     !isCurrentRoomCombat || releasedRoomSet.has(currentRoom.id)
   );
@@ -2278,16 +2281,18 @@
     {roomTransitionTitle}
   />
 
-  <GameMinimap
-    {currentRoom}
-    {dungeon}
-    {exploredRoomSet}
-    {isRoomUnlocked}
-    {minimapBounds}
-    {roomList}
-  />
+  {#if sceneUiVisible}
+    <GameMinimap
+      {currentRoom}
+      {dungeon}
+      {exploredRoomSet}
+      {isRoomUnlocked}
+      {minimapBounds}
+      {roomList}
+    />
 
-  <GameHud {playerHealth} {playerHealthRatio} {playerRecoverRatio} />
+    <GameHud {playerHealth} {playerHealthRatio} {playerRecoverRatio} />
+  {/if}
 </div>
 
 <style>

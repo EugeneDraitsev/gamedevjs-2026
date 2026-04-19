@@ -1,10 +1,5 @@
 <script lang="ts">
-  import type {
-    CameraMode,
-    FloorTheme,
-    SceneSettings,
-    WallTheme,
-  } from "$lib/config/scene-settings";
+  import type { SceneSettings } from "$lib/config/scene-settings";
 
   interface SettingsPanelProps {
     debugEnabled?: boolean;
@@ -14,10 +9,6 @@
     onResetDefaults: () => void;
     settings: SceneSettings;
   }
-
-  const cameraModes: CameraMode[] = ["follow", "orbit"];
-  const floorThemes: FloorTheme[] = ["check", "ember", "steel"];
-  const wallThemes: WallTheme[] = ["aqua", "brass", "foundry"];
 
   let {
     debugEnabled,
@@ -40,33 +31,6 @@
 
     <div class="panel-rule"></div>
   {/if}
-
-  <label>
-    <span>Camera</span>
-    <select bind:value={settings.cameraMode}>
-      {#each cameraModes as mode}
-        <option value={mode}>{mode}</option>
-      {/each}
-    </select>
-  </label>
-
-  <label>
-    <span>Floor Theme</span>
-    <select bind:value={settings.floorTheme}>
-      {#each floorThemes as theme}
-        <option value={theme}>{theme}</option>
-      {/each}
-    </select>
-  </label>
-
-  <label>
-    <span>Wall Theme</span>
-    <select bind:value={settings.wallTheme}>
-      {#each wallThemes as theme}
-        <option value={theme}>{theme}</option>
-      {/each}
-    </select>
-  </label>
 
   <label class="toggle">
     <input type="checkbox" bind:checked={settings.showPhysicsDebug}>
