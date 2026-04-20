@@ -14,6 +14,7 @@ const roomKindSchema = z.enum([
 
 const roomLayoutSchema = z.enum([
   "blocks",
+  "boss-bomber",
   "boss-crucible",
   "boss-foundry",
   "catwalk",
@@ -36,7 +37,21 @@ const roomEnvironmentSchema = z.enum([
 
 const enemyTemplateSchema = z
   .object({
-    behavior: z.enum(["rush", "shooter"]),
+    behavior: z.enum(["rush", "shooter", "bomber"]),
+    bombArmMs: z.number().int().positive().optional(),
+    bombColor: z
+      .string()
+      .regex(/^#[0-9a-f]{6}$/i)
+      .optional(),
+    bombCooldownMs: z.number().int().positive().optional(),
+    bombCount: z.number().int().positive().optional(),
+    bombDamage: z.number().positive().optional(),
+    bombExplosionRadius: z.number().positive().optional(),
+    bombHp: z.number().positive().optional(),
+    bombMaxActive: z.number().int().positive().optional(),
+    bombRadius: z.number().positive().optional(),
+    bombSpeed: z.number().positive().optional(),
+    bombTtlMs: z.number().int().positive().optional(),
     color: z.string().regex(/^#[0-9a-f]{6}$/i),
     hp: z.number().positive(),
     id: z.string().min(1),
@@ -67,6 +82,27 @@ const enemyTemplateSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Shooter enemies need shot stats.",
+      });
+    }
+
+    const hasBombStats = Boolean(
+      template.bombArmMs &&
+        template.bombColor &&
+        template.bombCooldownMs &&
+        template.bombCount &&
+        template.bombDamage &&
+        template.bombExplosionRadius &&
+        template.bombHp &&
+        template.bombMaxActive &&
+        template.bombRadius &&
+        template.bombSpeed &&
+        template.bombTtlMs
+    );
+
+    if (template.behavior === "bomber" && !hasBombStats) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Bomber enemies need bomb stats.",
       });
     }
   });

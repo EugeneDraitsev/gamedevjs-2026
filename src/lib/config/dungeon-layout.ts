@@ -216,7 +216,7 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
       bossAnchor.grid[0] + bossDirection.dx,
       bossAnchor.grid[1] + bossDirection.dy,
     ],
-    floor === 1 ? "boss-warden" : "boss-smelter",
+    floor === 1 ? "boss-warden" : "boss-bomber",
     premiumModules[Math.floor(random() * premiumModules.length)]
   );
 

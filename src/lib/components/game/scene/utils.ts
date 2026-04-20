@@ -6,6 +6,7 @@ import {
   enemyShotTtlMs,
 } from "$lib/game/scene-layout";
 import type {
+  ActiveBomb,
   ActiveEnemy,
   ActiveEnemyShot,
   ActiveProjectile,
@@ -71,6 +72,20 @@ export const resolveEnemyWallImpact = (
 };
 
 export const getEnemyMoveIntent = (enemy: ActiveEnemy, distance: number) => {
+  if (enemy.behavior === "bomber") {
+    const preferredRange = enemy.preferredRange ?? 6.4;
+
+    if (distance < preferredRange) {
+      return -1.1;
+    }
+
+    if (distance < preferredRange + 1.6) {
+      return -0.45;
+    }
+
+    return 0.25;
+  }
+
   if (enemy.behavior !== "shooter") {
     return 1;
   }
@@ -207,4 +222,75 @@ export const createEnemyShots = (
       Math.cos(baseYaw + spread) * shotSpeed,
     ],
   }));
+};
+
+export const createBombs = (
+  enemy: ActiveEnemy,
+  position: Vec3,
+  dx: number,
+  dz: number,
+  now: number
+): ActiveBomb[] => {
+  const {
+    bombArmMs,
+    bombColor,
+    bombCount,
+    bombDamage,
+    bombExplosionRadius,
+    bombHp,
+    bombRadius,
+    bombSpeed,
+    bombTtlMs,
+  } = enemy;
+
+  if (
+    typeof bombArmMs !== "number" ||
+    typeof bombColor !== "string" ||
+    typeof bombCount !== "number" ||
+    typeof bombDamage !== "number" ||
+    typeof bombExplosionRadius !== "number" ||
+    typeof bombHp !== "number" ||
+    typeof bombRadius !== "number" ||
+    typeof bombSpeed !== "number" ||
+    typeof bombTtlMs !== "number"
+  ) {
+    return [];
+  }
+
+  const baseYaw = Math.atan2(dx, dz);
+  const muzzleDistance = enemy.radius + bombRadius + 0.18;
+  const spreads = Array.from({ length: bombCount }, (_, index) => {
+    if (bombCount === 1) {
+      return 0;
+    }
+
+    const span = 0.88;
+
+    return -span / 2 + (span * index) / (bombCount - 1);
+  });
+
+  return spreads.map((spread) => {
+    const yaw = baseYaw + spread;
+
+    return {
+      armAt: now + bombArmMs,
+      color: bombColor,
+      damage: bombDamage,
+      explosionRadius: bombExplosionRadius,
+      expiresAt: now + bombTtlMs,
+      hp: bombHp,
+      id: crypto.randomUUID(),
+      lastHitAt: 0,
+      maxHp: bombHp,
+      originId: enemy.id,
+      position: [
+        position[0] + Math.sin(yaw) * muzzleDistance,
+        position[1],
+        position[2] + Math.cos(yaw) * muzzleDistance,
+      ],
+      radius: bombRadius,
+      spawnedAt: now,
+      velocity: [Math.sin(yaw) * bombSpeed, 0, Math.cos(yaw) * bombSpeed],
+    };
+  });
 };

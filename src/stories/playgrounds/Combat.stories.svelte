@@ -42,7 +42,4 @@
 
 <Story args={{ initialPresetId: "iron-warden" }} name="Boss — Iron Warden" />
 
-<Story
-  args={{ initialPresetId: "brass-overseer" }}
-  name="Boss — Brass Overseer"
-/>
+<Story args={{ initialPresetId: "mine-herald" }} name="Boss — Mine Herald" />

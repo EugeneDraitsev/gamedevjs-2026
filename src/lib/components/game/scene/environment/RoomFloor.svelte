@@ -68,7 +68,8 @@
 {/if}
 
 {#if (currentRoomTemplate.layout === "boss-foundry" ||
-  currentRoomTemplate.layout === "boss-crucible") &&
+  currentRoomTemplate.layout === "boss-crucible" ||
+  currentRoomTemplate.layout === "boss-bomber") &&
   bossFloorTexture}
   <T.Mesh
     position={[0, 0.032, 0]}

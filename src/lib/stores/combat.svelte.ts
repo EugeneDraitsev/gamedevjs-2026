@@ -1,5 +1,6 @@
 import type {
   ActiveBeam,
+  ActiveBomb,
   ActiveEnemy,
   ActiveEnemyShot,
   ActiveProjectile,
@@ -12,6 +13,7 @@ import type {
 export class CombatStore {
   enemies = $state<ActiveEnemy[]>([]);
   beams = $state<ActiveBeam[]>([]);
+  bombs = $state<ActiveBomb[]>([]);
   enemyShots = $state<ActiveEnemyShot[]>([]);
   projectiles = $state<ActiveProjectile[]>([]);
   deflectBursts = $state<DeflectBurst[]>([]);
@@ -88,6 +90,7 @@ export class CombatStore {
   resetForFloor() {
     this.enemies = [];
     this.beams = [];
+    this.bombs = [];
     this.enemyShots = [];
     this.projectiles = [];
     this.damagePopups = [];
@@ -100,6 +103,7 @@ export class CombatStore {
   clearForRoomChange() {
     this.enemies = [];
     this.beams = [];
+    this.bombs = [];
     this.enemyShots = [];
     this.projectiles = [];
     this.damagePopups = [];

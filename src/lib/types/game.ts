@@ -47,11 +47,23 @@ export interface ActiveBeam {
 }
 
 export interface ActiveEnemy {
-  behavior: "rush" | "shooter";
+  behavior: "rush" | "shooter" | "bomber";
+  bombArmMs?: number;
+  bombColor?: string;
+  bombCooldownMs?: number;
+  bombCount?: number;
+  bombDamage?: number;
+  bombExplosionRadius?: number;
+  bombHp?: number;
+  bombMaxActive?: number;
+  bombRadius?: number;
+  bombSpeed?: number;
+  bombTtlMs?: number;
   color: string;
   hp: number;
   id: string;
   knockbackVelocity: Vec3;
+  lastBombAt?: number;
   lastHitAt: number;
   lastShotAt: number;
   maxHp: number;
@@ -74,6 +86,23 @@ export interface ActiveEnemyShot {
   position: Vec3;
   radius: number;
   ttlMs: number;
+  velocity: Vec3;
+}
+
+export interface ActiveBomb {
+  armAt: number;
+  color: string;
+  damage: number;
+  expiresAt: number;
+  explosionRadius: number;
+  hp: number;
+  id: string;
+  lastHitAt: number;
+  maxHp: number;
+  originId: string;
+  position: Vec3;
+  radius: number;
+  spawnedAt: number;
   velocity: Vec3;
 }
 

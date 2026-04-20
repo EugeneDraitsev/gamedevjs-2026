@@ -163,13 +163,13 @@
     "enemyCount": 1
   },
   {
-    "id": "boss-smelter",
+    "id": "boss-bomber",
     "kind": "boss",
-    "label": "Crucible",
+    "label": "Mine Garden",
     "environment": "boss-gears",
-    "layout": "boss-crucible",
+    "layout": "boss-bomber",
     "spawnPattern": "boss",
-    "enemyTemplateId": "brass-overseer",
+    "enemyTemplateId": "mine-herald",
     "enemyCount": 1
   },
   {

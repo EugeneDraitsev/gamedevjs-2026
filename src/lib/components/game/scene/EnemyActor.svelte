@@ -38,6 +38,28 @@
     animationNow: number;
     enemy: ActiveEnemy;
   } = $props();
+
+  const bomberSatellites = $derived.by(() => {
+    if (enemy.behavior !== "bomber") {
+      return [];
+    }
+
+    const orbit = enemy.radius * 1.18;
+    const spin = animationNow * 0.0018;
+
+    return [0, 1, 2].map((index) => {
+      const yaw = spin + (index / 3) * Math.PI * 2;
+
+      return {
+        index,
+        position: [
+          Math.sin(yaw) * orbit,
+          enemy.radius * 0.18 + Math.sin(spin * 3 + index) * 0.08,
+          Math.cos(yaw) * orbit,
+        ] as [number, number, number],
+      };
+    });
+  });
 </script>
 
 <T.Group position={enemy.position}>
@@ -100,6 +122,23 @@
       />
     </T.Mesh>
   {/if}
+
+  {#each bomberSatellites as satellite (satellite.index)}
+    <T.Mesh
+      castShadow
+      position={satellite.position}
+      scale={[enemy.radius * 0.24, enemy.radius * 0.24, enemy.radius * 0.24]}
+    >
+      <T.SphereGeometry args={[1, 12, 12]} />
+      <T.MeshStandardMaterial
+        color={enemy.bombColor ?? enemy.color}
+        emissive={enemy.bombColor ?? enemy.color}
+        emissiveIntensity={0.6}
+        metalness={0.22}
+        roughness={0.32}
+      />
+    </T.Mesh>
+  {/each}
 
   <T.Group position={[0, enemy.radius + 0.38, 0]}>
     <T.Mesh

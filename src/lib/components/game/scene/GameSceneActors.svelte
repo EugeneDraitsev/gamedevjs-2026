@@ -1,5 +1,6 @@
 <script lang="ts">
   import { T } from "@threlte/core";
+  import BombActor from "$lib/components/game/scene/BombActor.svelte";
   import EnemyActor from "$lib/components/game/scene/EnemyActor.svelte";
   import { getGameSceneContext } from "$lib/stores/scene-context";
 
@@ -9,6 +10,10 @@
 
 {#each combat.enemies as enemy (enemy.id)}
   <EnemyActor animationNow={timing.now} {enemy} />
+{/each}
+
+{#each combat.bombs as bomb (bomb.id)}
+  <BombActor animationNow={timing.now} {bomb} />
 {/each}
 
 {#each combat.enemyShots as shot (shot.id)}

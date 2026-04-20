@@ -6,7 +6,7 @@
   import EnemyModelShowcase from "../_helpers/EnemyModelShowcase.svelte";
 
   const allTemplates = enemyTemplateData as EnemyTemplate[];
-  const bossIds = new Set(["iron-warden", "brass-overseer"]);
+  const bossIds = new Set(["iron-warden", "mine-herald"]);
   const bosses = allTemplates.filter((template) => bossIds.has(template.id));
   const byId = (id: string): EnemyTemplate => {
     const template = bosses.find((entry) => entry.id === id);
@@ -45,7 +45,7 @@
   args={{
     autoRotate: true,
     height: "520px",
-    template: byId("brass-overseer"),
+    template: byId("mine-herald"),
   }}
-  name="Brass Overseer"
+  name="Mine Herald"
 />

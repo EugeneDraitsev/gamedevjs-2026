@@ -146,11 +146,12 @@ export const combatPresets: CombatPreset[] = [
     templateId: "boss-warden",
   },
   {
-    description: "Boss fight: Brass Overseer.",
+    description:
+      "Boss fight: Mine Herald kites and scatters arming bombs — slash unarmed ones.",
     enemyCount: 1,
-    enemyTemplateId: "brass-overseer",
-    id: "brass-overseer",
-    label: "Boss — Brass Overseer",
-    templateId: "boss-smelter",
+    enemyTemplateId: "mine-herald",
+    id: "mine-herald",
+    label: "Boss — Mine Herald",
+    templateId: "boss-bomber",
   },
 ];

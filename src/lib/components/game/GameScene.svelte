@@ -21,6 +21,7 @@
   import { stepEnemies } from "$lib/game/enemy-stepper";
   import {
     applyMeleeDeflects,
+    applyMeleeHitsToBombs,
     applyMeleeHitsToEnemies,
     handleMeleeFrame,
   } from "$lib/game/melee-resolver";
@@ -112,6 +113,7 @@
       room.clearedSet
     );
     combat.beams = [];
+    combat.bombs = [];
     combat.enemyShots = [];
     timing.lastHazardAt = performance.now();
     room.doorOpenAmount =
@@ -191,6 +193,13 @@
 
     if (!timing.bossIntroActive && combat.currentMeleeFrame) {
       applyMeleeHitsToEnemies({
+        combat,
+        frame: combat.currentMeleeFrame,
+        hitboxPadding: settings.meleeHitboxPadding,
+        meleeParams: scene.meleeParams,
+        weaponBuild: scene.weaponBuild,
+      });
+      applyMeleeHitsToBombs({
         combat,
         frame: combat.currentMeleeFrame,
         hitboxPadding: settings.meleeHitboxPadding,

@@ -7,6 +7,7 @@ import type { WeaponBuild } from "$lib/config/weapon-graph";
 import { cheats } from "$lib/stores/cheats.svelte";
 import type { CombatStore } from "$lib/stores/combat.svelte";
 import type {
+  ActiveBomb,
   ActiveEnemy,
   ActiveEnemyShot,
   DeflectBurst,
@@ -88,6 +89,73 @@ export const applyMeleeDeflects = ({
 interface ApplyMeleeHitsArgs extends ApplyMeleeArgs {
   weaponBuild: WeaponBuild;
 }
+
+export const applyMeleeHitsToBombs = ({
+  combat,
+  frame,
+  hitboxPadding,
+  meleeParams,
+  weaponBuild,
+}: ApplyMeleeHitsArgs) => {
+  if (!frame.active || combat.bombs.length === 0) {
+    return;
+  }
+
+  const swingConfig: SwingParams = {
+    ...meleeParams,
+    damage: weaponBuild.meleeDamage,
+    reach: meleeParams.reach + hitboxPadding,
+  };
+  const now = performance.now();
+  const survivors: ActiveBomb[] = [];
+
+  for (const bomb of combat.bombs) {
+    const armed = now >= bomb.armAt;
+
+    if (
+      armed ||
+      !isPointInSwing(
+        bomb.position,
+        frame.t,
+        frame.center,
+        frame.facingYaw,
+        swingConfig
+      )
+    ) {
+      survivors.push(bomb);
+      continue;
+    }
+
+    const damage = cheats.oneHitKill ? bomb.hp : swingConfig.damage;
+
+    combat.popDamage(
+      damage,
+      [
+        bomb.position[0],
+        bomb.position[1] + bomb.radius + 0.28,
+        bomb.position[2],
+      ],
+      "enemy"
+    );
+
+    const remaining = bomb.hp - damage;
+
+    if (remaining <= 0) {
+      combat.deflectBursts.push({
+        color: bomb.color,
+        createdAt: now,
+        id: crypto.randomUUID(),
+        position: bomb.position,
+        radius: bomb.radius * 1.4,
+      });
+      continue;
+    }
+
+    survivors.push({ ...bomb, hp: remaining, lastHitAt: now });
+  }
+
+  combat.bombs = survivors;
+};
 
 export const applyMeleeHitsToEnemies = ({
   combat,
