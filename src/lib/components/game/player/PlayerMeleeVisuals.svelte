@@ -40,7 +40,7 @@
   rotation={[0, swordRotationY, 0]}
 >
   <T.Mesh
-    castShadow
+    castShadow={swordVisibleOpacity > 0.001}
     position={[0, 0, meleeParams.innerRadius - 0.18]}
     rotation={[Math.PI / 2, 0, 0]}
   >
@@ -54,7 +54,10 @@
     />
   </T.Mesh>
 
-  <T.Mesh castShadow position={[0, 0, meleeParams.innerRadius]}>
+  <T.Mesh
+    castShadow={swordVisibleOpacity > 0.001}
+    position={[0, 0, meleeParams.innerRadius]}
+  >
     <T.CylinderGeometry args={[0.035, 0.035, 0.46, 16]} />
     <T.MeshStandardMaterial
       color="#c08a2f"
