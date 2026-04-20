@@ -120,8 +120,18 @@
     weaponLabOpen = true;
   };
 
+  const withDebugParam = (path: string) => {
+    const nextUrl = new URL(path, page.url);
+
+    if (page.url.searchParams.get("debug") === "true") {
+      nextUrl.searchParams.set("debug", "true");
+    }
+
+    return nextUrl;
+  };
+
   const openMainMenu = async () => {
-    await goto("/");
+    await goto(withDebugParam("/"));
   };
 
   const setDebugEnabled = async (enabled: boolean) => {

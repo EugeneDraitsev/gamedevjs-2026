@@ -31,6 +31,16 @@
     });
   };
 
+  const withDebugParam = (path: string) => {
+    const nextUrl = new URL(path, page.url);
+
+    if (page.url.searchParams.get("debug") === "true") {
+      nextUrl.searchParams.set("debug", "true");
+    }
+
+    return nextUrl;
+  };
+
   $effect(() => {
     saveSceneSettings(settings);
   });
@@ -42,7 +52,7 @@
   <SettingsPanel
     {debugEnabled}
     bind:settings
-    onBack={() => goto("/")}
+    onBack={() => goto(withDebugParam("/"))}
     onDebugEnabledChange={setDebugEnabled}
     onResetDefaults={resetDefaults}
   />

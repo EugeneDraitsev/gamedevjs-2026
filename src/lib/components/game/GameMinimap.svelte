@@ -82,7 +82,7 @@
     right: 1.35rem;
     z-index: 8;
     display: flex;
-    gap: 0.45rem;
+    gap: 0.65rem;
     align-items: flex-start;
   }
 

@@ -43,9 +43,6 @@
   {#if !onOpenMainMenu}
     <div class="panel-header">
       <h2>Run Settings</h2>
-      <p>
-        Tune the camera, material palette, and debug flags before the descent.
-      </p>
     </div>
 
     <div class="panel-rule"></div>
@@ -142,10 +139,6 @@
     background-clip: text;
     filter: drop-shadow(0 0 18px rgba(230, 188, 104, 0.12))
       drop-shadow(0 10px 20px rgba(0, 0, 0, 0.34));
-  }
-
-  .panel p {
-    max-inline-size: 30rem;
   }
 
   .toggle {
