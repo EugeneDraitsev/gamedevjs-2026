@@ -34,6 +34,7 @@ export const enemyFromTemplate = (
   shotDamage: template.shotDamage,
   shotIntervalMs: template.shotIntervalMs,
   shotSpeed: template.shotSpeed,
+  templateId: template.id,
   touchDamage: template.touchDamage,
   touchIntervalMs: template.touchIntervalMs,
 });

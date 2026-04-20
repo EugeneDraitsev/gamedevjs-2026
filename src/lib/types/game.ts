@@ -75,6 +75,7 @@ export interface ActiveEnemy {
   shotDamage?: number;
   shotIntervalMs?: number;
   shotSpeed?: number;
+  templateId: string;
   touchDamage: number;
   touchIntervalMs: number;
 }

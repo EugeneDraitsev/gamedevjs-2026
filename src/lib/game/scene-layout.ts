@@ -950,6 +950,7 @@ export const createRoomEnemies = (
     shotDamage: enemyTemplate.shotDamage,
     shotIntervalMs: enemyTemplate.shotIntervalMs,
     shotSpeed: enemyTemplate.shotSpeed,
+    templateId: enemyTemplate.id,
     touchDamage: enemyTemplate.touchDamage,
     touchIntervalMs: enemyTemplate.touchIntervalMs,
   }));

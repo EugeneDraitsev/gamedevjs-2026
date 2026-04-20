@@ -22,8 +22,8 @@
   const cameraTargetY = $derived(mountY);
 </script>
 
-<ModelTurntable autoRotate={false} {cameraTargetY} {groundY} {label}>
+<ModelTurntable {autoRotate} {cameraTargetY} {groundY} {label}>
   <T.Group position={[0, mountY, 0]}>
-    <OrbKnight {autoRotate} {hitFlash} {scale} />
+    <OrbKnight autoRotate={false} {hitFlash} {scale} />
   </T.Group>
 </ModelTurntable>

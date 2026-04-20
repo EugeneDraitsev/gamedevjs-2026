@@ -1,6 +1,8 @@
 <script module lang="ts">
   import {
     BoxGeometry,
+    ConeGeometry,
+    CylinderGeometry,
     MeshBasicMaterial,
     MeshStandardMaterial,
     RingGeometry,
@@ -9,8 +11,11 @@
 
   export const enemyRingGeometry = new RingGeometry(1.15, 1.45, 36);
   export const enemyBodyGeometry = new SphereGeometry(1, 24, 24);
+  export const enemyLampShellGeometry = new SphereGeometry(1, 10, 8);
+  export const enemyLampBandGeometry = new CylinderGeometry(1, 1, 1, 10);
   export const enemyEyeGeometry = new SphereGeometry(1, 16, 16);
   export const enemyGunGeometry = new BoxGeometry(1, 1, 1);
+  export const enemyConeGeometry = new ConeGeometry(1, 1, 18);
   export const enemyHealthBarGeometry = new BoxGeometry(1.1, 0.11, 0.06);
   export const enemyEyeMaterial = new MeshStandardMaterial({
     color: "#f5fbff",
@@ -39,13 +44,30 @@
     enemy: ActiveEnemy;
   } = $props();
 
+  const isMineHerald = $derived(enemy.templateId === "mine-herald");
+  const hitFlash = $derived(animationNow - enemy.lastHitAt < 130);
+  const lampBob = $derived(
+    Math.sin(animationNow * 0.0022 + enemy.radius) * enemy.radius * 0.05
+  );
+  const lampPulse = $derived(0.9 + Math.sin(animationNow * 0.0052) * 0.1);
+  const lampYaw = $derived(Math.sin(animationNow * 0.000_45) * 0.14);
+
+  const heraldBands = [
+    { color: "#ff7348", height: 0.14, index: 0, radius: 0.28, y: -0.58 },
+    { color: "#ff6a42", height: 0.18, index: 1, radius: 0.42, y: -0.34 },
+    { color: "#ff5d3a", height: 0.22, index: 2, radius: 0.6, y: -0.08 },
+    { color: "#ff4f35", height: 0.24, index: 3, radius: 0.76, y: 0.18 },
+    { color: "#ff5b39", height: 0.22, index: 4, radius: 0.62, y: 0.42 },
+    { color: "#ff6942", height: 0.16, index: 5, radius: 0.42, y: 0.64 },
+  ] as const;
+
   const bomberSatellites = $derived.by(() => {
     if (enemy.behavior !== "bomber") {
       return [];
     }
 
-    const orbit = enemy.radius * 1.18;
-    const spin = animationNow * 0.0018;
+    const orbit = enemy.radius * (isMineHerald ? 1.46 : 1.18);
+    const spin = animationNow * (isMineHerald ? 0.000_55 : 0.0018);
 
     return [0, 1, 2].map((index) => {
       const yaw = spin + (index / 3) * Math.PI * 2;
@@ -54,7 +76,10 @@
         index,
         position: [
           Math.sin(yaw) * orbit,
-          enemy.radius * 0.18 + Math.sin(spin * 3 + index) * 0.08,
+          enemy.radius * (isMineHerald ? 0.08 : 0.18) +
+            Math.sin(spin * 3 + index) *
+              enemy.radius *
+              (isMineHerald ? 0.03 : 0.08),
           Math.cos(yaw) * orbit,
         ] as [number, number, number],
       };
@@ -75,61 +100,221 @@
     </T.Mesh>
   {/if}
 
-  <T.Mesh
-    geometry={enemyBodyGeometry}
-    castShadow
-    receiveShadow
-    scale={[enemy.radius, enemy.radius, enemy.radius]}
-  >
-    <T.MeshStandardMaterial
-      color={animationNow - enemy.lastHitAt < 130 ? "#fff4da" : enemy.color}
-      emissive={enemy.color}
-      emissiveIntensity={animationNow - enemy.lastHitAt < 130 ? 0.52 : 0.18}
-      metalness={0.16}
-      roughness={0.36}
-    />
-  </T.Mesh>
+  {#if isMineHerald}
+    <T.Group position={[0, lampBob, 0]} rotation={[0, lampYaw, 0]}>
+      <T.Mesh
+        geometry={enemyLampShellGeometry}
+        castShadow
+        receiveShadow
+        scale={[enemy.radius * 0.98, enemy.radius * 1.08, enemy.radius * 0.98]}
+      >
+        <T.MeshStandardMaterial
+          color="#2d1c1a"
+          emissive="#5a2b22"
+          emissiveIntensity={0.24}
+          flatShading
+          metalness={0.26}
+          opacity={0.42}
+          roughness={0.18}
+          transparent
+        />
+      </T.Mesh>
 
-  <T.Mesh
-    geometry={enemyEyeGeometry}
-    material={enemyEyeMaterial}
-    castShadow
-    position={[0, enemy.radius * 0.92, 0]}
-    scale={[
-      enemy.radius * 0.38,
-      enemy.radius * 0.38,
-      enemy.radius * 0.38,
-    ]}
-  />
+      <T.Mesh
+        geometry={enemyLampShellGeometry}
+        scale={[enemy.radius * 1.01, enemy.radius * 1.11, enemy.radius * 1.01]}
+      >
+        <T.MeshBasicMaterial
+          color="#f7c4a8"
+          opacity={0.22}
+          transparent
+          wireframe
+        />
+      </T.Mesh>
 
-  {#if enemy.behavior === "shooter"}
+      <T.Mesh
+        geometry={enemyLampShellGeometry}
+        castShadow
+        scale={[
+          enemy.radius * 0.56 * lampPulse,
+          enemy.radius * 0.8 * lampPulse,
+          enemy.radius * 0.56 * lampPulse,
+        ]}
+      >
+        <T.MeshStandardMaterial
+          color={enemy.color}
+          emissive={enemy.color}
+          emissiveIntensity={1}
+          flatShading
+          metalness={0.08}
+          roughness={0.12}
+        />
+      </T.Mesh>
+
+      {#each heraldBands as band (band.index)}
+        <T.Mesh
+          geometry={enemyLampBandGeometry}
+          castShadow
+          receiveShadow
+          position={[0, band.y * enemy.radius, 0]}
+          scale={[
+            enemy.radius * band.radius,
+            enemy.radius * band.height,
+            enemy.radius * band.radius,
+          ]}
+        >
+          <T.MeshStandardMaterial
+            color={band.color}
+            emissive={band.color}
+            emissiveIntensity={band.index === 3 ? 0.72 : 0.48}
+            flatShading
+            metalness={0.16}
+            roughness={0.14}
+          />
+        </T.Mesh>
+
+        <T.Mesh
+          geometry={enemyLampBandGeometry}
+          position={[0, band.y * enemy.radius, 0]}
+          scale={[
+            enemy.radius * band.radius * 1.02,
+            enemy.radius * band.height * 1.02,
+            enemy.radius * band.radius * 1.02,
+          ]}
+        >
+          <T.MeshBasicMaterial
+            color="#ffcfb5"
+            opacity={0.2}
+            transparent
+            wireframe
+          />
+        </T.Mesh>
+      {/each}
+
+      <T.Mesh
+        geometry={enemyLampBandGeometry}
+        castShadow
+        position={[0, enemy.radius * 0.92, 0]}
+        scale={[enemy.radius * 0.28, enemy.radius * 0.12, enemy.radius * 0.28]}
+      >
+        <T.MeshStandardMaterial
+          color="#4a2e28"
+          flatShading
+          metalness={0.28}
+          roughness={0.16}
+        />
+      </T.Mesh>
+
+      <T.Mesh castShadow position={[0, enemy.radius * 1.36, 0]}>
+        <T.CylinderGeometry
+          args={[enemy.radius * 0.08, enemy.radius * 0.08, enemy.radius * 0.68, 10]}
+        />
+        <T.MeshStandardMaterial
+          color="#45322d"
+          flatShading
+          metalness={0.32}
+          roughness={0.14}
+        />
+      </T.Mesh>
+
+      <T.Mesh castShadow position={[0, enemy.radius * 1.76, 0]}>
+        <T.CylinderGeometry
+          args={[enemy.radius * 0.26, enemy.radius * 0.18, enemy.radius * 0.32, 10]}
+        />
+        <T.MeshStandardMaterial
+          color="#3a2c29"
+          flatShading
+          metalness={0.3}
+          roughness={0.16}
+        />
+      </T.Mesh>
+
+      <T.Mesh
+        geometry={enemyConeGeometry}
+        castShadow
+        position={[0, -enemy.radius * 0.96, 0]}
+        rotation={[Math.PI, 0, 0]}
+        scale={[
+          enemy.radius * 0.14,
+          enemy.radius * 0.28,
+          enemy.radius * 0.14,
+        ]}
+      >
+        <T.MeshStandardMaterial
+          color={enemy.shotColor ?? enemy.color}
+          emissive={enemy.shotColor ?? enemy.color}
+          emissiveIntensity={0.64}
+          metalness={0.12}
+          roughness={0.14}
+        />
+      </T.Mesh>
+    </T.Group>
+  {:else}
     <T.Mesh
-      geometry={enemyGunGeometry}
+      geometry={enemyBodyGeometry}
       castShadow
-      position={[0, enemy.radius * 0.34, enemy.radius * 0.8]}
-      scale={[
-        enemy.radius * 0.52,
-        enemy.radius * 0.28,
-        enemy.radius * 0.92,
-      ]}
+      receiveShadow
+      scale={[enemy.radius, enemy.radius, enemy.radius]}
     >
       <T.MeshStandardMaterial
-        color={enemy.shotColor ?? enemy.color}
-        emissive={enemy.shotColor ?? enemy.color}
-        emissiveIntensity={0.12}
-        metalness={0.28}
-        roughness={0.26}
+        color={hitFlash ? "#fff4da" : enemy.color}
+        emissive={enemy.color}
+        emissiveIntensity={hitFlash ? 0.52 : 0.18}
+        metalness={0.16}
+        roughness={0.36}
       />
     </T.Mesh>
+
+    <T.Mesh
+      geometry={enemyEyeGeometry}
+      material={enemyEyeMaterial}
+      castShadow
+      position={[0, enemy.radius * 0.92, 0]}
+      scale={[
+        enemy.radius * 0.38,
+        enemy.radius * 0.38,
+        enemy.radius * 0.38,
+      ]}
+    />
+
+    {#if enemy.behavior === "shooter"}
+      <T.Mesh
+        geometry={enemyGunGeometry}
+        castShadow
+        position={[0, enemy.radius * 0.34, enemy.radius * 0.8]}
+        scale={[
+          enemy.radius * 0.52,
+          enemy.radius * 0.28,
+          enemy.radius * 0.92,
+        ]}
+      >
+        <T.MeshStandardMaterial
+          color={enemy.shotColor ?? enemy.color}
+          emissive={enemy.shotColor ?? enemy.color}
+          emissiveIntensity={0.12}
+          metalness={0.28}
+          roughness={0.26}
+        />
+      </T.Mesh>
+    {/if}
   {/if}
 
   {#each bomberSatellites as satellite (satellite.index)}
     <T.Mesh
       castShadow
       position={satellite.position}
-      scale={[enemy.radius * 0.24, enemy.radius * 0.24, enemy.radius * 0.24]}
+      scale={[
+        enemy.radius * (isMineHerald ? 0.14 : 0.24),
+        enemy.radius * (isMineHerald ? 0.14 : 0.24),
+        enemy.radius * (isMineHerald ? 0.14 : 0.24),
+      ]}
+      rotation={[0, animationNow * 0.0012, 0]}
     >
-      <T.SphereGeometry args={[1, 12, 12]} />
+      {#if isMineHerald}
+        <T.BoxGeometry args={[1, 1, 1]} />
+      {:else}
+        <T.SphereGeometry args={[1, 12, 12]} />
+      {/if}
       <T.MeshStandardMaterial
         color={enemy.bombColor ?? enemy.color}
         emissive={enemy.bombColor ?? enemy.color}

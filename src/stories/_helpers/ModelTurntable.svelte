@@ -2,7 +2,6 @@
   import { Canvas, T } from "@threlte/core";
   import { OrbitControls } from "@threlte/extras";
   import type { Snippet } from "svelte";
-  import TurntableMount from "./TurntableMount.svelte";
 
   interface Props {
     autoRotate?: boolean;
@@ -36,6 +35,8 @@
     <Canvas dpr={2} shadows>
       <T.PerspectiveCamera fov={42} makeDefault position={[3.4, 2.4, 4.6]}>
         <OrbitControls
+          {autoRotate}
+          autoRotateSpeed={rotateSpeed * 10}
           enableDamping
           enableZoom={false}
           target={[0, cameraTargetY, 0]}
@@ -60,9 +61,7 @@
         <T.MeshStandardMaterial color="#0f1a2c" roughness={0.96} />
       </T.Mesh>
 
-      <TurntableMount {autoRotate} {rotateSpeed}>
-        {@render children()}
-      </TurntableMount>
+      {@render children()}
     </Canvas>
   </div>
 </div>
