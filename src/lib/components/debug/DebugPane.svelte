@@ -16,6 +16,7 @@
     SceneSettings,
     WallTheme,
   } from "$lib/config/scene-settings";
+  import { cheats } from "$lib/stores/cheats.svelte";
 
   interface DebugPaneProps {
     onResetDefaults: () => void;
@@ -377,6 +378,15 @@
         bind:value={settings.wallTheme}
         label="Walls"
         options={wallThemeOptions}
+      />
+    </Folder>
+
+    <Folder title="Cheats" expanded={false}>
+      <Checkbox bind:value={cheats.oneHitKill} label="One-Hit Kill" />
+      <Checkbox bind:value={cheats.infiniteHealth} label="Infinite Health" />
+      <Button
+        on:click={() => cheats.requestRevealMap()}
+        title="Reveal Entire Map"
       />
     </Folder>
 

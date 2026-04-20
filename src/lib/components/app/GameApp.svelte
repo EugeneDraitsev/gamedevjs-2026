@@ -6,6 +6,7 @@
   import { DEFAULT_SWING, type SwingParams } from "$lib/combat/melee-swing";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import GameScene from "$lib/components/game/GameScene.svelte";
+  import MobileControls from "$lib/components/game/MobileControls.svelte";
   import WeaponLabModal from "$lib/components/weapon-lab/WeaponLabModal.svelte";
   import { createDungeonLayout } from "$lib/config/dungeon-layout";
   import {
@@ -22,7 +23,9 @@
     type WeaponNodeType,
   } from "$lib/config/weapon-graph";
   import { isEditableTarget } from "$lib/game/dom";
+  import { isTouchDevice } from "$lib/game/mobile";
   import { loadRunSave, saveRunSave } from "$lib/game/run-save";
+  import { mobileInput } from "$lib/stores/mobile-input.svelte";
   import type { MeleeTrailSettings } from "$lib/types/game";
 
   interface GameAppProps {
@@ -44,6 +47,7 @@
   let collectedArtifactRooms = $state<string[]>([]);
   let floorIndex = $state(1);
   let runReady = $state(page.url.searchParams.get("continue") !== "1");
+  let touchControls = $state(false);
 
   const startingDungeon = $derived.by(() =>
     createDungeonLayout(`${seed}-f1`, 1)
@@ -101,6 +105,19 @@
 
   const closeSettings = () => {
     settingsOpen = false;
+  };
+
+  const openSettings = () => {
+    weaponLabOpen = false;
+    settingsOpen = true;
+  };
+
+  const openWeaponLab = () => {
+    if (settingsOpen) {
+      return;
+    }
+
+    weaponLabOpen = true;
   };
 
   const openMainMenu = async () => {
@@ -184,6 +201,14 @@
     }
 
     runReady = true;
+    touchControls = isTouchDevice();
+
+    const coarseQuery = window.matchMedia("(pointer: coarse)");
+    const onCoarseChange = (event: MediaQueryListEvent) => {
+      touchControls = event.matches || isTouchDevice();
+    };
+
+    coarseQuery.addEventListener("change", onCoarseChange);
 
     let isActive = true;
 
@@ -226,7 +251,15 @@
     return () => {
       isActive = false;
       window.removeEventListener("keydown", handleKeyDown);
+      coarseQuery.removeEventListener("change", onCoarseChange);
+      mobileInput.reset();
     };
+  });
+
+  $effect(() => {
+    if (controlsLocked) {
+      mobileInput.reset();
+    }
   });
 </script>
 
@@ -248,11 +281,15 @@
         meleeParams={swingParams}
         meleeTrailSettings={trailSettings}
         onCollectArtifact={collectArtifact}
+        onOpenSettings={openSettings}
+        onOpenWeaponLab={openWeaponLab}
         {settings}
         weaponBuild={weaponPreview}
       />
     {/key}
   {/if}
+
+  <MobileControls visible={touchControls && !controlsLocked} />
 
   {#if debugEnabled && DebugPane}
     <DebugPane
@@ -265,7 +302,15 @@
   {/if}
 
   {#if settingsOpen}
-    <dialog class="settings-dialog" open>
+    <dialog
+      class="settings-dialog"
+      open
+      onclick={(event) => {
+        if (event.target === event.currentTarget) {
+          closeSettings();
+        }
+      }}
+    >
       <SettingsPanel
         {debugEnabled}
         bind:settings
@@ -334,15 +379,24 @@
     position: fixed;
     inset: 0;
     z-index: 20;
-    display: grid;
-    place-items: center;
-    inline-size: 100%;
-    max-inline-size: none;
-    block-size: 100%;
-    max-block-size: none;
-    padding: 1rem;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 100vw;
+    max-inline-size: 100vw;
+    block-size: 100dvh;
+    max-block-size: 100dvh;
+    padding: 1.5rem;
+    margin: 0;
     background: transparent;
     border: 0;
+  }
+
+  @media (max-width: 700px) {
+    .settings-dialog {
+      padding: 1rem;
+    }
   }
 
   .settings-dialog::backdrop {
@@ -365,7 +419,10 @@
     display: grid;
     gap: 1.05rem;
     inline-size: min(100%, 36rem);
+    max-block-size: calc(100dvh - 3rem);
     padding: 1.55rem 1.5rem 1.4rem;
+    margin: 0;
+    overflow-y: auto;
     color: #eff7ff;
     background:
       radial-gradient(
@@ -384,6 +441,31 @@
     box-shadow:
       inset 0 1px 0 rgba(255, 243, 217, 0.05),
       0 24px 60px rgba(0, 0, 0, 0.34);
+  }
+
+  @media (max-width: 700px) {
+    :global(.settings-dialog .panel) {
+      gap: 1rem;
+      inline-size: min(100%, 20rem);
+      max-block-size: calc(100dvh - 2.5rem);
+      padding: 1.4rem 1.25rem 1.25rem;
+      overflow-y: auto;
+      border-radius: 1rem;
+    }
+
+    :global(.settings-dialog .panel .actions) {
+      gap: 0.7rem;
+      padding-top: 0.7rem;
+      margin-top: 0.4rem;
+    }
+
+    :global(.settings-dialog .panel .toggle) {
+      padding-block: 0.2rem;
+    }
+
+    :global(.settings-dialog .panel .menu-button) {
+      font-size: 1.05rem;
+    }
   }
 
   :global(.settings-dialog .eyebrow) {

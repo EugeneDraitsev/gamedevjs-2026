@@ -488,6 +488,62 @@
   }
 
   @media (max-width: 700px) {
+    .backdrop {
+      place-items: stretch;
+      padding: 0.5rem;
+    }
+
+    .modal {
+      inline-size: 100%;
+      block-size: calc(100dvh - 1rem);
+      max-block-size: calc(100dvh - 1rem);
+      border-radius: 0.9rem;
+    }
+
+    .header {
+      padding: 0.75rem 0.85rem;
+    }
+
+    .header strong {
+      font-size: 1rem;
+    }
+
+    .header span {
+      font-size: 0.72rem;
+    }
+
+    .header button {
+      padding: 0.5rem 0.8rem;
+      font-size: 0.9rem;
+    }
+
+    .layout {
+      display: block;
+      overflow-y: auto;
+      min-block-size: 0;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .workspace {
+      display: block;
+    }
+
+    :global(.flow-pane) {
+      display: block;
+      block-size: 22rem;
+      min-block-size: 22rem;
+    }
+
+    :global(.palette),
+    :global(.preview) {
+      padding: 0.9rem;
+    }
+
+    :global(.slot-strip > div) {
+      min-inline-size: 5.5rem;
+      padding: 0.5rem;
+    }
+
     :global(.stat-grid),
     :global(.damage-bands) {
       grid-template-columns: 1fr;

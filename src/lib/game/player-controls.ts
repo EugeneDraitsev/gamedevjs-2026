@@ -23,11 +23,22 @@ export const isGameplayPreventDefaultCode = (code: string) =>
   code === "ArrowLeft" ||
   code === "ArrowRight";
 
+export interface AnalogMove {
+  x: number;
+  z: number;
+}
+
 export const readMovementInput = (
   pressed: Set<string>,
-  moveDirection: Vector3
+  moveDirection: Vector3,
+  analogMove?: AnalogMove | null
 ) => {
   moveDirection.set(0, 0, 0);
+
+  if (analogMove && (analogMove.x !== 0 || analogMove.z !== 0)) {
+    moveDirection.set(analogMove.x, 0, analogMove.z);
+    return true;
+  }
 
   if (pressed.has("KeyW") || pressed.has("ArrowUp")) {
     moveDirection.z -= 1;
@@ -50,16 +61,23 @@ export const getDesiredHorizontalVelocity = (
   moveDirection: Vector3,
   moveSpeed: number,
   moveSpeedFactor: number,
-  velocity: ReturnType<RapierRigidBody["linvel"]>
+  velocity: ReturnType<RapierRigidBody["linvel"]>,
+  analogMove?: AnalogMove | null
 ) => {
-  const hasInput = readMovementInput(pressed, moveDirection);
+  const hasInput = readMovementInput(pressed, moveDirection, analogMove);
+  const analogMagnitude =
+    analogMove && (analogMove.x !== 0 || analogMove.z !== 0)
+      ? Math.min(1, Math.hypot(analogMove.x, analogMove.z))
+      : 1;
 
   if (hasInput) {
     moveDirection.normalize();
   }
 
+  const effectiveSpeed = moveSpeed * moveSpeedFactor * analogMagnitude;
+
   return {
-    x: hasInput ? moveDirection.x * moveSpeed * moveSpeedFactor : velocity.x,
-    z: hasInput ? moveDirection.z * moveSpeed * moveSpeedFactor : velocity.z,
+    x: hasInput ? moveDirection.x * effectiveSpeed : velocity.x,
+    z: hasInput ? moveDirection.z * effectiveSpeed : velocity.z,
   };
 };

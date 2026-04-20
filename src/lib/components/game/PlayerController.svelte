@@ -38,6 +38,7 @@
   import PlayerMeleeVisuals from "$lib/components/game/player/PlayerMeleeVisuals.svelte";
   import { getDesiredHorizontalVelocity as resolveHorizontalVelocity } from "$lib/game/player-controls";
   import { clampToRoom } from "$lib/game/scene-layout";
+  import { mobileInput } from "$lib/stores/mobile-input.svelte";
   import { getGameSceneContext } from "$lib/stores/scene-context";
   import type { CameraMode, Vec3 } from "$lib/types/game";
   import type { PlayerControllerProps } from "$lib/types/game-components";
@@ -92,6 +93,10 @@
   let meleeRequested = false;
   let mouseScreenX = 0;
   let mouseScreenY = 0;
+  let lastMobileJumpPulse = 0;
+  let lastMobileMeleePulse = 0;
+  let mobileShooting = false;
+  const playerScreenProjection = new Vector3();
   let isGroundedState = $state(false);
   let rigidBody = $state<RapierRigidBody>();
   let lastShotAt = 0;
@@ -329,14 +334,19 @@
 
   const getDesiredHorizontalVelocity = (
     velocity: ReturnType<RapierRigidBody["linvel"]>
-  ) =>
-    resolveHorizontalVelocity(
+  ) => {
+    const analog = mobileInput.moveVector;
+    const analogActive = analog.x !== 0 || analog.y !== 0;
+
+    return resolveHorizontalVelocity(
       pressed,
       moveDirection,
       settings.moveSpeed,
       scene.moveSpeedFactor,
-      velocity
+      velocity,
+      analogActive ? { x: analog.x, z: analog.y } : null
     );
+  };
 
   const updateBodyMovement = (body: RapierRigidBody, delta: number) => {
     const velocity = body.linvel();
@@ -757,6 +767,61 @@
     body.wakeUp();
   };
 
+  const pollMobileInput = (
+    body: RapierRigidBody,
+    activeCamera: NonNullable<typeof camera.current>
+  ) => {
+    if (scene.sceneControlsLocked || settings.cameraMode === "orbit") {
+      lastMobileJumpPulse = mobileInput.jumpPulse;
+      lastMobileMeleePulse = mobileInput.meleePulse;
+      return;
+    }
+
+    if (mobileInput.jumpPulse !== lastMobileJumpPulse) {
+      lastMobileJumpPulse = mobileInput.jumpPulse;
+      jumpRequested = true;
+    }
+
+    if (mobileInput.meleePulse !== lastMobileMeleePulse) {
+      lastMobileMeleePulse = mobileInput.meleePulse;
+      meleeRequested = true;
+    }
+
+    const aim = mobileInput.aimVector;
+
+    if (!aim) {
+      if (mobileShooting) {
+        mobileShooting = false;
+        shootingHeld = false;
+        shootRequested = false;
+      }
+      return;
+    }
+
+    const translation = body.translation();
+
+    playerScreenProjection.set(
+      translation.x,
+      translation.y + projectileHeightOffset,
+      translation.z
+    );
+    activeCamera.updateMatrixWorld();
+    playerScreenProjection.project(activeCamera);
+
+    const playerScreenX =
+      ((playerScreenProjection.x + 1) / 2) * window.innerWidth;
+    const playerScreenY =
+      ((1 - playerScreenProjection.y) / 2) * window.innerHeight;
+    const offset = Math.max(window.innerWidth, window.innerHeight);
+
+    mouseScreenX = playerScreenX + aim.x * offset;
+    mouseScreenY = playerScreenY + aim.y * offset;
+    crosshair.set(mouseScreenX, mouseScreenY);
+    mobileShooting = true;
+    shootingHeld = true;
+    shootRequested = true;
+  };
+
   useTask((delta) => {
     const body = rigidBody;
     const activeCamera = camera.current;
@@ -765,6 +830,7 @@
       return;
     }
 
+    pollMobileInput(body, activeCamera);
     updateBodyMovement(body, delta);
     keepBodyInRoom(body);
 

@@ -51,9 +51,20 @@
     <div class="panel-rule"></div>
   {/if}
 
-  <label class="toggle">
-    <input type="checkbox" bind:checked={settings.showPhysicsDebug}>
-    <span>Physics Debug</span>
+  <label class="slider">
+    <span class="slider-label">
+      <span>Minimap Opacity</span>
+      <span class="slider-value">
+        {Math.round(settings.minimapOpacity * 100)}%
+      </span>
+    </span>
+    <input
+      type="range"
+      min="0.1"
+      max="1"
+      step="0.05"
+      bind:value={settings.minimapOpacity}
+    >
   </label>
 
   {#if onDebugEnabledChange}
@@ -145,11 +156,47 @@
     accent-color: #d5b06f;
   }
 
+  .slider {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .slider-label {
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .slider-label > span:first-child {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: rgba(221, 200, 154, 0.72);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  .slider-value {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.8rem;
+    color: rgba(242, 231, 199, 0.86);
+  }
+
+  .slider input[type="range"] {
+    inline-size: 100%;
+    block-size: 0.3rem;
+    accent-color: #d5b06f;
+    cursor: pointer;
+    background: transparent;
+  }
+
   .actions {
     display: grid;
-    gap: 0.4rem;
+    gap: 0.55rem;
     justify-items: start;
-    margin-top: 0.2rem;
+    padding-top: 0.9rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid rgba(212, 190, 132, 0.12);
   }
 
   .menu-button {

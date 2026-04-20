@@ -35,6 +35,7 @@ export interface SceneSettings {
   meleeShowSword: boolean;
   meleeSwordOpacity: number;
   meleeTailLength: number;
+  minimapOpacity: number;
   moveResponsiveness: number;
   moveSpeed: number;
   playerLinearDamping: number;
@@ -83,6 +84,7 @@ export const createSceneSettings = (): SceneSettings => ({
   meleeShowSword: true,
   meleeSwordOpacity: 0.5,
   meleeTailLength: 0.59,
+  minimapOpacity: 0.82,
   moveResponsiveness: 12,
   moveSpeed: 7,
   playerLinearDamping: 1.6,

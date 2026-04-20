@@ -83,7 +83,26 @@ export class GameSceneStore {
     createDoorMarkers(this.currentRoom, this.dungeon)
   );
   readonly roomDoorSeals = $derived(createDoorSeals(this.currentRoom));
-  readonly minimapBounds = $derived(getMinimapBounds(this.roomList));
+  readonly visibleMinimapRooms = $derived.by(() => {
+    const explored = this.roomList.filter((room) =>
+      this.room.exploredSet.has(room.id)
+    );
+
+    if (explored.length > 0) {
+      return explored;
+    }
+
+    const fallback = this.dungeon.rooms[this.room.currentId];
+
+    return fallback ? [fallback] : [];
+  });
+  readonly minimapBounds = $derived(
+    getMinimapBounds(
+      this.visibleMinimapRooms.length > 0
+        ? this.visibleMinimapRooms
+        : this.roomList
+    )
+  );
   readonly collectedArtifactRoomSet = $derived(
     new Set(this.collectedArtifactRoomIds)
   );

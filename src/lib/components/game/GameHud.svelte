@@ -2,13 +2,28 @@
   import orbKnightIconUrl from "$lib/assets/orb-knight-icon.svg";
   import { getGameSceneContext } from "$lib/stores/scene-context";
 
+  interface GameHudProps {
+    onOpenSettings?: () => void;
+    onOpenWeaponLab?: () => void;
+  }
+
+  let { onOpenSettings, onOpenWeaponLab }: GameHudProps = $props();
+
   const scene = getGameSceneContext();
   const { player } = scene;
 </script>
 
 <div class="hud">
   <div class="hud-shell">
-    <img class="hud-icon" src={orbKnightIconUrl} alt="" aria-hidden="true">
+    <button
+      type="button"
+      class="hud-icon-button"
+      aria-label="Open weapon lab"
+      onclick={onOpenWeaponLab}
+    >
+      <img class="hud-icon" src={orbKnightIconUrl} alt="" aria-hidden="true">
+      <span class="hud-icon-hint" aria-hidden="true">E</span>
+    </button>
     <div
       class="hud-bar"
       aria-label={`Health ${player.health}/${player.maxHealth}`}
@@ -20,13 +35,26 @@
       <div class="hud-fill" style:width={`${player.healthRatio * 100}%`}></div>
     </div>
   </div>
+  <button
+    type="button"
+    class="hud-settings-button"
+    aria-label="Open settings"
+    onclick={onOpenSettings}
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M19.14 12.94a7.49 7.49 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.48 7.48 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.48 7.48 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.49 7.49 0 0 0 0 1.88L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.49.38 1.04.7 1.63.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54a7.48 7.48 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5z"
+        fill="currentColor"
+      />
+    </svg>
+  </button>
 </div>
 
 <style>
   .hud {
     position: fixed;
-    top: 1.75rem;
-    left: 1.1rem;
+    top: 1.5rem;
+    left: 1.35rem;
     z-index: 8;
     inline-size: clamp(16rem, 16vw, 13rem);
   }
@@ -37,11 +65,55 @@
     align-items: center;
   }
 
-  .hud-icon {
+  .hud-icon-button {
+    position: relative;
     flex: 0 0 auto;
+    padding: 0;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+  }
+
+  .hud-icon-button:focus-visible {
+    outline: 2px solid rgba(255, 220, 170, 0.8);
+    outline-offset: 3px;
+    border-radius: 999px;
+  }
+
+  .hud-icon {
+    display: block;
     inline-size: 2.1rem;
     block-size: 2.1rem;
+    pointer-events: none;
     filter: drop-shadow(0 0.2rem 0.45rem rgba(0, 0, 0, 0.3));
+    transition: transform 0.12s ease-out;
+  }
+
+  .hud-icon-button:active .hud-icon {
+    transform: scale(0.94);
+  }
+
+  .hud-icon-hint {
+    position: absolute;
+    inset-block-end: -0.55rem;
+    inset-inline-end: -0.6rem;
+    display: grid;
+    place-items: center;
+    min-inline-size: 0.95rem;
+    block-size: 0.95rem;
+    padding: 0 0.24rem;
+    font-size: 0.52rem;
+    font-weight: 800;
+    color: rgba(255, 236, 204, 0.95);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    background: rgba(10, 8, 12, 0.98);
+    border: 1px solid rgba(236, 224, 196, 0.5);
+    border-radius: 0.28rem;
+    box-shadow:
+      0 0 0 1.5px rgba(10, 8, 12, 0.65),
+      0 0.16rem 0.35rem rgba(0, 0, 0, 0.55);
   }
 
   .hud-bar {
@@ -87,16 +159,64 @@
       inset 0 1px 0 rgba(255, 214, 214, 0.16);
   }
 
+  .hud-settings-button {
+    display: none;
+    padding: 0;
+    margin-block-start: 0.75rem;
+    color: rgba(236, 224, 196, 0.85);
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    filter: drop-shadow(0 0.2rem 0.45rem rgba(0, 0, 0, 0.35));
+    transition: transform 0.12s ease-out;
+  }
+
+  .hud-settings-button:hover {
+    color: rgba(255, 236, 196, 1);
+  }
+
+  .hud-settings-button:active {
+    transform: scale(0.94);
+  }
+
+  .hud-settings-button:focus-visible {
+    outline: 2px solid rgba(255, 220, 170, 0.8);
+    outline-offset: 3px;
+    border-radius: 0.4rem;
+  }
+
+  .hud-settings-button svg {
+    display: block;
+    inline-size: 1.8rem;
+    block-size: 1.8rem;
+    pointer-events: none;
+  }
+
   @media (max-width: 700px) {
     .hud {
-      top: 0.9rem;
-      left: 0.9rem;
-      inline-size: min(11rem, calc(100vw - 8rem));
+      top: 0.85rem;
+      left: 0.85rem;
+      inline-size: min(11rem, calc(100vw - 9.5rem));
     }
 
     .hud-icon {
       inline-size: 1.8rem;
       block-size: 1.8rem;
+    }
+
+    .hud-settings-button {
+      display: block;
+    }
+
+    .hud-settings-button svg {
+      inline-size: 1.8rem;
+      block-size: 1.8rem;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .hud-icon-hint {
+      display: none;
     }
   }
 </style>

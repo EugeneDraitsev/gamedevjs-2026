@@ -4,6 +4,7 @@ import {
   swingKnockbackDirection,
 } from "$lib/combat/melee-swing";
 import type { WeaponBuild } from "$lib/config/weapon-graph";
+import { cheats } from "$lib/stores/cheats.svelte";
 import type { CombatStore } from "$lib/stores/combat.svelte";
 import type {
   ActiveEnemy,
@@ -131,7 +132,7 @@ export const applyMeleeHitsToEnemies = ({
 
     hitSet.add(enemy.id);
 
-    const damage = swingConfig.damage;
+    const damage = cheats.oneHitKill ? enemy.hp : swingConfig.damage;
     const [kx, kz] = swingKnockbackDirection(
       enemy.position,
       frame.center,

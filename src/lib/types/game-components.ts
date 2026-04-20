@@ -34,6 +34,8 @@ export interface GameSceneProps {
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;
   onCollectArtifact?: (roomId: string, type: WeaponNodeType) => void;
+  onOpenSettings?: () => void;
+  onOpenWeaponLab?: () => void;
   settings: SceneSettings;
   weaponBuild: WeaponBuild;
 }

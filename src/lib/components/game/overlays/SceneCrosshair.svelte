@@ -53,4 +53,10 @@
     block-size: 1.5rem;
     border: 1px solid rgba(138, 198, 255, 0.72);
   }
+
+  @media (pointer: coarse) {
+    .crosshair {
+      display: none;
+    }
+  }
 </style>

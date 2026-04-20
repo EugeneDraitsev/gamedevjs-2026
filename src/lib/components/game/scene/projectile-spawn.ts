@@ -4,6 +4,7 @@ import {
   getDamageAtDistance,
   type WeaponBuild,
 } from "$lib/config/weapon-graph";
+import { cheats } from "$lib/stores/cheats.svelte";
 import type {
   ActiveBeam,
   ActiveEnemy,
@@ -135,12 +136,15 @@ const applyBeamAttack = (
         continue;
       }
 
-      const damage = Math.max(
-        1,
-        Math.round(
-          build.damage * getDamageAtDistance(build.damageProfile, hitDistance)
-        )
-      );
+      const damage = cheats.oneHitKill
+        ? enemy.hp
+        : Math.max(
+            1,
+            Math.round(
+              build.damage *
+                getDamageAtDistance(build.damageProfile, hitDistance)
+            )
+          );
       const kick =
         enemy.radius > 1
           ? 0

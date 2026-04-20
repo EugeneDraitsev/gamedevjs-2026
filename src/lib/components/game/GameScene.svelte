@@ -37,6 +37,7 @@
     doorOpenDurationMs,
   } from "$lib/game/scene-layout";
   import { deflectBurstDurationMs } from "$lib/game/scene-ui";
+  import { cheats } from "$lib/stores/cheats.svelte";
   import { GameSceneStore } from "$lib/stores/game-scene.svelte";
   import { setGameSceneContext } from "$lib/stores/scene-context";
   import type { MeleeFrame, Vec3 } from "$lib/types/game";
@@ -49,6 +50,8 @@
     meleeParams,
     meleeTrailSettings,
     onCollectArtifact,
+    onOpenSettings,
+    onOpenWeaponLab,
     settings,
     weaponBuild,
   }: GameSceneProps = $props();
@@ -88,6 +91,16 @@
     combat.resetForFloor();
     room.resetForFloor(dungeon.startRoomId);
     player.resetForFloor();
+  });
+
+  $effect(() => {
+    if (cheats.revealMapNonce === 0) {
+      return;
+    }
+
+    for (const id of Object.keys(scene.dungeon.rooms)) {
+      room.markExplored(id);
+    }
   });
 
   $effect(() => {
@@ -209,6 +222,11 @@
       timing,
     });
 
+    if (cheats.infiniteHealth) {
+      player.health = player.maxHealth;
+      return;
+    }
+
     if (result.nextHealth <= 0) {
       resetPlayerAfterDeath({
         combat,
@@ -316,9 +334,9 @@
   <GameSceneOverlays overlays={scene.overlays} />
 
   {#if scene.sceneUiVisible}
-    <GameMinimap />
+    <GameMinimap {onOpenSettings} />
 
-    <GameHud />
+    <GameHud {onOpenSettings} {onOpenWeaponLab} />
   {/if}
 </div>
 
