@@ -138,6 +138,19 @@ export class GameSceneStore {
         )
       : 0
   );
+  readonly playerReloadRatio = $derived(
+    this.player.reloading && this.player.reloadDuration > 0
+      ? Math.max(
+          0,
+          Math.min(
+            1,
+            1 -
+              (this.player.reloadUntil - this.timing.now) /
+                this.player.reloadDuration
+          )
+        )
+      : 0
+  );
   readonly sceneControlsLocked = $derived(
     this.controlsLocked || this.timing.bossIntroActive
   );
@@ -172,6 +185,8 @@ export class GameSceneStore {
     floorIntroProgress: this.timing.floorIntroProgress,
     pickedArtifactTemplate: this.pickedArtifactTemplate,
     playerHitFlash: this.playerHitFlash,
+    playerReloadRatio: this.playerReloadRatio,
+    playerReloading: this.player.reloading,
     projectedDamagePopups: this.projectedDamagePopups,
   }));
   readonly sceneUiVisible = $derived(

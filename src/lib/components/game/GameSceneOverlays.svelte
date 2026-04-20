@@ -15,6 +15,8 @@
     controlsLocked={overlays.controlsLocked}
     crosshairX={overlays.crosshairX}
     crosshairY={overlays.crosshairY}
+    playerReloadRatio={overlays.playerReloadRatio}
+    playerReloading={overlays.playerReloading}
   />
 
   <div

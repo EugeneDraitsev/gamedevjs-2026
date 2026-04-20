@@ -11,6 +11,25 @@
 
   const scene = getGameSceneContext();
   const { player } = scene;
+  const ammoSlots = $derived(
+    Array.from({ length: player.magazineSize }, (_, index) => index)
+  );
+  const reloadRatio = $derived(
+    player.reloading && player.reloadDuration > 0
+      ? Math.max(
+          0,
+          Math.min(
+            1,
+            1 - (player.reloadUntil - scene.timing.now) / player.reloadDuration
+          )
+        )
+      : 0
+  );
+  const animatedAmmo = $derived(
+    player.reloading
+      ? Math.max(player.ammo, Math.round(reloadRatio * player.magazineSize))
+      : player.ammo
+  );
 </script>
 
 <div class="hud">
@@ -22,17 +41,43 @@
       onclick={onOpenWeaponLab}
     >
       <img class="hud-icon" src={orbKnightIconUrl} alt="" aria-hidden="true">
-      <span class="hud-icon-hint" aria-hidden="true">E</span>
+      <span class="hud-hint hud-icon-hint" aria-hidden="true">E</span>
     </button>
-    <div
-      class="hud-bar"
-      aria-label={`Health ${player.health}/${player.maxHealth}`}
-    >
+    <div class="hud-bars">
       <div
-        class="hud-recover"
-        style:width={`${scene.playerRecoverRatio * 100}%`}
-      ></div>
-      <div class="hud-fill" style:width={`${player.healthRatio * 100}%`}></div>
+        class="hud-bar"
+        aria-label={`Health ${player.health}/${player.maxHealth}`}
+      >
+        <div
+          class="hud-recover"
+          style:width={`${scene.playerRecoverRatio * 100}%`}
+        ></div>
+        <div
+          class="hud-fill"
+          style:width={`${player.healthRatio * 100}%`}
+        ></div>
+      </div>
+      <div
+        class="hud-ammo"
+        aria-label={`Ammo ${player.ammo}/${player.magazineSize}`}
+      >
+        <div
+          class="hud-ammo-track"
+          style:grid-template-columns={`repeat(${player.magazineSize}, minmax(0, 1fr))`}
+        >
+          {#if player.reloading}
+            <div
+              class="hud-ammo-reload"
+              style:width={`${reloadRatio * 100}%`}
+            ></div>
+          {/if}
+
+          {#each ammoSlots as slot}
+            <div class:spent={slot >= animatedAmmo} class="hud-ammo-slot"></div>
+          {/each}
+        </div>
+        <span class="hud-hint" aria-hidden="true">R</span>
+      </div>
     </div>
   </div>
   <button
@@ -65,6 +110,11 @@
     align-items: center;
   }
 
+  .hud-bars {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+
   .hud-icon-button {
     position: relative;
     flex: 0 0 auto;
@@ -93,10 +143,7 @@
     transform: scale(0.94);
   }
 
-  .hud-icon-hint {
-    position: absolute;
-    inset-block-end: -0.55rem;
-    inset-inline-end: -0.6rem;
+  .hud-hint {
     display: grid;
     place-items: center;
     min-inline-size: 0.95rem;
@@ -114,6 +161,13 @@
     box-shadow:
       0 0 0 1.5px rgba(10, 8, 12, 0.65),
       0 0.16rem 0.35rem rgba(0, 0, 0, 0.55);
+  }
+
+  .hud-icon-hint {
+    position: absolute;
+    inset-block-end: -0.55rem;
+    inset-inline-end: -0.6rem;
+    pointer-events: none;
   }
 
   .hud-bar {
@@ -157,6 +211,62 @@
     box-shadow:
       0 0 0.7rem rgba(179, 33, 29, 0.2),
       inset 0 1px 0 rgba(255, 214, 214, 0.16);
+  }
+
+  .hud-ammo {
+    display: flex;
+    gap: 0.34rem;
+    align-items: center;
+    margin-block-start: 0.28rem;
+  }
+
+  .hud-ammo-track {
+    position: relative;
+    display: grid;
+    flex: 1 1 auto;
+    gap: 0.14rem;
+    block-size: 0.34rem;
+    padding: 0.05rem;
+    overflow: hidden;
+    background: rgba(11, 8, 14, 0.62);
+    border-radius: 999px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 236, 204, 0.06),
+      0 0 0.8rem rgba(0, 0, 0, 0.14);
+  }
+
+  .hud-ammo-reload {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 185, 107, 0.14),
+      rgba(255, 225, 168, 0.7)
+    );
+    border-radius: inherit;
+    box-shadow: 0 0 0.7rem rgba(255, 184, 107, 0.18);
+    transition: width 0.12s linear;
+  }
+
+  .hud-ammo-slot {
+    position: relative;
+    z-index: 1;
+    min-inline-size: 0;
+    background: linear-gradient(180deg, #ffe8a6, #ff9b57);
+    border-radius: 999px;
+    box-shadow:
+      0 0 0.45rem rgba(255, 168, 94, 0.25),
+      inset 0 1px 0 rgba(255, 249, 228, 0.55);
+    transition:
+      opacity 0.14s ease,
+      transform 0.14s ease,
+      filter 0.14s ease;
+  }
+
+  .hud-ammo-slot.spent {
+    opacity: 0.18;
+    filter: saturate(0.45);
+    transform: scaleY(0.52);
   }
 
   .hud-settings-button {
@@ -215,7 +325,7 @@
   }
 
   @media (pointer: coarse) {
-    .hud-icon-hint {
+    .hud-hint {
       display: none;
     }
   }

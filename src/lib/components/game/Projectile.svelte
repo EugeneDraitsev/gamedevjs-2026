@@ -3,7 +3,7 @@
   import { T, useTask } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
   import { onMount } from "svelte";
-  import { Vector3 } from "three";
+  import { MathUtils, Vector3 } from "three";
   import { getDamageAtDistance } from "$lib/config/weapon-graph";
   import type { Vec3 } from "$lib/types/game";
   import type { ProjectileProps } from "$lib/types/game-components";
@@ -22,6 +22,8 @@
   let ttlTimer = 0;
   let armed = false;
   let visualYaw = $state(0);
+  let trailOpacity = $state(0.7);
+  let trailStretch = $state(1.5);
 
   let { data, enemyTargets = [], onExpire, onMove }: ProjectileProps = $props();
 
@@ -127,6 +129,17 @@
     const translation = body.translation();
     currentPosition.set(translation.x, translation.y, translation.z);
     visualYaw = Math.atan2(projectileVelocity.x, projectileVelocity.z);
+    const speed = Math.hypot(projectileVelocity.x, projectileVelocity.z);
+
+    trailStretch = MathUtils.lerp(
+      trailStretch,
+      Math.min(3.1, 1.35 + speed / 15),
+      Math.min(1, delta * 16)
+    );
+    trailOpacity =
+      0.42 +
+      (0.24 + Math.min(0.16, speed * 0.008)) *
+        (0.5 + 0.5 * Math.sin(flightTime * 42));
 
     onMove?.(data.id, [translation.x, translation.y, translation.z]);
 
@@ -303,27 +316,60 @@
         </T.Mesh>
       </T.Group>
     {:else}
-      <T.Mesh castShadow>
-        <T.SphereGeometry args={[data.build.radius, 20, 20]} />
-        <T.MeshStandardMaterial
-          color={data.build.colors.shell}
-          emissive={data.build.colors.glow}
-          emissiveIntensity={1.05}
-          metalness={0.12}
-          roughness={0.22}
-        />
-      </T.Mesh>
+      <T.Group rotation={[0, visualYaw, 0]}>
+        <T.Mesh
+          position={[0, 0, -data.build.radius * (1.2 + trailStretch * 0.52)]}
+          rotation={[Math.PI / 2, 0, 0]}
+          scale={[1, 1, trailStretch]}
+        >
+          <T.CylinderGeometry
+            args={[data.build.radius * 0.74, data.build.radius * 0.18, data.build.radius * 3.8, 12]}
+          />
+          <T.MeshStandardMaterial
+            color={data.build.colors.shell}
+            emissive={data.build.colors.glow}
+            emissiveIntensity={1.45}
+            metalness={0.02}
+            opacity={trailOpacity}
+            roughness={0.16}
+            transparent
+          />
+        </T.Mesh>
 
-      <T.Mesh scale={0.62}>
-        <T.SphereGeometry args={[data.build.radius, 16, 16]} />
-        <T.MeshStandardMaterial
-          color={data.build.colors.core}
-          emissive={data.build.colors.shell}
-          emissiveIntensity={0.45}
-          metalness={0.05}
-          roughness={0.3}
-        />
-      </T.Mesh>
+        <T.Mesh
+          castShadow
+          position={[0, 0, data.build.radius * 1.1]}
+          rotation={[Math.PI / 2, 0, 0]}
+        >
+          <T.CylinderGeometry
+            args={[data.build.radius * 0.2, data.build.radius * 0.34, data.build.radius * 2.7, 12]}
+          />
+          <T.MeshStandardMaterial
+            color={data.build.colors.core}
+            emissive={data.build.colors.shell}
+            emissiveIntensity={1.2}
+            metalness={0.08}
+            roughness={0.14}
+          />
+        </T.Mesh>
+
+        <T.Mesh
+          castShadow
+          position={[0, 0, data.build.radius * 2.2]}
+          rotation={[Math.PI / 2, 0, 0]}
+        >
+          <T.ConeGeometry
+            args={[data.build.radius * 0.4, data.build.radius * 1.05, 12]}
+          />
+          <T.MeshStandardMaterial
+            color="#fff2c4"
+            emissive={data.build.colors.core}
+            emissiveIntensity={0.78}
+            metalness={0.04}
+            roughness={0.16}
+          />
+        </T.Mesh>
+      </T.Group>
     {/if}
   </RigidBody>
 </T.Group>

@@ -11,6 +11,7 @@ interface PlayerInputBindings {
   onJump: () => void;
   onMeleeRequest: () => void;
   onMouseMove: (x: number, y: number) => void;
+  onReload: () => void;
   onReset: () => void;
   onShootPointerDown: (x: number, y: number) => void;
   onShootPointerUp: () => void;
@@ -24,6 +25,7 @@ export const bindPlayerInput = ({
   onJump,
   onMeleeRequest,
   onMouseMove,
+  onReload,
   onReset,
   onShootPointerDown,
   onShootPointerUp,
@@ -51,6 +53,8 @@ export const bindPlayerInput = ({
         onJump();
       } else if (event.code === "KeyF") {
         onMeleeRequest();
+      } else if (event.code === "KeyR") {
+        onReload();
       }
     }
   };

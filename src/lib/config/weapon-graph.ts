@@ -796,10 +796,7 @@ export const computeWeaponBuild = (
   finalizeDraft(draft);
 
   const damage = Math.round(BASE_DAMAGE * draft.damageFactor);
-  const meleeDamage = Math.max(
-    1,
-    Math.round(damage * 0.5 * draft.meleeDamageFactor)
-  );
+  const meleeDamage = Math.max(1, Math.round(damage * draft.meleeDamageFactor));
   const speed = BASE_SPEED * draft.speedFactor;
   const mass = BASE_MASS * draft.massFactor;
   const radius = BASE_RADIUS * draft.radiusFactor;

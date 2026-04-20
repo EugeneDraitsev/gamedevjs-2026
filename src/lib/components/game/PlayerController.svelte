@@ -81,13 +81,15 @@
   const orbitKeyboardPanSpeed = 0.9;
   const projectileForwardOffset = 1.1;
   const projectileHeightOffset = 0.18;
-  const shootCooldownMs = 180;
+  const shootCooldownMs = 350;
+  const reloadDurationMs = 900;
   const DYNAMIC_BODY_TYPE: RigidBodyType = 0 as RigidBodyType;
   const shellYawSmoothing = 14;
   const playerBodyRadius = 0.55;
   const wallUnstuckInset = 0.08;
 
   let jumpRequested = false;
+  let reloadRequested = false;
   let shootRequested = false;
   let shootingHeld = false;
   let meleeRequested = false;
@@ -225,6 +227,7 @@
   $effect(() => {
     if (settings.cameraMode === "orbit" || scene.sceneControlsLocked) {
       jumpRequested = false;
+      reloadRequested = false;
       shootRequested = false;
       shootingHeld = false;
       meleeRequested = false;
@@ -294,6 +297,7 @@
 
   const resetInputState = () => {
     jumpRequested = false;
+    reloadRequested = false;
     shootRequested = false;
     shootingHeld = false;
     meleeRequested = false;
@@ -315,6 +319,9 @@
         mouseScreenX = x;
         mouseScreenY = y;
         crosshair.set(x, y);
+      },
+      onReload: () => {
+        reloadRequested = true;
       },
       onReset: resetInputState,
       onShootPointerDown: (x, y) => {
@@ -603,6 +610,25 @@
     }
   };
 
+  const updateReload = () => {
+    const now = performance.now();
+
+    if (player.reloading) {
+      if (now >= player.reloadUntil) {
+        player.finishReload();
+      }
+
+      reloadRequested = false;
+      return;
+    }
+
+    if (reloadRequested || player.ammo <= 0) {
+      player.startReload(now, reloadDurationMs);
+    }
+
+    reloadRequested = false;
+  };
+
   const tryShoot = (
     body: RapierRigidBody,
     activeCamera: NonNullable<typeof camera.current>
@@ -616,7 +642,16 @@
       return;
     }
 
+    if (player.reloading) {
+      return;
+    }
+
     const now = performance.now();
+
+    if (player.ammo <= 0) {
+      player.startReload(now, reloadDurationMs);
+      return;
+    }
 
     if (now - lastShotAt < shootCooldownMs) {
       return;
@@ -651,13 +686,17 @@
     }
 
     forwardDirection.normalize();
-    const projectileSpeed = scene.weaponBuild.speed;
+    const projectileSpeed = Math.max(scene.weaponBuild.speed * 1.6, 28);
     const spawnOffset =
       projectileForwardOffset + scene.weaponBuild.radius * 2.4;
 
     shootSpawnPosition
       .set(translation.x, translation.y + projectileHeightOffset, translation.z)
       .addScaledVector(forwardDirection, spawnOffset);
+
+    if (!player.consumeAmmo()) {
+      return;
+    }
 
     onShoot?.({
       position: [
@@ -673,6 +712,11 @@
     });
 
     lastShotAt = now;
+
+    if (player.ammo <= 0) {
+      player.startReload(now, reloadDurationMs);
+    }
+
     shootRequested = shootingHeld;
   };
 
@@ -846,6 +890,7 @@
 
     updateCamera(activeCamera, delta);
     updateOrbitKeyboardCamera(activeCamera, delta);
+    updateReload();
     tryShoot(body, activeCamera);
     updateMelee(body, activeCamera);
 

@@ -237,6 +237,8 @@ export interface SceneOverlayProps {
   floorIntroStartedAt?: number;
   pickedArtifactTemplate: WeaponNodeTemplate | null;
   playerHitFlash: number;
+  playerReloading: boolean;
+  playerReloadRatio: number;
   projectedDamagePopups: ProjectedDamagePopup[];
 }
 
