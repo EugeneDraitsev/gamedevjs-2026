@@ -16,6 +16,8 @@ const preview: Preview = {
         order: [
           "Playgrounds",
           ["Player", "Combat"],
+          "Rooms",
+          ["Preview"],
           "Models",
           ["Player", "Enemies", "Bosses", "Pickups"],
         ],

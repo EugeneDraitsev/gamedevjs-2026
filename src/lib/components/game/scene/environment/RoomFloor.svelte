@@ -1,48 +1,331 @@
 <script module lang="ts">
-  import { DataTexture, NearestFilter, SRGBColorSpace } from "three";
+  import { DataTexture, LinearFilter, SRGBColorSpace } from "three";
+  import type { RoomTemplate as FloorRoomTemplate } from "$lib/config/room-templates";
   import type { SceneFloorPalette as FloorTexturePalette } from "$lib/types/game";
 
+  type Rgb = [number, number, number];
+
+  interface Decal {
+    dark: number;
+    radius: number;
+    warmth: number;
+    x: number;
+    y: number;
+  }
+
+  interface FloorPattern {
+    bronze: Rgb;
+    cracks: Crack[];
+    decals: Decal[];
+    grout: Rgb;
+    height: number;
+    seed: number;
+    stone: Rgb;
+    tileSize: number;
+    width: number;
+  }
+
+  interface Crack {
+    width: number;
+    x1: number;
+    x2: number;
+    y1: number;
+    y2: number;
+  }
+
   const floorTextureCache = new Map<string, DataTexture>();
-  const hexToRgb = (hex: string) => {
+  const hexToRgb = (hex: string): Rgb => {
     const value = Number.parseInt(hex.slice(1), 16);
 
     return [
       Math.floor(value / 65_536) % 256,
       Math.floor(value / 256) % 256,
       value % 256,
-    ] as const;
+    ];
   };
 
-  const getFloorTexture = (palette: FloorTexturePalette) => {
-    const key = `${palette.even}:${palette.odd}`;
+  const clampByte = (value: number) => Math.max(0, Math.min(255, value));
+  const mixRgb = (left: Rgb, right: Rgb, amount: number): Rgb => [
+    clampByte(left[0] + (right[0] - left[0]) * amount),
+    clampByte(left[1] + (right[1] - left[1]) * amount),
+    clampByte(left[2] + (right[2] - left[2]) * amount),
+  ];
+  const shadeRgb = (color: Rgb, amount: number): Rgb => [
+    clampByte(color[0] + amount),
+    clampByte(color[1] + amount),
+    clampByte(color[2] + amount),
+  ];
+  const clampNumber = (value: number, min = 0, max = 1) =>
+    Math.max(min, Math.min(max, value));
+  const lerp = (left: number, right: number, amount: number) =>
+    left + (right - left) * amount;
+  const smooth = (value: number) => value * value * (3 - value * 2);
+  const seedFromText = (text: string) =>
+    [...text].reduce((total, char) => total + char.charCodeAt(0), 0);
+
+  const randomFromSeed = (seed: number) => {
+    let state = seed || 1;
+
+    return () => {
+      state = (state * 16_807) % 2_147_483_647;
+
+      return (state - 1) / 2_147_483_646;
+    };
+  };
+
+  const hashNoise = (x: number, y: number, seed: number) => {
+    const value =
+      Math.sin(x * 12.9898 + y * 78.233 + seed * 0.013) * 43_758.5453;
+
+    return value - Math.floor(value);
+  };
+
+  const valueNoise = (x: number, y: number, scale: number, seed: number) => {
+    const px = x / scale;
+    const py = y / scale;
+    const x0 = Math.floor(px);
+    const y0 = Math.floor(py);
+    const sx = smooth(px - x0);
+    const sy = smooth(py - y0);
+    const north = lerp(
+      hashNoise(x0, y0, seed),
+      hashNoise(x0 + 1, y0, seed),
+      sx
+    );
+    const south = lerp(
+      hashNoise(x0, y0 + 1, seed),
+      hashNoise(x0 + 1, y0 + 1, seed),
+      sx
+    );
+
+    return lerp(north, south, sy);
+  };
+
+  const distanceToCrack = (crack: Crack, x: number, y: number) => {
+    const length = (crack.x2 - crack.x1) ** 2 + (crack.y2 - crack.y1) ** 2 || 1;
+    const t = clampNumber(
+      ((x - crack.x1) * (crack.x2 - crack.x1) +
+        (y - crack.y1) * (crack.y2 - crack.y1)) /
+        length,
+      0,
+      1
+    );
+
+    return Math.hypot(
+      x - lerp(crack.x1, crack.x2, t),
+      y - lerp(crack.y1, crack.y2, t)
+    );
+  };
+
+  const createCracks = (
+    random: () => number,
+    width: number,
+    height: number
+  ) => {
+    const cracks: Crack[] = [];
+
+    for (let i = 0; i < 18; i += 1) {
+      let angle = random() * Math.PI * 2;
+      let x = random() * width;
+      let y = random() * height;
+
+      for (let step = 0; step < 4 + Math.floor(random() * 5); step += 1) {
+        const length = 8 + random() * 20;
+        const x2 = clampNumber(x + Math.cos(angle) * length, 4, width - 4);
+        const y2 = clampNumber(y + Math.sin(angle) * length, 4, height - 4);
+
+        cracks.push({
+          width: 0.28 + random() * 0.58,
+          x1: x,
+          x2,
+          y1: y,
+          y2,
+        });
+
+        if (random() > 0.64) {
+          const branch = angle + (random() > 0.5 ? 0.85 : -0.85);
+          const branchLength = 7 + random() * 18;
+
+          cracks.push({
+            width: 0.28 + random() * 0.45,
+            x1: lerp(x, x2, 0.45),
+            x2: clampNumber(
+              lerp(x, x2, 0.45) + Math.cos(branch) * branchLength,
+              4,
+              width - 4
+            ),
+            y1: lerp(y, y2, 0.45),
+            y2: clampNumber(
+              lerp(y, y2, 0.45) + Math.sin(branch) * branchLength,
+              4,
+              height - 4
+            ),
+          });
+        }
+
+        angle += (random() - 0.5) * 1.15;
+        x = x2;
+        y = y2;
+      }
+    }
+
+    return cracks;
+  };
+
+  const createFloorPattern = (
+    palette: FloorTexturePalette,
+    template: FloorRoomTemplate,
+    textureSeed: string
+  ): FloorPattern => {
+    const columns = 16;
+    const rows = 14;
+    const tileSize = 64;
+    const seed = seedFromText(`${template.id}:${textureSeed}:plates`);
+    const random = randomFromSeed(seed);
+    const width = columns * tileSize;
+    const height = rows * tileSize;
+
+    return {
+      bronze: hexToRgb("#3b3327"),
+      cracks: createCracks(random, width, height),
+      decals: Array.from({ length: 22 }, () => ({
+        dark: 10 + random() * 30,
+        radius: 26 + random() * 92,
+        warmth: random() * 0.08,
+        x: random() * width,
+        y: random() * height,
+      })),
+      grout: hexToRgb("#070707"),
+      height,
+      seed,
+      stone: mixRgb(hexToRgb("#222723"), hexToRgb(palette.odd), 0.06),
+      tileSize,
+      width,
+    };
+  };
+
+  const getDecalWear = (pattern: FloorPattern, x: number, y: number) => {
+    let shade = 0;
+    let warmth = 0;
+
+    for (const decal of pattern.decals) {
+      const amount = 1 - Math.hypot(x - decal.x, y - decal.y) / decal.radius;
+      const wear =
+        amount + (valueNoise(x, y, 19, pattern.seed + 29) - 0.5) * 0.6;
+
+      if (wear > 0.1) {
+        shade -= decal.dark * wear;
+        warmth += decal.warmth * wear;
+      }
+    }
+
+    return { shade, warmth };
+  };
+
+  const getCrackShade = (pattern: FloorPattern, x: number, y: number) => {
+    let shade = 0;
+
+    for (const crack of pattern.cracks) {
+      const distance = distanceToCrack(crack, x, y);
+      const noise = valueNoise(x, y, 11, pattern.seed + 97);
+
+      if (distance < crack.width) {
+        shade -= 17 + noise * 12;
+      } else if (distance < crack.width + 1.2) {
+        shade -= 4 + noise * 4;
+      }
+    }
+
+    return shade;
+  };
+
+  const getRivetColor = (
+    pattern: FloorPattern,
+    x: number,
+    y: number,
+    localX: number,
+    localY: number
+  ) => {
+    const nearestX = localX < pattern.tileSize / 2 ? 0 : pattern.tileSize;
+    const nearestY = localY < pattern.tileSize / 2 ? 0 : pattern.tileSize;
+    const distance = Math.hypot(localX - nearestX, localY - nearestY);
+
+    if (distance > 2.25) {
+      return null;
+    }
+
+    const core = mixRgb(
+      pattern.stone,
+      pattern.bronze,
+      distance < 0.9 ? 0.1 : 0.32
+    );
+
+    return shadeRgb(core, valueNoise(x, y, 5, pattern.seed + 13) * 8 - 10);
+  };
+
+  const getFloorColor = (pattern: FloorPattern, x: number, y: number) => {
+    const tileX = Math.floor(x / pattern.tileSize);
+    const tileY = Math.floor(y / pattern.tileSize);
+    const localX = x % pattern.tileSize;
+    const localY = y % pattern.tileSize;
+    const seam = Math.min(
+      localX,
+      localY,
+      pattern.tileSize - localX,
+      pattern.tileSize - localY
+    );
+    const rivet = getRivetColor(pattern, x, y, localX, localY);
+
+    if (rivet) {
+      return rivet;
+    }
+
+    if (seam < 2.2) {
+      return shadeRgb(
+        pattern.grout,
+        valueNoise(x, y, 9, pattern.seed + 71) * 12 - 7
+      );
+    }
+
+    const decal = getDecalWear(pattern, x, y);
+    const tileTint = (hashNoise(tileX, tileY, pattern.seed) - 0.5) * 18;
+    const edgeShade = seam < 9 ? (seam - 9) * 1.3 : Math.min(5, seam * 0.04);
+    const shade =
+      tileTint +
+      (valueNoise(x, y, 42, pattern.seed) - 0.5) * 24 +
+      (valueNoise(x, y, 12, pattern.seed + 11) - 0.5) * 9 +
+      (hashNoise(x, y, pattern.seed) - 0.5) * 4 +
+      edgeShade +
+      getCrackShade(pattern, x, y) +
+      decal.shade;
+    let color = shadeRgb(pattern.stone, shade);
+
+    if (seam < 6) {
+      color = mixRgb(color, pattern.bronze, (1 - seam / 6) * 0.03);
+    }
+
+    return mixRgb(color, pattern.bronze, clampNumber(decal.warmth));
+  };
+
+  const getFloorTexture = (
+    palette: FloorTexturePalette,
+    template: FloorRoomTemplate,
+    textureSeed: string
+  ) => {
+    const key = `${palette.even}:${palette.odd}:${palette.trim}:${template.id}:${textureSeed}`;
     const cached = floorTextureCache.get(key);
 
     if (cached) {
       return cached;
     }
 
-    const tileSize = 4;
-    const columns = 20;
-    const rows = 18;
-    const width = columns * tileSize;
-    const height = rows * tileSize;
-    const data = new Uint8Array(width * height * 4);
-    const even = hexToRgb(palette.even);
-    const odd = hexToRgb(palette.odd);
-    const grout = hexToRgb("#090705");
+    const pattern = createFloorPattern(palette, template, textureSeed);
+    const data = new Uint8Array(pattern.width * pattern.height * 4);
 
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const offset = (y * width + x) * 4;
-        const border = x % tileSize === 0 || y % tileSize === 0;
-        let color = grout;
-
-        if (!border) {
-          color =
-            (Math.floor(x / tileSize) + Math.floor(y / tileSize)) % 2 === 0
-              ? even
-              : odd;
-        }
+    for (let y = 0; y < pattern.height; y += 1) {
+      for (let x = 0; x < pattern.width; x += 1) {
+        const offset = (y * pattern.width + x) * 4;
+        const color = getFloorColor(pattern, x, y);
 
         data[offset] = color[0];
         data[offset + 1] = color[1];
@@ -51,11 +334,11 @@
       }
     }
 
-    const texture = new DataTexture(data, width, height);
+    const texture = new DataTexture(data, pattern.width, pattern.height);
 
     texture.colorSpace = SRGBColorSpace;
-    texture.magFilter = NearestFilter;
-    texture.minFilter = NearestFilter;
+    texture.magFilter = LinearFilter;
+    texture.minFilter = LinearFilter;
     texture.needsUpdate = true;
     floorTextureCache.set(key, texture);
 
@@ -75,15 +358,19 @@
     bossFloorTexture = null,
     currentFloorPalette,
     currentRoomTemplate,
+    textureSeed = currentRoomTemplate.id,
     treasureFloorTexture = null,
   }: {
     bossFloorTexture?: Texture | null;
     currentFloorPalette: SceneFloorPalette;
     currentRoomTemplate: RoomTemplate;
+    textureSeed?: string;
     treasureFloorTexture?: Texture | null;
   } = $props();
 
-  const floorTexture = $derived(getFloorTexture(currentFloorPalette));
+  const floorTexture = $derived(
+    getFloorTexture(currentFloorPalette, currentRoomTemplate, textureSeed)
+  );
 </script>
 
 <T.Group position={[0, -0.35, 0]}>
@@ -103,8 +390,8 @@
       <T.PlaneGeometry args={[floorHalfWidth * 2, floorHalfDepth * 2]} />
       <T.MeshStandardMaterial
         map={floorTexture}
-        metalness={0.22}
-        roughness={0.58}
+        metalness={0.14}
+        roughness={0.82}
       />
     </T.Mesh>
   </RigidBody>

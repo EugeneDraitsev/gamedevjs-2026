@@ -12,28 +12,75 @@ export const playgroundRoomId = "playground-room";
 
 export const buildPlaygroundDungeon = (
   templateId: string,
-  seed = "playground"
+  seed = "playground",
+  previewExits = false
 ): DungeonLayout => {
-  if (!roomTemplateById[templateId]) {
+  const template = roomTemplateById[templateId];
+
+  if (!template) {
     throw new Error(`Unknown room template: ${templateId}`);
   }
 
-  return {
+  const dungeon: DungeonLayout = {
     floor: 1,
     initialModules: [],
     rooms: {
       [playgroundRoomId]: {
-        exits: {},
+        exits: previewExits
+          ? {
+              east: "preview-treasure",
+              north: "preview-boss",
+              south: "preview-normal",
+              west: "preview-shop",
+            }
+          : {},
         grid: [0, 0],
         id: playgroundRoomId,
-        kind: roomTemplateById[templateId].kind,
-        label: roomTemplateById[templateId].label,
+        kind: template.kind,
+        label: template.label,
         templateId,
       },
     },
     seed,
     startRoomId: playgroundRoomId,
   };
+
+  if (previewExits) {
+    dungeon.rooms["preview-boss"] = {
+      exits: { south: playgroundRoomId },
+      grid: [0, -1],
+      id: "preview-boss",
+      kind: "boss",
+      label: "Foundry",
+      templateId: "boss-warden",
+    };
+    dungeon.rooms["preview-normal"] = {
+      exits: { north: playgroundRoomId },
+      grid: [0, 1],
+      id: "preview-normal",
+      kind: "normal",
+      label: "Chamber",
+      templateId: "normal-line",
+    };
+    dungeon.rooms["preview-shop"] = {
+      exits: { east: playgroundRoomId },
+      grid: [-1, 0],
+      id: "preview-shop",
+      kind: "shop",
+      label: "Shop",
+      templateId: "shop-empty",
+    };
+    dungeon.rooms["preview-treasure"] = {
+      exits: { west: playgroundRoomId },
+      grid: [1, 0],
+      id: "preview-treasure",
+      kind: "treasure",
+      label: "Treasure",
+      templateId: "treasure-artifact",
+    };
+  }
+
+  return dungeon;
 };
 
 const defaultGraph = createDefaultWeaponGraph();
