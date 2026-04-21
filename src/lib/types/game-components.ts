@@ -31,9 +31,11 @@ export interface GameSceneProps {
   collectedArtifactRoomIds?: string[];
   controlsLocked?: boolean;
   dungeon: DungeonLayout;
+  gearCount?: number;
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;
   onCollectArtifact?: (roomId: string, type: WeaponNodeType) => void;
+  onGearCountChange?: (gearCount: number) => void;
   onOpenSettings?: () => void;
   onOpenWeaponLab?: () => void;
   settings: SceneSettings;

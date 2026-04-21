@@ -22,6 +22,7 @@ import {
 } from "$lib/game/scene-ui";
 import { CombatStore } from "$lib/stores/combat.svelte";
 import { CrosshairStore } from "$lib/stores/crosshair.svelte";
+import { PickupStore } from "$lib/stores/pickups.svelte";
 import { PlayerStore } from "$lib/stores/player.svelte";
 import { RoomStore } from "$lib/stores/room.svelte";
 import { TextureStore } from "$lib/stores/textures.svelte";
@@ -41,6 +42,7 @@ interface GameSceneStoreInput {
 export class GameSceneStore {
   readonly combat = new CombatStore();
   readonly crosshair = new CrosshairStore();
+  readonly pickups = new PickupStore();
   readonly player = new PlayerStore();
   readonly room = new RoomStore();
   readonly textures = new TextureStore();

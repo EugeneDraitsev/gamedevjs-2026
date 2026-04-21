@@ -22,6 +22,6 @@
 <Story args={{ scale: 0.9, hitFlash: 0.8 }} name="Orb Knight (Hit Flash)" />
 
 <Story
-  args={{ scale: 1.6, autoRotate: true, label: "Orb Knight (Hero Pose)" }}
+  args={{ scale: 1.6, label: "Orb Knight (Hero Pose)" }}
   name="Hero Pose"
 />

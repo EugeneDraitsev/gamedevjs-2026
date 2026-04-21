@@ -7,6 +7,7 @@ import type {
 export interface SavedRunState {
   collectedArtifactRooms: string[];
   floorIndex: number;
+  gearCount?: number;
   looseModules: WeaponNodeType[];
   weaponEdges: WeaponFlowEdge[];
   weaponNodes: WeaponFlowNode[];

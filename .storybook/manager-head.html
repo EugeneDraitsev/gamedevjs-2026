@@ -1,0 +1,38 @@
+<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<style>
+  #list-item-guide,
+  #storybook-checklist-widget,
+  a[href*="/settings/guide"],
+  button[aria-label="Onboarding guide menu"],
+  button[aria-label="Open onboarding guide"] {
+    display: none !important;
+  }
+
+  button[aria-label="Settings"]::before,
+  button[aria-label="Settings"]::after {
+    display: none !important;
+    content: none !important;
+  }
+</style>
+<script>
+  "use strict";
+
+  (() => {
+    const hideOnboarding = () => {
+      const nodes = document.querySelectorAll(
+        '#list-item-guide, a[href*="/settings/guide"]'
+      );
+
+      for (const node of nodes) {
+        const row = node.closest('[role="menuitem"], li') || node;
+        row.style.display = "none";
+      }
+    };
+
+    new MutationObserver(hideOnboarding).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+    hideOnboarding();
+  })();
+</script>

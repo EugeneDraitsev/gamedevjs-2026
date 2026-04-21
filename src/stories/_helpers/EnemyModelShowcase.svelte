@@ -9,7 +9,7 @@
     template: EnemyTemplate;
   }
 
-  let { autoRotate = true, height = "260px", template }: Props = $props();
+  let { autoRotate = false, height = "260px", template }: Props = $props();
 
   const groundY = -1;
   const cameraTargetY = $derived(groundY + template.radius);

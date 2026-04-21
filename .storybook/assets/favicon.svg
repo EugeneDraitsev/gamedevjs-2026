@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>Warden Labs</title>
+  <defs>
+    <linearGradient id="bg" x1="8" x2="56" y1="6" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17253a"/>
+      <stop offset="1" stop-color="#040812"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="16" x2="48" y1="13" y2="53" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffd15a"/>
+      <stop offset=".55" stop-color="#ff8b24"/>
+      <stop offset="1" stop-color="#a84912"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="22" x2="43" y1="17" y2="46" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7df7ff"/>
+      <stop offset="1" stop-color="#2c84ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <path fill="#07111f" stroke="#2d4667" stroke-width="2" d="m32 6 22 13v26L32 58 10 45V19z"/>
+  <path fill="url(#gold)" d="m32 10 5 6 8-1 2 8 7 4-4 7 2 8-8 2-4 7-8-3-8 3-4-7-8-2 2-8-4-7 7-4 2-8 8 1z"/>
+  <circle cx="32" cy="31" r="16" fill="#07111f"/>
+  <path fill="url(#cyan)" d="M21 24h6l3 16 2-10h5l2 10 3-16h6l-6 25h-6l-2-10-2 10h-6z"/>
+  <circle cx="32" cy="31" r="6" fill="#ffcf6b"/>
+  <circle cx="32" cy="31" r="3" fill="#07111f"/>
+</svg>

@@ -9,7 +9,7 @@
     rotateSpeed?: number;
   }
 
-  let { autoRotate = true, children, rotateSpeed = 0.4 }: Props = $props();
+  let { autoRotate = false, children, rotateSpeed = 0.4 }: Props = $props();
 
   let mount = $state<Group>();
 

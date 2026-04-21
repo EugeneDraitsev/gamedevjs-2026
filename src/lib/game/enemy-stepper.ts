@@ -5,6 +5,7 @@ import {
   getProjectileHitDamage,
   resolveEnemyWallImpact,
 } from "$lib/components/game/scene/utils";
+import type { RoomTemplate } from "$lib/config/room-templates";
 import {
   floorHalfDepth,
   floorHalfWidth,
@@ -12,6 +13,7 @@ import {
   playerRadius,
 } from "$lib/game/scene-layout";
 import type { CombatStore } from "$lib/stores/combat.svelte";
+import type { PickupStore } from "$lib/stores/pickups.svelte";
 import type { PlayerStore } from "$lib/stores/player.svelte";
 import type { RoomStore } from "$lib/stores/room.svelte";
 import type { TimingStore } from "$lib/stores/timing.svelte";
@@ -26,7 +28,9 @@ import type {
 interface StepContext {
   combat: CombatStore;
   currentRoomId: string;
+  currentRoomTemplate: RoomTemplate;
   isCurrentRoomCombat: boolean;
+  pickups: PickupStore;
   player: PlayerStore;
   room: RoomStore;
   roomHazards: RoomHazard[];
@@ -562,8 +566,10 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
   const {
     combat,
     currentRoomId,
+    currentRoomTemplate,
     delta,
     isCurrentRoomCombat,
+    pickups,
     player,
     room,
     timing,
@@ -637,6 +643,7 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
     room.unlockingRoomId !== currentRoomId;
 
   if (roomCleared) {
+    pickups.dropRoom(currentRoomId, currentRoomTemplate, now);
     room.markCleared(currentRoomId);
     room.beginUnlock(currentRoomId, now);
   }

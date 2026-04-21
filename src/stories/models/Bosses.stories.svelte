@@ -37,13 +37,12 @@
 </Story>
 
 <Story
-  args={{ autoRotate: true, height: "520px", template: byId("iron-warden") }}
+  args={{ height: "520px", template: byId("iron-warden") }}
   name="Iron Warden"
 />
 
 <Story
   args={{
-    autoRotate: true,
     height: "520px",
     template: byId("mine-herald"),
   }}

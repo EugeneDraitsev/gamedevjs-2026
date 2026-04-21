@@ -15,7 +15,7 @@
   }
 
   let {
-    autoRotate = true,
+    autoRotate = false,
     background = "#040816",
     cameraTargetY = 0.2,
     children,
@@ -38,7 +38,9 @@
           {autoRotate}
           autoRotateSpeed={rotateSpeed * 10}
           enableDamping
-          enableZoom={false}
+          enableZoom
+          maxDistance={9}
+          minDistance={1.4}
           target={[0, cameraTargetY, 0]}
         />
       </T.PerspectiveCamera>

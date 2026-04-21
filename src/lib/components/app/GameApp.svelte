@@ -46,6 +46,7 @@
   let weaponLabOpen = $state(false);
   let collectedArtifactRooms = $state<string[]>([]);
   let floorIndex = $state(1);
+  let gearCount = $state(0);
   let runReady = $state(page.url.searchParams.get("continue") !== "1");
   let touchControls = $state(false);
 
@@ -188,6 +189,7 @@
     saveRunSave(seed, {
       collectedArtifactRooms,
       floorIndex,
+      gearCount,
       looseModules,
       weaponEdges,
       weaponNodes,
@@ -196,6 +198,7 @@
 
   $effect(() => {
     seed;
+    gearCount = 0;
     looseModules = [...startingDungeon.initialModules];
   });
 
@@ -205,6 +208,7 @@
     if (page.url.searchParams.get("continue") === "1" && savedRun) {
       collectedArtifactRooms = savedRun.collectedArtifactRooms;
       floorIndex = savedRun.floorIndex;
+      gearCount = savedRun.gearCount ?? 0;
       looseModules = savedRun.looseModules;
       weaponEdges = savedRun.weaponEdges;
       weaponNodes = savedRun.weaponNodes;
@@ -288,9 +292,11 @@
         collectedArtifactRoomIds={collectedArtifactRooms}
         {controlsLocked}
         {dungeon}
+        {gearCount}
         meleeParams={swingParams}
         meleeTrailSettings={trailSettings}
         onCollectArtifact={collectArtifact}
+        onGearCountChange={(value) => (gearCount = value)}
         onOpenSettings={openSettings}
         onOpenWeaponLab={openWeaponLab}
         {settings}

@@ -11,7 +11,7 @@
   }
 
   let {
-    autoRotate = true,
+    autoRotate = false,
     columns = 3,
     height = "260px",
     templates,

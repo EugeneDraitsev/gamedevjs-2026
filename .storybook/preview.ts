@@ -17,7 +17,7 @@ const preview: Preview = {
           "Playgrounds",
           ["Player", "Combat"],
           "Models",
-          ["Player", "Enemies", "Bosses"],
+          ["Player", "Enemies", "Bosses", "Pickups"],
         ],
       },
     },

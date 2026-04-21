@@ -11,7 +11,7 @@
   }
 
   let {
-    autoRotate = true,
+    autoRotate = false,
     hitFlash = 0,
     label = "Orb Knight (Player)",
     scale = 0.9,

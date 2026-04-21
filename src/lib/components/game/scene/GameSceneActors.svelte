@@ -2,10 +2,11 @@
   import { T } from "@threlte/core";
   import BombActor from "$lib/components/game/scene/BombActor.svelte";
   import EnemyActor from "$lib/components/game/scene/EnemyActor.svelte";
+  import PickupActor from "$lib/components/game/scene/PickupActor.svelte";
   import { getGameSceneContext } from "$lib/stores/scene-context";
 
   const scene = getGameSceneContext();
-  const { combat, timing } = scene;
+  const { combat, pickups, timing } = scene;
 </script>
 
 {#each combat.enemies as enemy (enemy.id)}
@@ -14,6 +15,10 @@
 
 {#each combat.bombs as bomb (bomb.id)}
   <BombActor animationNow={timing.now} {bomb} />
+{/each}
+
+{#each pickups.items as pickup (pickup.id)}
+  <PickupActor animationNow={timing.now} {pickup} />
 {/each}
 
 {#each combat.enemyShots as shot (shot.id)}

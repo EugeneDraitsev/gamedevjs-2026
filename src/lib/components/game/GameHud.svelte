@@ -1,4 +1,5 @@
 <script lang="ts">
+  import gearCurrencyUrl from "$lib/assets/gear-currency.svg";
   import orbKnightIconUrl from "$lib/assets/orb-knight-icon.svg";
   import { getGameSceneContext } from "$lib/stores/scene-context";
 
@@ -10,7 +11,7 @@
   let { onOpenSettings, onOpenWeaponLab }: GameHudProps = $props();
 
   const scene = getGameSceneContext();
-  const { player } = scene;
+  const { pickups, player } = scene;
   const ammoSlots = $derived(
     Array.from({ length: player.magazineSize }, (_, index) => index)
   );
@@ -78,6 +79,10 @@
         </div>
         <span class="hud-hint" aria-hidden="true">R</span>
       </div>
+      <div class="hud-currency" aria-label={`Gears ${pickups.gears}`}>
+        <img src={gearCurrencyUrl} alt="" aria-hidden="true">
+        <span>{pickups.gears}</span>
+      </div>
     </div>
   </div>
   <button
@@ -106,13 +111,39 @@
 
   .hud-shell {
     display: flex;
-    gap: 0.55rem;
-    align-items: center;
+    gap: 18px;
+    align-items: flex-start;
   }
 
   .hud-bars {
     flex: 1 1 auto;
     min-inline-size: 0;
+    margin-top: 6px;
+  }
+
+  .hud-currency {
+    display: inline-flex;
+    gap: 0.18rem;
+    align-items: center;
+    padding: 0;
+    margin-top: 5px;
+    font-size: 0.78rem;
+    font-weight: 900;
+    color: #ffe7a3;
+    text-shadow: 0 0.12rem 0.35rem rgba(0, 0, 0, 0.65);
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .hud-currency {
+    margin-left: 5px;
+  }
+
+  .hud-currency img {
+    inline-size: 1.3rem;
+    block-size: 1.3rem;
+    filter: drop-shadow(0 0 0.32rem rgba(255, 184, 77, 0.45));
   }
 
   .hud-icon-button {
@@ -182,6 +213,10 @@
       0 0 1rem rgba(0, 0, 0, 0.16);
   }
 
+  .hud-bar {
+    margin-bottom: 6px;
+  }
+
   .hud-recover,
   .hud-fill {
     position: absolute;
@@ -215,7 +250,7 @@
 
   .hud-ammo {
     display: flex;
-    gap: 0.34rem;
+    gap: 0.5rem;
     align-items: center;
     margin-block-start: 0.28rem;
   }

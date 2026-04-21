@@ -48,9 +48,11 @@
     collectedArtifactRoomIds = [],
     controlsLocked = false,
     dungeon,
+    gearCount = 0,
     meleeParams,
     meleeTrailSettings,
     onCollectArtifact,
+    onGearCountChange,
     onOpenSettings,
     onOpenWeaponLab,
     settings,
@@ -70,7 +72,7 @@
     });
 
   syncSceneInputs();
-  const { combat, player, room, textures, timing } = scene;
+  const { combat, pickups, player, room, textures, timing } = scene;
 
   let orbitControls = $state<OrbitControlsInstance>();
   let sceneCamera = $state<PerspectiveCamera>();
@@ -83,6 +85,10 @@
   });
 
   $effect(() => {
+    scene.pickups.gears = gearCount;
+  });
+
+  $effect(() => {
     scene.camera = sceneCamera;
   });
 
@@ -90,6 +96,7 @@
     dungeon.seed;
     timing.resetForFloor();
     combat.resetForFloor();
+    pickups.clear();
     room.resetForFloor(dungeon.startRoomId);
     player.resetForFloor();
   });
@@ -163,6 +170,22 @@
   };
 
   const handlePositionChange = (position: Vec3) => {
+    const pickupResult = pickups.collectAt(
+      position,
+      player.health,
+      player.maxHealth
+    );
+
+    if (pickupResult.healthDelta > 0) {
+      player.health = pickupResult.nextHealth;
+    }
+
+    if (pickupResult.gearDelta > 0) {
+      onGearCountChange?.(pickups.gears);
+    }
+
+    const roomBefore = room.currentId;
+
     handlePlayerPositionChange({
       combat,
       currentArtifactType: scene.currentArtifactType,
@@ -175,6 +198,10 @@
       room,
       timing,
     });
+
+    if (room.currentId !== roomBefore) {
+      pickups.clear();
+    }
   };
 
   const handleMelee = (frame: MeleeFrame) => {
@@ -221,10 +248,12 @@
     const result = stepEnemies({
       combat,
       currentRoomId: scene.currentRoom.id,
+      currentRoomTemplate: scene.currentRoomTemplate,
       delta,
       doorOpenDelayMs,
       doorOpenDurationMs,
       isCurrentRoomCombat: scene.isCurrentRoomCombat,
+      pickups,
       player,
       room,
       roomHazards: scene.roomHazards,
@@ -245,6 +274,7 @@
         room,
         timing,
       });
+      pickups.clear();
       return;
     }
 

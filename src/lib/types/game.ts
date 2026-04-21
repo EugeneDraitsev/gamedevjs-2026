@@ -107,6 +107,17 @@ export interface ActiveBomb {
   velocity: Vec3;
 }
 
+export type PickupKind = "gear" | "heal";
+
+export interface ActivePickup {
+  createdAt: number;
+  id: string;
+  kind: PickupKind;
+  position: Vec3;
+  radius: number;
+  value: number;
+}
+
 export interface DeflectBurst {
   color: string;
   createdAt: number;

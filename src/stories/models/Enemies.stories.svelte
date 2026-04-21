@@ -55,18 +55,17 @@
 </Story>
 
 <Story
-  args={{ autoRotate: true, height: "420px", template: byId("scrap-runner") }}
+  args={{ height: "420px", template: byId("scrap-runner") }}
   name="Scrap Runner"
 />
 
 <Story
-  args={{ autoRotate: true, height: "420px", template: byId("bolt-runner") }}
+  args={{ height: "420px", template: byId("bolt-runner") }}
   name="Bolt Runner"
 />
 
 <Story
   args={{
-    autoRotate: true,
     height: "420px",
     template: byId("ember-artillery"),
   }}
@@ -74,16 +73,16 @@
 />
 
 <Story
-  args={{ autoRotate: true, height: "420px", template: byId("coil-sentry") }}
+  args={{ height: "420px", template: byId("coil-sentry") }}
   name="Coil Sentry"
 />
 
 <Story
-  args={{ autoRotate: true, height: "420px", template: byId("slag-brute") }}
+  args={{ height: "420px", template: byId("slag-brute") }}
   name="Slag Brute"
 />
 
 <Story
-  args={{ autoRotate: true, height: "420px", template: byId("rail-hunter") }}
+  args={{ height: "420px", template: byId("rail-hunter") }}
   name="Rail Hunter"
 />
