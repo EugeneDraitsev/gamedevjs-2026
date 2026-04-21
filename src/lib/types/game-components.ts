@@ -22,7 +22,6 @@ import type {
   RenderedDeflectBurst,
   RoomHazard,
   RoomPlatform,
-  SceneFloorPalette,
   StaticWall,
   Vec3,
 } from "$lib/types/game";
@@ -47,11 +46,12 @@ export interface GameSceneEnvironmentProps {
   bossDoorTexture: Texture | null;
   bossFloorTexture: Texture | null;
   currentArtifactTemplate: WeaponNodeTemplate | null;
-  currentFloorPalette: SceneFloorPalette;
   currentRoom: DungeonRoom;
   currentRoomTemplate: RoomTemplate;
   doorOpenAmount: number;
   dungeon: DungeonLayout;
+  foundryFloorDecalTexture: Texture | null;
+  foundryFloorTexture: Texture | null;
   lavaSurfaceTexture: Texture | null;
   roomDoorSeals: DoorSeal[];
   roomDoors: DoorMarker[];

@@ -14,9 +14,9 @@
 
 <RoomFloor
   bossFloorTexture={textures.bossFloor}
-  currentFloorPalette={scene.currentFloorPalette}
   currentRoomTemplate={scene.currentRoomTemplate}
-  textureSeed={scene.dungeon.seed}
+  foundryFloorDecalTexture={textures.foundryFloorDecals}
+  foundryFloorTexture={textures.foundryFloor}
   treasureFloorTexture={textures.treasureFloor}
 />
 
