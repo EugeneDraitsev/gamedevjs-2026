@@ -9,7 +9,7 @@ import bossDoorTextureUrl from "$lib/assets/boss-door.svg";
 import bossFloorTextureUrl from "$lib/assets/boss-floor.svg";
 import foundryFloorTextureUrl from "$lib/assets/foundry-floor-atlas.png";
 import foundryFloorDecalsTextureUrl from "$lib/assets/foundry-floor-decals.png";
-import lavaSurfaceTextureUrl from "$lib/assets/lava-surface.svg";
+import lavaSurfaceTextureUrl from "$lib/assets/lava-surface.png";
 import treasureFloorTextureUrl from "$lib/assets/treasure-floor.svg";
 
 const makeTexture = (url: string, repeat = 1): Texture => {
@@ -38,7 +38,7 @@ export class TextureStore {
     this.bossFloor = makeTexture(bossFloorTextureUrl);
     this.foundryFloor = makeTexture(foundryFloorTextureUrl, 4);
     this.foundryFloorDecals = makeTexture(foundryFloorDecalsTextureUrl);
-    this.lavaSurface = makeTexture(lavaSurfaceTextureUrl, 2.4);
+    this.lavaSurface = makeTexture(lavaSurfaceTextureUrl);
     this.treasureFloor = makeTexture(treasureFloorTextureUrl);
   }
 
@@ -47,7 +47,7 @@ export class TextureStore {
       return;
     }
 
-    this.lavaSurface.offset.x += delta * 0.18;
-    this.lavaSurface.offset.y -= delta * 0.08;
+    this.lavaSurface.offset.x = (this.lavaSurface.offset.x + delta * 0.018) % 1;
+    this.lavaSurface.offset.y = (this.lavaSurface.offset.y + delta * 0.004) % 1;
   }
 }

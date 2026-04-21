@@ -1,18 +1,54 @@
+<script module lang="ts">
+  import { PlaneGeometry } from "three";
+  import type { RoomHazard } from "$lib/types/game";
+
+  const lavaTileSize = 2.1;
+  const lavaGeometries = new Map<string, PlaneGeometry>();
+
+  const getLavaGeometry = (hazard: RoomHazard) => {
+    const key = `${hazard.id}:${hazard.args[0]}:${hazard.args[2]}:${hazard.position[0]}:${hazard.position[2]}`;
+    const cached = lavaGeometries.get(key);
+
+    if (cached) {
+      return cached;
+    }
+
+    const geometry = new PlaneGeometry(hazard.args[0] * 2, hazard.args[2] * 2);
+    const uv = geometry.attributes.uv;
+    const minX = (hazard.position[0] - hazard.args[0]) / lavaTileSize;
+    const maxX = (hazard.position[0] + hazard.args[0]) / lavaTileSize;
+    const minZ = (hazard.position[2] - hazard.args[2]) / lavaTileSize;
+    const maxZ = (hazard.position[2] + hazard.args[2]) / lavaTileSize;
+
+    uv.setXY(0, minX, minZ);
+    uv.setXY(1, maxX, minZ);
+    uv.setXY(2, minX, maxZ);
+    uv.setXY(3, maxX, maxZ);
+    uv.needsUpdate = true;
+    lavaGeometries.set(key, geometry);
+
+    return geometry;
+  };
+</script>
+
 <script lang="ts">
   import { T } from "@threlte/core";
   import type { Texture } from "three";
-  import type { RoomHazard } from "$lib/types/game";
 
   let {
+    animationNow = 0,
     lavaSurfaceTexture = null,
     roomHazards,
   }: {
+    animationNow?: number;
     lavaSurfaceTexture?: Texture | null;
     roomHazards: RoomHazard[];
   } = $props();
+
+  const lavaPulse = $derived(0.5 + Math.sin(animationNow * 0.003) * 0.5);
 </script>
 
-{#each roomHazards as hazard (hazard.id)}
+{#each roomHazards as hazard, index (hazard.id)}
   <T.Group position={hazard.position}>
     <T.Mesh receiveShadow>
       <T.BoxGeometry
@@ -27,39 +63,20 @@
 
     {#if lavaSurfaceTexture}
       <T.Mesh
-        position={[0, hazard.args[1] + 0.004, 0]}
+        geometry={getLavaGeometry(hazard)}
+        position={[0, hazard.args[1] + 0.02 + index * 0.006, 0]}
         receiveShadow
         rotation={[-Math.PI / 2, 0, 0]}
       >
-        <T.PlaneGeometry args={[hazard.args[0] * 2, hazard.args[2] * 2]} />
         <T.MeshStandardMaterial
-          color={hazard.color}
-          emissive={hazard.color}
-          emissiveIntensity={0.7}
+          color={`hsl(${28 + lavaPulse * 4} 78% ${38 + lavaPulse * 6}%)`}
+          emissive="#ff5a16"
+          emissiveIntensity={0.1 + lavaPulse * 0.08}
           map={lavaSurfaceTexture}
-          metalness={0.08}
-          roughness={0.18}
+          metalness={0.04}
+          roughness={0.36}
         />
       </T.Mesh>
     {/if}
-  </T.Group>
-{/each}
-
-{#each roomHazards as hazard (hazard.id)}
-  <T.Group position={hazard.position}>
-    <T.Mesh
-      position={[0, hazard.args[1] + 0.01, 0]}
-      receiveShadow
-      rotation={[-Math.PI / 2, 0, 0]}
-    >
-      <T.RingGeometry
-        args={[
-          Math.max(0.2, Math.min(hazard.args[0], hazard.args[2]) * 0.18),
-          Math.min(hazard.args[0], hazard.args[2]) * 0.42,
-          24,
-        ]}
-      />
-      <T.MeshBasicMaterial color="#ffd7a6" opacity={0.34} transparent />
-    </T.Mesh>
   </T.Group>
 {/each}

@@ -134,11 +134,44 @@
       <T.Mesh castShadow receiveShadow>
         <T.BoxGeometry args={[4.4, 0.36, 2.4]} />
         <T.MeshStandardMaterial
-          color={currentFloorPalette.trim}
-          roughness={0.78}
-          metalness={0.08}
+          color="#1b2935"
+          roughness={0.7}
+          metalness={0.34}
         />
       </T.Mesh>
+
+      <T.Mesh castShadow receiveShadow position={[0, 0.23, 0]}>
+        <T.BoxGeometry args={[4.6, 0.07, 2.55]} />
+        <T.MeshStandardMaterial
+          color="#24384a"
+          metalness={0.36}
+          roughness={0.64}
+        />
+      </T.Mesh>
+
+      {#each [-1, 1] as side}
+        <T.Mesh castShadow receiveShadow position={[0, 0.31, side * 1.24]}>
+          <T.BoxGeometry args={[4.65, 0.1, 0.14]} />
+          <T.MeshStandardMaterial
+            color="#8a5c31"
+            metalness={0.66}
+            roughness={0.38}
+          />
+        </T.Mesh>
+      {/each}
+
+      {#each [-1, 1] as x}
+        {#each [-1, 1] as z}
+          <T.Mesh castShadow receiveShadow position={[x * 2.1, 0.34, z * 1.02]}>
+            <T.BoxGeometry args={[0.36, 0.1, 0.36]} />
+            <T.MeshStandardMaterial
+              color="#b77b42"
+              metalness={0.68}
+              roughness={0.34}
+            />
+          </T.Mesh>
+        {/each}
+      {/each}
     </RigidBody>
   </T.Group>
 
@@ -149,11 +182,37 @@
       <T.Mesh castShadow receiveShadow>
         <T.BoxGeometry args={[1.2, 0.9, 1.2]} />
         <T.MeshStandardMaterial
-          color="#ff7a59"
-          metalness={0.08}
-          roughness={0.42}
+          color="#1f3442"
+          metalness={0.32}
+          roughness={0.64}
         />
       </T.Mesh>
+
+      <T.Mesh castShadow receiveShadow position={[0, 0.49, 0]}>
+        <T.BoxGeometry args={[1.28, 0.08, 1.28]} />
+        <T.MeshStandardMaterial
+          color="#263d4f"
+          metalness={0.38}
+          roughness={0.58}
+        />
+      </T.Mesh>
+
+      {#each [-1, 1] as x}
+        {#each [-1, 1] as z}
+          <T.Mesh
+            castShadow
+            receiveShadow
+            position={[x * 0.47, 0.58, z * 0.47]}
+          >
+            <T.BoxGeometry args={[0.24, 0.16, 0.24]} />
+            <T.MeshStandardMaterial
+              color="#b77b42"
+              metalness={0.68}
+              roughness={0.34}
+            />
+          </T.Mesh>
+        {/each}
+      {/each}
     </RigidBody>
   </T.Group>
 
@@ -164,38 +223,64 @@
       <T.Mesh castShadow receiveShadow>
         <T.BoxGeometry args={[1.8, 1.3, 1.8]} />
         <T.MeshStandardMaterial
-          color="#4cc9f0"
-          metalness={0.08}
-          roughness={0.38}
+          color="#20394a"
+          metalness={0.32}
+          roughness={0.64}
         />
       </T.Mesh>
+
+      <T.Mesh castShadow receiveShadow position={[0, 0.69, 0]}>
+        <T.BoxGeometry args={[1.9, 0.09, 1.9]} />
+        <T.MeshStandardMaterial
+          color="#2a4356"
+          metalness={0.38}
+          roughness={0.58}
+        />
+      </T.Mesh>
+
+      {#each [-1, 1] as x}
+        {#each [-1, 1] as z}
+          <T.Mesh
+            castShadow
+            receiveShadow
+            position={[x * 0.76, 0.81, z * 0.76]}
+          >
+            <T.BoxGeometry args={[0.32, 0.18, 0.32]} />
+            <T.MeshStandardMaterial
+              color="#b77b42"
+              metalness={0.68}
+              roughness={0.34}
+            />
+          </T.Mesh>
+        {/each}
+      {/each}
     </RigidBody>
   </T.Group>
 
-  <ShootingTarget position={[-4, 0, -3.5]} color="#e63946" />
-  <ShootingTarget position={[-3, 0, -3.5]} color="#e63946" />
-  <ShootingTarget position={[-2, 0, -3.5]} color="#e63946" />
+  <ShootingTarget position={[-4, 0, -3.5]} color="#a94b3d" />
+  <ShootingTarget position={[-3, 0, -3.5]} color="#a94b3d" />
+  <ShootingTarget position={[-2, 0, -3.5]} color="#a94b3d" />
   <ShootingTarget
     position={[4.5, 0, -4]}
-    color="#f4a261"
+    color="#a8793d"
     height={2}
     width={0.3}
   />
   <ShootingTarget
     position={[5.5, 0, -4]}
-    color="#f4a261"
+    color="#a8793d"
     height={2}
     width={0.3}
   />
   <ShootingTarget
     position={[-5, 0, 3]}
-    color="#2a9d8f"
+    color="#1f7475"
     height={1.2}
     width={0.4}
   />
   <ShootingTarget
     position={[6, 0, 2]}
-    color="#2a9d8f"
+    color="#1f7475"
     height={1.2}
     width={0.4}
   />

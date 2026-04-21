@@ -41,13 +41,31 @@
     />
 
     <T.Mesh castShadow receiveShadow>
-      <T.BoxGeometry args={[width, height, width]} />
-      <T.MeshStandardMaterial {color} metalness={0.1} roughness={0.55} />
+      <T.CylinderGeometry args={[width * 0.48, width * 0.62, height, 8]} />
+      <T.MeshStandardMaterial
+        {color}
+        flatShading
+        metalness={0.34}
+        roughness={0.62}
+      />
     </T.Mesh>
 
-    <T.Mesh castShadow receiveShadow position.y={halfHeight + 0.12}>
-      <T.SphereGeometry args={[width * 0.7, 16, 16]} />
-      <T.MeshStandardMaterial {color} metalness={0.15} roughness={0.45} />
+    <T.Mesh castShadow receiveShadow position.y={-halfHeight + 0.08}>
+      <T.CylinderGeometry args={[width * 0.9, width * 1.08, 0.16, 8]} />
+      <T.MeshStandardMaterial
+        color="#7a5631"
+        metalness={0.62}
+        roughness={0.44}
+      />
+    </T.Mesh>
+
+    <T.Mesh castShadow receiveShadow position.y={halfHeight + 0.08}>
+      <T.CylinderGeometry args={[width * 0.66, width * 0.82, 0.16, 8]} />
+      <T.MeshStandardMaterial
+        color="#c18a4a"
+        metalness={0.58}
+        roughness={0.4}
+      />
     </T.Mesh>
   </RigidBody>
 </T.Group>

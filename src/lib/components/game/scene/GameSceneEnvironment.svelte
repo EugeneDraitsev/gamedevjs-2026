@@ -30,6 +30,7 @@
 />
 
 <RoomHazards
+  animationNow={timing.now}
   lavaSurfaceTexture={textures.lavaSurface}
   roomHazards={scene.roomHazards}
 />
