@@ -60,7 +60,7 @@ export interface SceneSettings {
 }
 
 export const createSceneSettings = (): SceneSettings => ({
-  ambientLightIntensity: 1.13,
+  ambientLightIntensity: 1.47,
   cameraFov: 63,
   cameraMode: "follow",
   cameraOrthographic: false,
