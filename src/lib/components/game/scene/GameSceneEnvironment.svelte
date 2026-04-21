@@ -16,7 +16,7 @@
   bossFloorTexture={textures.bossFloor}
   currentFloorPalette={scene.currentFloorPalette}
   currentRoomTemplate={scene.currentRoomTemplate}
-  textureSeed={`${scene.dungeon.seed}:${scene.currentRoom.id}`}
+  textureSeed={scene.dungeon.seed}
   treasureFloorTexture={textures.treasureFloor}
 />
 

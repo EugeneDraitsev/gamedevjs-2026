@@ -1,6 +1,5 @@
 <script module lang="ts">
   import { DataTexture, LinearFilter, SRGBColorSpace } from "three";
-  import type { RoomTemplate as FloorRoomTemplate } from "$lib/config/room-templates";
   import type { SceneFloorPalette as FloorTexturePalette } from "$lib/types/game";
 
   type Rgb = [number, number, number];
@@ -101,7 +100,7 @@
     return lerp(north, south, sy);
   };
 
-  const distanceToCrack = (crack: Crack, x: number, y: number) => {
+  const distanceSquaredToCrack = (crack: Crack, x: number, y: number) => {
     const length = (crack.x2 - crack.x1) ** 2 + (crack.y2 - crack.y1) ** 2 || 1;
     const t = clampNumber(
       ((x - crack.x1) * (crack.x2 - crack.x1) +
@@ -111,9 +110,9 @@
       1
     );
 
-    return Math.hypot(
-      x - lerp(crack.x1, crack.x2, t),
-      y - lerp(crack.y1, crack.y2, t)
+    return (
+      (x - lerp(crack.x1, crack.x2, t)) ** 2 +
+      (y - lerp(crack.y1, crack.y2, t)) ** 2
     );
   };
 
@@ -124,12 +123,12 @@
   ) => {
     const cracks: Crack[] = [];
 
-    for (let i = 0; i < 18; i += 1) {
+    for (let i = 0; i < 12; i += 1) {
       let angle = random() * Math.PI * 2;
       let x = random() * width;
       let y = random() * height;
 
-      for (let step = 0; step < 4 + Math.floor(random() * 5); step += 1) {
+      for (let step = 0; step < 3 + Math.floor(random() * 4); step += 1) {
         const length = 8 + random() * 20;
         const x2 = clampNumber(x + Math.cos(angle) * length, 4, width - 4);
         const y2 = clampNumber(y + Math.sin(angle) * length, 4, height - 4);
@@ -174,13 +173,12 @@
 
   const createFloorPattern = (
     palette: FloorTexturePalette,
-    template: FloorRoomTemplate,
     textureSeed: string
   ): FloorPattern => {
     const columns = 16;
     const rows = 14;
-    const tileSize = 64;
-    const seed = seedFromText(`${template.id}:${textureSeed}:plates`);
+    const tileSize = 32;
+    const seed = seedFromText(`${textureSeed}:plates`);
     const random = randomFromSeed(seed);
     const width = columns * tileSize;
     const height = rows * tileSize;
@@ -188,7 +186,7 @@
     return {
       bronze: hexToRgb("#3b3327"),
       cracks: createCracks(random, width, height),
-      decals: Array.from({ length: 22 }, () => ({
+      decals: Array.from({ length: 12 }, () => ({
         dark: 10 + random() * 30,
         radius: 26 + random() * 92,
         warmth: random() * 0.08,
@@ -209,7 +207,15 @@
     let warmth = 0;
 
     for (const decal of pattern.decals) {
-      const amount = 1 - Math.hypot(x - decal.x, y - decal.y) / decal.radius;
+      const dx = x - decal.x;
+      const dy = y - decal.y;
+      const distanceSquared = dx * dx + dy * dy;
+
+      if (distanceSquared > decal.radius * decal.radius) {
+        continue;
+      }
+
+      const amount = 1 - Math.sqrt(distanceSquared) / decal.radius;
       const wear =
         amount + (valueNoise(x, y, 19, pattern.seed + 29) - 0.5) * 0.6;
 
@@ -226,12 +232,17 @@
     let shade = 0;
 
     for (const crack of pattern.cracks) {
-      const distance = distanceToCrack(crack, x, y);
-      const noise = valueNoise(x, y, 11, pattern.seed + 97);
+      const distanceSquared = distanceSquaredToCrack(crack, x, y);
+      const widthSquared = crack.width * crack.width;
+      const featherSquared = (crack.width + 1.2) ** 2;
 
-      if (distance < crack.width) {
+      if (distanceSquared < widthSquared) {
+        const noise = valueNoise(x, y, 11, pattern.seed + 97);
+
         shade -= 17 + noise * 12;
-      } else if (distance < crack.width + 1.2) {
+      } else if (distanceSquared < featherSquared) {
+        const noise = valueNoise(x, y, 11, pattern.seed + 97);
+
         shade -= 4 + noise * 4;
       }
     }
@@ -248,16 +259,18 @@
   ) => {
     const nearestX = localX < pattern.tileSize / 2 ? 0 : pattern.tileSize;
     const nearestY = localY < pattern.tileSize / 2 ? 0 : pattern.tileSize;
-    const distance = Math.hypot(localX - nearestX, localY - nearestY);
+    const dx = localX - nearestX;
+    const dy = localY - nearestY;
+    const distanceSquared = dx * dx + dy * dy;
 
-    if (distance > 2.25) {
+    if (distanceSquared > 2.25 ** 2) {
       return null;
     }
 
     const core = mixRgb(
       pattern.stone,
       pattern.bronze,
-      distance < 0.9 ? 0.1 : 0.32
+      distanceSquared < 0.9 ** 2 ? 0.1 : 0.32
     );
 
     return shadeRgb(core, valueNoise(x, y, 5, pattern.seed + 13) * 8 - 10);
@@ -309,17 +322,16 @@
 
   const getFloorTexture = (
     palette: FloorTexturePalette,
-    template: FloorRoomTemplate,
     textureSeed: string
   ) => {
-    const key = `${palette.even}:${palette.odd}:${palette.trim}:${template.id}:${textureSeed}`;
+    const key = `${palette.even}:${palette.odd}:${palette.trim}:${textureSeed}`;
     const cached = floorTextureCache.get(key);
 
     if (cached) {
       return cached;
     }
 
-    const pattern = createFloorPattern(palette, template, textureSeed);
+    const pattern = createFloorPattern(palette, textureSeed);
     const data = new Uint8Array(pattern.width * pattern.height * 4);
 
     for (let y = 0; y < pattern.height; y += 1) {
@@ -369,7 +381,7 @@
   } = $props();
 
   const floorTexture = $derived(
-    getFloorTexture(currentFloorPalette, currentRoomTemplate, textureSeed)
+    getFloorTexture(currentFloorPalette, textureSeed)
   );
 </script>
 
