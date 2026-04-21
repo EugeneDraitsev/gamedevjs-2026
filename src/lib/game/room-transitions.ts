@@ -48,7 +48,11 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
     ? getTransition(currentRoom, position)
     : null;
 
-  if (!transition || now - room.lastTransitionAt < 240) {
+  if (
+    !transition ||
+    room.transitionPending ||
+    now - room.lastTransitionAt < 240
+  ) {
     if (currentArtifactType && Math.hypot(position[0], position[2]) < 1.5) {
       timing.pickArtifact(currentArtifactType, now);
       onCollectArtifact?.(currentRoom.id, currentArtifactType);
@@ -58,33 +62,50 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
   }
 
   const nextRoom = dungeon.rooms[transition.roomId];
-
   room.lastTransitionAt = now;
-  room.entryDirection =
-    nextRoom.kind === "boss"
-      ? "south"
-      : getEntryDirectionFromTarget(transition.target);
-  room.currentId = transition.roomId;
-  room.teleportTo(
-    nextRoom.kind === "boss"
-      ? [0, transition.target[1], roomTeleportZ]
-      : transition.target
-  );
-  combat.clearForRoomChange();
-  timing.enemyWakeUntil = now + 650;
-  timing.lastHazardAt = now;
-  player.impactVelocity = null;
+  room.transitionPending = true;
+  timing.beginRoomTransition(now);
 
-  if (nextRoom.kind === "boss") {
-    const title =
-      enemyTemplateById[
-        roomTemplateById[nextRoom.templateId].enemyTemplateId ?? ""
-      ]?.label ?? "Boss";
+  const applyTransition = () => {
+    if (!room.transitionPending) {
+      return;
+    }
 
-    timing.beginBossIntro(title, now);
+    const appliedAt = performance.now();
+
+    room.transitionPending = false;
+    room.entryDirection =
+      nextRoom.kind === "boss"
+        ? "south"
+        : getEntryDirectionFromTarget(transition.target);
+    room.currentId = transition.roomId;
+    room.teleportTo(
+      nextRoom.kind === "boss"
+        ? [0, transition.target[1], roomTeleportZ]
+        : transition.target
+    );
+    combat.clearForRoomChange();
+    timing.enemyWakeUntil = appliedAt + 650;
+    timing.lastHazardAt = appliedAt;
+    player.impactVelocity = null;
+
+    if (nextRoom.kind === "boss") {
+      const title =
+        enemyTemplateById[
+          roomTemplateById[nextRoom.templateId].enemyTemplateId ?? ""
+        ]?.label ?? "Boss";
+
+      timing.beginBossIntro(title, appliedAt);
+    }
+
+    room.markExplored(transition.roomId);
+  };
+
+  if (typeof requestAnimationFrame === "undefined") {
+    applyTransition();
+  } else {
+    requestAnimationFrame(() => requestAnimationFrame(applyTransition));
   }
-
-  room.markExplored(transition.roomId);
 };
 
 interface ResetArgs {
@@ -116,6 +137,7 @@ export const resetPlayerAfterDeath = ({
   timing.bossIntroTitle = "";
   room.currentId = dungeon.startRoomId;
   room.unlockingRoomId = "";
+  room.transitionPending = false;
   room.doorOpenAmount = 1;
   player.resetForRespawn();
   room.teleportTo([0, 1.1, 0]);

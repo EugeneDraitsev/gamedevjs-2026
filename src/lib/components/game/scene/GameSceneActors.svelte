@@ -1,13 +1,155 @@
 <script lang="ts">
   import { T } from "@threlte/core";
+  import { onMount } from "svelte";
   import BombActor from "$lib/components/game/scene/BombActor.svelte";
   import EnemyActor from "$lib/components/game/scene/EnemyActor.svelte";
   import PickupActor from "$lib/components/game/scene/PickupActor.svelte";
+  import { enemyTemplateById } from "$lib/config/room-templates";
   import { getGameSceneContext } from "$lib/stores/scene-context";
+  import type {
+    ActiveBomb,
+    ActiveEnemy,
+    ActiveEnemyShot,
+    ActivePickup,
+  } from "$lib/types/game";
 
   const scene = getGameSceneContext();
   const { combat, pickups, timing } = scene;
+  const enemyWarmups: ActiveEnemy[] = [
+    "scrap-runner",
+    "coil-sentry",
+    "iron-warden",
+    "mine-herald",
+  ].map((templateId, index) => {
+    const template = enemyTemplateById[templateId];
+
+    return {
+      behavior: template.behavior,
+      bombArmMs: template.bombArmMs,
+      bombColor: template.bombColor,
+      bombCooldownMs: template.bombCooldownMs,
+      bombCount: template.bombCount,
+      bombDamage: template.bombDamage,
+      bombExplosionRadius: template.bombExplosionRadius,
+      bombHp: template.bombHp,
+      bombMaxActive: template.bombMaxActive,
+      bombRadius: template.bombRadius,
+      bombSpeed: template.bombSpeed,
+      bombTtlMs: template.bombTtlMs,
+      color: template.color,
+      hp: template.hp,
+      id: `enemy-warmup-${templateId}`,
+      knockbackVelocity: [0, 0, 0],
+      lastBombAt: 0,
+      lastHitAt: 0,
+      lastShotAt: 0,
+      maxHp: template.hp,
+      moveSpeed: template.moveSpeed,
+      position: [(index - 1.5) * 2, 0.62, 0],
+      preferredRange: template.preferredRange,
+      radius: template.radius,
+      shotColor: template.shotColor,
+      shotDamage: template.shotDamage,
+      shotIntervalMs: template.shotIntervalMs,
+      shotSpeed: template.shotSpeed,
+      templateId: template.id,
+      touchDamage: template.touchDamage,
+      touchIntervalMs: template.touchIntervalMs,
+    };
+  });
+  const bombWarmups: ActiveBomb[] = [
+    {
+      armAt: 1200,
+      color: "#ff6f58",
+      damage: 1,
+      expiresAt: 5000,
+      explosionRadius: 1.4,
+      hp: 4,
+      id: "bomb-warmup",
+      lastHitAt: 0,
+      maxHp: 4,
+      originId: "enemy-warmup-mine-herald",
+      position: [0, 0.34, 0],
+      radius: 0.34,
+      spawnedAt: 0,
+      velocity: [0, 0, 0],
+    },
+  ];
+  const enemyShotWarmups: ActiveEnemyShot[] = [
+    {
+      color: "#ffd6a0",
+      damage: 1,
+      id: "enemy-shot-warmup",
+      position: [0, 0.62, 0],
+      radius: 0.18,
+      ttlMs: 1000,
+      velocity: [0, 0, 1],
+    },
+  ];
+  const pickupWarmups: ActivePickup[] = [
+    {
+      createdAt: 0,
+      id: "pickup-warmup-gear",
+      kind: "gear",
+      position: [0, 0.54, 0],
+      radius: 0.38,
+      value: 1,
+    },
+    {
+      createdAt: 0,
+      id: "pickup-warmup-heal",
+      kind: "heal",
+      position: [0, 0.54, 0],
+      radius: 0.46,
+      value: 1,
+    },
+  ];
+
+  let actorWarmupVisible = $state(true);
+
+  onMount(() => {
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        actorWarmupVisible = false;
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  });
 </script>
+
+<T.Group visible={actorWarmupVisible} position={[0, -80, 0]}>
+  {#each enemyWarmups as enemy (enemy.id)}
+    <EnemyActor animationNow={0} {enemy} />
+  {/each}
+
+  {#each bombWarmups as bomb (bomb.id)}
+    <BombActor animationNow={0} {bomb} />
+  {/each}
+
+  {#each pickupWarmups as pickup (pickup.id)}
+    <PickupActor animationNow={0} {pickup} />
+  {/each}
+
+  {#each enemyShotWarmups as shot (shot.id)}
+    <T.Group position={shot.position}>
+      <T.Mesh castShadow>
+        <T.SphereGeometry args={[shot.radius, 16, 16]} />
+        <T.MeshStandardMaterial
+          color={shot.color}
+          emissive={shot.color}
+          emissiveIntensity={0.7}
+          metalness={0.08}
+          roughness={0.16}
+        />
+      </T.Mesh>
+    </T.Group>
+  {/each}
+</T.Group>
 
 {#each combat.enemies as enemy (enemy.id)}
   <EnemyActor animationNow={timing.now} {enemy} />

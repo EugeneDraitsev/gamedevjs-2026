@@ -8,7 +8,20 @@
     gearTeeth,
     treasureGearMounts,
   } from "$lib/game/scene-layout";
-  import type { SceneFloorPalette } from "$lib/types/game";
+  import type { SceneFloorPalette, Vec3 } from "$lib/types/game";
+
+  const backdropGears: { position: Vec3; size: number }[] = [
+    { position: [-8.5, 2.75, -7.72], size: 1.45 },
+    { position: [8.5, 2.8, -7.72], size: 1.55 },
+    { position: [-4.7, 4.0, -7.7], size: 0.8 },
+    { position: [4.6, 4.0, -7.7], size: 0.8 },
+  ];
+
+  const backdropLamps: Vec3[] = [
+    [-6.5, 2.05, -7.64],
+    [6.5, 2.05, -7.64],
+    [0, 3.25, -7.64],
+  ];
 
   let {
     currentFloorPalette,
@@ -18,6 +31,95 @@
     environment?: RoomEnvironmentId | null;
   } = $props();
 </script>
+
+<T.Mesh position={[0, -0.39, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+  <T.PlaneGeometry args={[32, 27]} />
+  <T.MeshStandardMaterial color="#100c08" metalness={0.28} roughness={0.78} />
+</T.Mesh>
+
+<T.Mesh position={[0, 2.15, -10.2]} castShadow receiveShadow>
+  <T.BoxGeometry args={[24, 4.9, 0.55]} />
+  <T.MeshStandardMaterial color="#18120d" metalness={0.42} roughness={0.74} />
+</T.Mesh>
+
+<T.Mesh position={[-12.15, 2.05, -0.5]} castShadow receiveShadow>
+  <T.BoxGeometry args={[0.55, 4.7, 19.5]} />
+  <T.MeshStandardMaterial color="#120e0a" metalness={0.38} roughness={0.78} />
+</T.Mesh>
+
+<T.Mesh position={[12.15, 2.05, -0.5]} castShadow receiveShadow>
+  <T.BoxGeometry args={[0.55, 4.7, 19.5]} />
+  <T.MeshStandardMaterial color="#120e0a" metalness={0.38} roughness={0.78} />
+</T.Mesh>
+
+<T.Mesh position={[0, 2.28, -9.87]}>
+  <T.BoxGeometry args={[2.8, 2.45, 0.08]} />
+  <T.MeshBasicMaterial color="#ffbf78" opacity={0.2} transparent />
+</T.Mesh>
+
+<T.PointLight
+  color="#ffae5f"
+  distance={8}
+  intensity={2.8}
+  position={[0, 2.7, -7.8]}
+/>
+
+{#each backdropLamps as lamp}
+  <T.PointLight
+    color="#ff9f4a"
+    distance={5.5}
+    intensity={1.4}
+    position={lamp}
+  />
+  <T.Mesh position={lamp}>
+    <T.SphereGeometry args={[0.13, 12, 8]} />
+    <T.MeshBasicMaterial color="#ffbd68" />
+  </T.Mesh>
+{/each}
+
+{#each [-7.2, -3.6, 3.6, 7.2] as x}
+  <T.Mesh position={[x, 2.35, -7.66]}>
+    <T.CylinderGeometry args={[0.026, 0.026, 2.55, 6]} />
+    <T.MeshStandardMaterial color="#17100a" metalness={0.7} roughness={0.48} />
+  </T.Mesh>
+{/each}
+
+{#each backdropGears as gear}
+  <T.Group position={gear.position}>
+    <T.Mesh castShadow>
+      <T.TorusGeometry args={[gear.size, 0.13, 12, 32]} />
+      <T.MeshStandardMaterial
+        color="#5d4325"
+        metalness={0.74}
+        roughness={0.4}
+      />
+    </T.Mesh>
+
+    <T.Mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
+      <T.CylinderGeometry args={[0.28, 0.28, 0.2, 16]} />
+      <T.MeshStandardMaterial
+        color="#2b2117"
+        metalness={0.68}
+        roughness={0.46}
+      />
+    </T.Mesh>
+
+    {#each gearTeeth as tooth}
+      <T.Mesh
+        castShadow
+        position={[tooth.x * gear.size, tooth.y * gear.size, 0.02]}
+        rotation={[0, 0, tooth.rotation]}
+      >
+        <T.BoxGeometry args={[0.18, 0.38, 0.16]} />
+        <T.MeshStandardMaterial
+          color="#5d4325"
+          metalness={0.72}
+          roughness={0.42}
+        />
+      </T.Mesh>
+    {/each}
+  </T.Group>
+{/each}
 
 {#if environment === "training-range"}
   <T.Group position={[2.9, 0.65, -1.6]} rotation={[0, 0, -0.32]}>

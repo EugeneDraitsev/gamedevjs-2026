@@ -2,11 +2,11 @@
   import { Canvas, T } from "@threlte/core";
   import { OrbitControls } from "@threlte/extras";
   import { Debug, World } from "@threlte/rapier";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import {
     type DirectionalLight,
     type OrthographicCamera,
-    PCFShadowMap,
+    PCFSoftShadowMap,
     type PerspectiveCamera,
   } from "three";
   import type { OrbitControls as OrbitControlsInstance } from "three/examples/jsm/controls/OrbitControls.js";
@@ -78,6 +78,7 @@
   let orthographicCamera = $state<OrthographicCamera>();
   let perspectiveCamera = $state<PerspectiveCamera>();
   let sunLight = $state<DirectionalLight>();
+  let enemySpawnPending = $state(false);
   const sceneCamera = $derived(
     scene.settings.cameraOrthographic ? orthographicCamera : perspectiveCamera
   );
@@ -97,12 +98,17 @@
   });
 
   $effect(() => {
+    const startRoomId = dungeon.startRoomId;
+
     dungeon.seed;
-    timing.resetForFloor();
-    combat.resetForFloor();
-    pickups.clear();
-    room.resetForFloor(dungeon.startRoomId);
-    player.resetForFloor();
+    untrack(() => {
+      timing.resetForFloor();
+      combat.resetForFloor();
+      pickups.clear();
+      room.resetForFloor(startRoomId);
+      pickups.enterRoom(startRoomId);
+      player.resetForFloor();
+    });
   });
 
   $effect(() => {
@@ -116,22 +122,42 @@
   });
 
   $effect(() => {
-    scene.currentRoom.id;
-    combat.enemies = createRoomEnemies(
-      scene.currentRoom,
-      scene.currentRoomTemplate,
-      room.entryDirection,
-      room.clearedSet
-    );
-    combat.beams = [];
-    combat.bombs = [];
-    combat.enemyShots = [];
-    timing.lastHazardAt = performance.now();
-    room.doorOpenAmount =
-      scene.currentRoomTemplate.spawnPattern === "none" ||
-      room.releasedSet.has(scene.currentRoom.id)
-        ? 1
-        : 0;
+    const currentRoom = scene.currentRoom;
+    const currentRoomTemplate = scene.currentRoomTemplate;
+    let spawnFrame = 0;
+
+    untrack(() => {
+      enemySpawnPending =
+        currentRoomTemplate.spawnPattern !== "none" &&
+        !room.clearedSet.has(currentRoom.id);
+      pickups.enterRoom(currentRoom.id);
+      combat.enemies = [];
+      combat.beams = [];
+      combat.bombs = [];
+      combat.enemyShots = [];
+      timing.lastHazardAt = performance.now();
+      room.doorOpenAmount =
+        currentRoomTemplate.spawnPattern === "none" ||
+        room.releasedSet.has(currentRoom.id) ||
+        room.clearedSet.has(currentRoom.id)
+          ? 1
+          : 0;
+    });
+
+    spawnFrame = requestAnimationFrame(() => {
+      combat.enemies = createRoomEnemies(
+        currentRoom,
+        currentRoomTemplate,
+        untrack(() => room.entryDirection),
+        untrack(() => room.clearedSet)
+      );
+      enemySpawnPending = false;
+    });
+
+    return () => {
+      cancelAnimationFrame(spawnFrame);
+      enemySpawnPending = false;
+    };
   });
 
   $effect(() => {
@@ -188,8 +214,6 @@
       onGearCountChange?.(pickups.gears);
     }
 
-    const roomBefore = room.currentId;
-
     handlePlayerPositionChange({
       combat,
       currentArtifactType: scene.currentArtifactType,
@@ -202,10 +226,6 @@
       room,
       timing,
     });
-
-    if (room.currentId !== roomBefore) {
-      pickups.clear();
-    }
   };
 
   const handleMelee = (frame: MeleeFrame) => {
@@ -249,6 +269,10 @@
       return;
     }
 
+    if (enemySpawnPending) {
+      return;
+    }
+
     const result = stepEnemies({
       combat,
       currentRoomId: scene.currentRoom.id,
@@ -278,7 +302,6 @@
         room,
         timing,
       });
-      pickups.clear();
       return;
     }
 
@@ -314,9 +337,12 @@
 </script>
 
 <div class="scene">
-  <Canvas shadows={PCFShadowMap} dpr={2}>
-    <SceneRendererConfig />
-    <T.Fog attach="fog" args={['#040816', 13, 24]} />
+  <Canvas shadows={PCFSoftShadowMap} dpr={2}>
+    <SceneRendererConfig exposure={scene.settings.toneMappingExposure} />
+    <T.Fog
+      attach="fog"
+      args={['#080604', scene.settings.fogNear, scene.settings.fogFar]}
+    />
 
     {#if scene.settings.cameraOrthographic}
       <T.OrthographicCamera
@@ -346,11 +372,14 @@
       />
     {/if}
 
-    <T.HemisphereLight args={['#9fd6ff', '#081221', 1.15]} />
+    <T.HemisphereLight
+      args={['#c18455', '#050403', scene.settings.hemisphereLightIntensity]}
+    />
     <T.AmbientLight intensity={scene.settings.ambientLightIntensity} />
     <T.DirectionalLight
       bind:ref={sunLight}
       castShadow
+      color="#ffbd76"
       intensity={scene.settings.sunIntensity}
       position={[
         scene.settings.sunPositionX,

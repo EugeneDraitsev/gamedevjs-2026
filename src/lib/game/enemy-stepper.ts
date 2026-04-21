@@ -526,7 +526,12 @@ const syncRoomDoorState = (
 ) => {
   const { currentRoomId, isCurrentRoomCombat, room } = ctx;
 
-  if (!isCurrentRoomCombat || room.releasedSet.has(currentRoomId)) {
+  if (
+    !isCurrentRoomCombat ||
+    room.releasedSet.has(currentRoomId) ||
+    (room.clearedSet.has(currentRoomId) &&
+      room.unlockingRoomId !== currentRoomId)
+  ) {
     room.doorOpenAmount = 1;
     return;
   }

@@ -35,6 +35,8 @@ const roomEnvironmentSchema = z.enum([
   "treasure-gears",
 ]);
 
+const roomSkinSchema = z.enum(["boss", "foundry", "treasure"]);
+
 const enemyTemplateSchema = z
   .object({
     behavior: z.enum(["rush", "shooter", "bomber"]),
@@ -112,6 +114,7 @@ const enemyTemplates = z.array(enemyTemplateSchema).parse(enemyTemplateData);
 export type EnemyTemplate = z.infer<typeof enemyTemplateSchema>;
 export type DungeonRoomKind = z.infer<typeof roomKindSchema>;
 export type RoomEnvironmentId = z.infer<typeof roomEnvironmentSchema>;
+export type RoomSkinId = z.infer<typeof roomSkinSchema>;
 
 const enemyTemplateIds = new Set(enemyTemplates.map((template) => template.id));
 
@@ -124,6 +127,7 @@ const roomTemplateSchema = z
     kind: roomKindSchema,
     label: z.string().min(1),
     layout: roomLayoutSchema,
+    skin: roomSkinSchema.optional(),
     spawnPattern: z.enum([
       "arc",
       "boss",

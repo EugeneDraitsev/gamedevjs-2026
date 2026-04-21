@@ -5,6 +5,7 @@ import type {
 } from "$lib/config/dungeon-layout";
 import {
   enemyTemplateById,
+  type RoomSkinId,
   type RoomTemplate,
 } from "$lib/config/room-templates";
 import type { FloorTheme, WallTheme } from "$lib/config/scene-settings";
@@ -12,7 +13,6 @@ import type {
   ActiveEnemy,
   DoorMarker,
   DoorSeal,
-  FloorTile,
   RoomHazard,
   RoomPlatform,
   SceneBossGearMount,
@@ -22,6 +22,7 @@ import type {
   SceneWallPalette,
   StaticWall,
   Vec3,
+  WallStyle,
 } from "$lib/types/game";
 
 export const doorwayHalfSpan = 1.2;
@@ -53,46 +54,101 @@ export const doorOpenDurationMs = 460;
 export const hazardTickMs = 420;
 export const playerMaxHealth = 6;
 export const playerRadius = 0.55;
-
-export const floorTiles: FloorTile[] = Array.from({ length: 18 }, (_, row) =>
-  Array.from({ length: 20 }, (_, column) => ({
-    even: (row + column) % 2 === 0,
-    position: [column - 9.5, 0.01, row - 8.5] as Vec3,
-  }))
-).flat();
+export const roomTransitionDurationMs = 190;
 
 export const floorThemes = {
   check: {
-    even: "#284457",
-    odd: "#173142",
-    trim: "#38556f",
+    even: "#2b312f",
+    odd: "#191e1d",
+    trim: "#44433b",
   },
   ember: {
-    even: "#4a3f55",
-    odd: "#2a2435",
-    trim: "#725b68",
+    even: "#3a3026",
+    odd: "#211a14",
+    trim: "#61492f",
   },
   steel: {
-    even: "#37556d",
-    odd: "#21384c",
-    trim: "#4d6d84",
+    even: "#34383a",
+    odd: "#202426",
+    trim: "#58554d",
   },
 } satisfies Record<FloorTheme, SceneFloorPalette>;
 
 export const wallThemes = {
   aqua: {
-    horizontal: "#58a6c9",
-    vertical: "#2a7ea8",
+    horizontal: "#354047",
+    vertical: "#222b31",
   },
   brass: {
-    horizontal: "#b58a51",
-    vertical: "#7f6037",
+    horizontal: "#6d5431",
+    vertical: "#42321e",
   },
   foundry: {
-    horizontal: "#8e5258",
-    vertical: "#6f3138",
+    horizontal: "#3b3025",
+    vertical: "#241d17",
   },
 } satisfies Record<WallTheme, SceneWallPalette>;
+
+export interface SceneRoomSkin {
+  doorColor: string;
+  doorEmissive: string;
+  doorSealColor: string;
+  floorTheme: FloorTheme;
+  trimColor: string;
+  wallLamps: boolean;
+  wallStyle: WallStyle;
+  wallTheme: WallTheme;
+}
+
+export const roomSkins = {
+  boss: {
+    doorColor: "#f0b15f",
+    doorEmissive: "#ff8f42",
+    doorSealColor: "#ffb35f",
+    floorTheme: "ember",
+    trimColor: "#6f5532",
+    wallLamps: true,
+    wallStyle: "mechanic",
+    wallTheme: "foundry",
+  },
+  foundry: {
+    doorColor: "#d49a55",
+    doorEmissive: "#ff9b46",
+    doorSealColor: "#ffc06d",
+    floorTheme: "ember",
+    trimColor: "#5d4528",
+    wallLamps: true,
+    wallStyle: "mechanic",
+    wallTheme: "foundry",
+  },
+  treasure: {
+    doorColor: "#d7a84f",
+    doorEmissive: "#ffd166",
+    doorSealColor: "#ffd166",
+    floorTheme: "steel",
+    trimColor: "#7b6430",
+    wallLamps: true,
+    wallStyle: "mechanic",
+    wallTheme: "brass",
+  },
+} satisfies Record<RoomSkinId, SceneRoomSkin>;
+
+const getDefaultRoomSkinId = (room: DungeonRoom): RoomSkinId => {
+  if (room.kind === "boss") {
+    return "boss";
+  }
+
+  if (room.kind === "treasure") {
+    return "treasure";
+  }
+
+  return "foundry";
+};
+
+export const getRoomSkin = (
+  room: DungeonRoom,
+  template: RoomTemplate
+): SceneRoomSkin => roomSkins[template.skin ?? getDefaultRoomSkinId(room)];
 
 export const gearTeeth: SceneGearTooth[] = Array.from(
   { length: 10 },
@@ -650,16 +706,18 @@ export const pushSpawnsFromEntry = (
 
 export const createRoomWalls = (
   room: DungeonRoom,
-  currentWallPalette: SceneWallPalette
+  currentWallPalette: SceneWallPalette,
+  skin?: SceneRoomSkin
 ): StaticWall[] => {
   const walls: StaticWall[] = [];
-  let palette = currentWallPalette;
-
-  if (room.kind === "boss") {
-    palette = wallThemes.foundry;
-  } else if (room.kind === "treasure") {
-    palette = wallThemes.brass;
-  }
+  const palette = skin ? wallThemes[skin.wallTheme] : currentWallPalette;
+  const wallSkin = skin
+    ? {
+        lamp: skin.wallLamps,
+        style: skin.wallStyle,
+        trimColor: skin.trimColor,
+      }
+    : {};
 
   const pushHorizontalWall = (
     id: string,
@@ -670,9 +728,11 @@ export const createRoomWalls = (
     walls.push({
       args: [wallSegmentHalfWidth, wallHalfHeight, wallThickness],
       color: palette.horizontal,
+      facing: z < 0 ? "south" : "north",
       id,
       opacity,
       position: [x, wallY, z],
+      ...wallSkin,
     });
   };
 
@@ -680,41 +740,37 @@ export const createRoomWalls = (
     walls.push({
       args: [wallThickness, wallHalfHeight, wallSegmentHalfDepth],
       color: palette.vertical,
+      facing: x < 0 ? "east" : "west",
       id,
       opacity,
       position: [x, wallY, z],
+      ...wallSkin,
     });
   };
 
   if (room.exits.north) {
-    pushHorizontalWall(
-      `${room.id}-north-west`,
-      -wallSegmentOffsetWidth,
-      -wallHalfDepth
-    );
-    pushHorizontalWall(
-      `${room.id}-north-east`,
-      wallSegmentOffsetWidth,
-      -wallHalfDepth
-    );
+    pushHorizontalWall("north-west", -wallSegmentOffsetWidth, -wallHalfDepth);
+    pushHorizontalWall("north-east", wallSegmentOffsetWidth, -wallHalfDepth);
   } else {
     walls.push({
       args: [wallHalfWidth, wallHalfHeight, wallThickness],
       color: palette.horizontal,
-      id: `${room.id}-north`,
+      facing: "south",
+      id: "north",
       position: [0, wallY, -wallHalfDepth],
+      ...wallSkin,
     });
   }
 
   if (room.exits.south) {
     pushHorizontalWall(
-      `${room.id}-south-west`,
+      "south-west",
       -wallSegmentOffsetWidth,
       wallHalfDepth,
       0.2
     );
     pushHorizontalWall(
-      `${room.id}-south-east`,
+      "south-east",
       wallSegmentOffsetWidth,
       wallHalfDepth,
       0.2
@@ -723,49 +779,39 @@ export const createRoomWalls = (
     walls.push({
       args: [wallHalfWidth, wallHalfHeight, wallThickness],
       color: palette.horizontal,
-      id: `${room.id}-south`,
+      facing: "north",
+      id: "south",
       opacity: 0.2,
       position: [0, wallY, wallHalfDepth],
+      ...wallSkin,
     });
   }
 
   if (room.exits.west) {
-    pushVerticalWall(
-      `${room.id}-west-north`,
-      -wallHalfWidth,
-      -wallSegmentOffsetDepth
-    );
-    pushVerticalWall(
-      `${room.id}-west-south`,
-      -wallHalfWidth,
-      wallSegmentOffsetDepth
-    );
+    pushVerticalWall("west-north", -wallHalfWidth, -wallSegmentOffsetDepth);
+    pushVerticalWall("west-south", -wallHalfWidth, wallSegmentOffsetDepth);
   } else {
     walls.push({
       args: [wallThickness, wallHalfHeight, wallHalfDepth],
       color: palette.vertical,
-      id: `${room.id}-west`,
+      facing: "east",
+      id: "west",
       position: [-wallHalfWidth, wallY, 0],
+      ...wallSkin,
     });
   }
 
   if (room.exits.east) {
-    pushVerticalWall(
-      `${room.id}-east-north`,
-      wallHalfWidth,
-      -wallSegmentOffsetDepth
-    );
-    pushVerticalWall(
-      `${room.id}-east-south`,
-      wallHalfWidth,
-      wallSegmentOffsetDepth
-    );
+    pushVerticalWall("east-north", wallHalfWidth, -wallSegmentOffsetDepth);
+    pushVerticalWall("east-south", wallHalfWidth, wallSegmentOffsetDepth);
   } else {
     walls.push({
       args: [wallThickness, wallHalfHeight, wallHalfDepth],
       color: palette.vertical,
-      id: `${room.id}-east`,
+      facing: "west",
+      id: "east",
       position: [wallHalfWidth, wallY, 0],
+      ...wallSkin,
     });
   }
 
@@ -774,7 +820,8 @@ export const createRoomWalls = (
 
 export const createDoorMarkers = (
   room: DungeonRoom,
-  dungeon: DungeonLayout
+  dungeon: DungeonLayout,
+  skin?: SceneRoomSkin
 ): DoorMarker[] =>
   (Object.entries(room.exits) as [DungeonRoomDirection, string][])
     .filter(([, target]) => Boolean(target))
@@ -792,12 +839,12 @@ export const createDoorMarkers = (
         position = [9.4, 0.03, 0];
       }
 
-      let color = "#8ac6ff";
+      let color = skin?.doorColor ?? "#8ac6ff";
 
       if (targetRoom.kind === "boss") {
-        color = "#ffd166";
+        color = skin?.doorEmissive ?? "#ffd166";
       } else if (targetRoom.kind === "treasure") {
-        color = "#57d6a5";
+        color = skin?.doorSealColor ?? "#57d6a5";
       }
 
       return {
@@ -807,12 +854,18 @@ export const createDoorMarkers = (
             : [0.95, 0.05, 0.45],
         boss: targetRoom.kind === "boss",
         color,
-        id: `${room.id}-${direction}-door`,
+        emissive: skin?.doorEmissive,
+        id: `${direction}-door`,
         position,
+        style: skin?.wallStyle,
+        trimColor: skin?.trimColor,
       };
     });
 
-export const createDoorSeals = (room: DungeonRoom): DoorSeal[] =>
+export const createDoorSeals = (
+  room: DungeonRoom,
+  skin?: SceneRoomSkin
+): DoorSeal[] =>
   (Object.keys(room.exits) as DungeonRoomDirection[]).map((direction) => {
     let position: Vec3;
 
@@ -831,9 +884,12 @@ export const createDoorSeals = (room: DungeonRoom): DoorSeal[] =>
         direction === "east" || direction === "west"
           ? [0.16, 2.2, doorwayHalfSpan]
           : [doorwayHalfSpan, 2.2, 0.16],
-      color: "#9dd6ff",
-      id: `${room.id}-${direction}-seal`,
+      color: skin?.doorSealColor ?? "#9dd6ff",
+      emissive: skin?.doorEmissive,
+      id: `${direction}-seal`,
       position,
+      style: skin?.wallStyle,
+      trimColor: skin?.trimColor,
     };
   });
 

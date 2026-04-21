@@ -2,6 +2,7 @@
   import ArtifactPickupOverlay from "$lib/components/game/overlays/ArtifactPickupOverlay.svelte";
   import BossIntroOverlay from "$lib/components/game/overlays/BossIntroOverlay.svelte";
   import FloorIntroOverlay from "$lib/components/game/overlays/FloorIntroOverlay.svelte";
+  import RoomTransitionOverlay from "$lib/components/game/overlays/RoomTransitionOverlay.svelte";
   import SceneCrosshair from "$lib/components/game/overlays/SceneCrosshair.svelte";
   import SceneDamagePopups from "$lib/components/game/overlays/SceneDamagePopups.svelte";
   import type { SceneOverlayProps } from "$lib/types/game";
@@ -19,10 +20,16 @@
     playerReloading={overlays.playerReloading}
   />
 
+  <div class="vibe-vignette" style:opacity={overlays.vignetteIntensity}></div>
+
   <div
     class="damage-flash"
     style:opacity={overlays.playerHitFlash * 0.66}
   ></div>
+
+  <RoomTransitionOverlay
+    roomTransitionProgress={overlays.roomTransitionProgress}
+  />
 
   <SceneDamagePopups
     animationNow={overlays.animationNow}
@@ -58,6 +65,22 @@
     z-index: 30;
     pointer-events: none;
     isolation: isolate;
+  }
+
+  .vibe-vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        circle at 50% 42%,
+        transparent 42%,
+        rgba(3, 2, 1, 0.2) 72%,
+        rgba(0, 0, 0, 0.72) 100%
+      ),
+      linear-gradient(180deg, rgba(255, 153, 62, 0.1), transparent 34%),
+      linear-gradient(0deg, rgba(0, 0, 0, 0.3), transparent 30%);
   }
 
   .damage-flash {

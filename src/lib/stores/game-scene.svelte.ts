@@ -13,6 +13,7 @@ import {
   floorThemes,
   getRoomHazards,
   getRoomPlatforms,
+  getRoomSkin,
   wallThemes,
 } from "$lib/game/scene-layout";
 import {
@@ -58,16 +59,21 @@ export class GameSceneStore {
   camera = $state<Camera>();
 
   readonly roomList = $derived(Object.values(this.dungeon.rooms));
-  readonly currentFloorPalette = $derived(
-    floorThemes[this.settings.floorTheme]
-  );
-  readonly currentWallPalette = $derived(wallThemes[this.settings.wallTheme]);
   readonly currentRoom = $derived(
     this.dungeon.rooms[this.room.currentId] ??
       this.dungeon.rooms[this.dungeon.startRoomId]
   );
   readonly currentRoomTemplate = $derived(
     roomTemplateById[this.currentRoom.templateId]
+  );
+  readonly currentRoomSkin = $derived(
+    getRoomSkin(this.currentRoom, this.currentRoomTemplate)
+  );
+  readonly currentFloorPalette = $derived(
+    floorThemes[this.currentRoomSkin?.floorTheme ?? this.settings.floorTheme]
+  );
+  readonly currentWallPalette = $derived(
+    wallThemes[this.currentRoomSkin?.wallTheme ?? this.settings.wallTheme]
   );
   readonly isCurrentRoomCombat = $derived(
     this.currentRoomTemplate.spawnPattern !== "none"
@@ -79,12 +85,18 @@ export class GameSceneStore {
     getRoomHazards(this.currentRoomTemplate.layout)
   );
   readonly roomWalls = $derived(
-    createRoomWalls(this.currentRoom, this.currentWallPalette)
+    createRoomWalls(
+      this.currentRoom,
+      this.currentWallPalette,
+      this.currentRoomSkin
+    )
   );
   readonly roomDoors = $derived(
-    createDoorMarkers(this.currentRoom, this.dungeon)
+    createDoorMarkers(this.currentRoom, this.dungeon, this.currentRoomSkin)
   );
-  readonly roomDoorSeals = $derived(createDoorSeals(this.currentRoom));
+  readonly roomDoorSeals = $derived(
+    createDoorSeals(this.currentRoom, this.currentRoomSkin)
+  );
   readonly visibleMinimapRooms = $derived.by(() => {
     const explored = this.roomList.filter((room) =>
       this.room.exploredSet.has(room.id)
@@ -190,6 +202,8 @@ export class GameSceneStore {
     playerReloadRatio: this.playerReloadRatio,
     playerReloading: this.player.reloading,
     projectedDamagePopups: this.projectedDamagePopups,
+    roomTransitionProgress: this.timing.roomTransitionProgress,
+    vignetteIntensity: this.settings.vignetteIntensity,
   }));
   readonly sceneUiVisible = $derived(
     this.timing.floorIntroStartedAt > 0 &&

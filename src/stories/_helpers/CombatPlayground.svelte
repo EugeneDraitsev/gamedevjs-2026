@@ -94,6 +94,7 @@
     <DebugPane
       bind:settings
       onResetDefaults={resetDefaults}
+      onResetLevel={restart}
       onResetScene={restart}
     />
   {/if}

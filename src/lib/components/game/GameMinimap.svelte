@@ -54,6 +54,18 @@
               class:locked={!scene.isRoomUnlocked(room)}
             ></span>
           {/each}
+          {#if scene.pickups.countsByRoomId[room.id]?.gear}
+            <span
+              class="pickup-icon gear"
+              aria-label="Gear pickup in room"
+            ></span>
+          {/if}
+          {#if scene.pickups.countsByRoomId[room.id]?.heal}
+            <span
+              class="pickup-icon heal"
+              aria-label="Heal pickup in room"
+            ></span>
+          {/if}
         </div>
       {/each}
     </div>
@@ -184,6 +196,49 @@
 
   .door.west {
     left: calc(-0.34rem - 0.08rem);
+  }
+
+  .pickup-icon {
+    position: absolute;
+    z-index: 2;
+    inline-size: 0.42rem;
+    block-size: 0.42rem;
+    border-radius: 999px;
+    box-shadow: 0 0 0.24rem currentColor;
+  }
+
+  .pickup-icon.gear {
+    right: 0.05rem;
+    bottom: 0.04rem;
+    color: rgba(255, 206, 101, 0.92);
+    background: currentColor;
+    border: 1px solid rgba(64, 38, 12, 0.9);
+  }
+
+  .pickup-icon.heal {
+    bottom: 0.04rem;
+    left: 0.05rem;
+    color: rgba(112, 226, 164, 0.92);
+    background: currentColor;
+  }
+
+  .pickup-icon.heal::before,
+  .pickup-icon.heal::after {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    content: "";
+    background: rgba(10, 28, 18, 0.88);
+    transform: translate(-50%, -50%);
+  }
+
+  .pickup-icon.heal::before {
+    inline-size: 0.24rem;
+    block-size: 0.06rem;
+  }
+
+  .pickup-icon.heal::after {
+    inline-size: 0.06rem;
+    block-size: 0.24rem;
   }
 
   .settings-button {

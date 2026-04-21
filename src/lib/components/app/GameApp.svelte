@@ -24,7 +24,7 @@
   } from "$lib/config/weapon-graph";
   import { isEditableTarget } from "$lib/game/dom";
   import { isTouchDevice } from "$lib/game/mobile";
-  import { loadRunSave, saveRunSave } from "$lib/game/run-save";
+  import { clearRunSave, loadRunSave, saveRunSave } from "$lib/game/run-save";
   import { mobileInput } from "$lib/stores/mobile-input.svelte";
   import type { MeleeTrailSettings } from "$lib/types/game";
 
@@ -36,6 +36,7 @@
 
   let DebugPane = $state<Component<{
     onResetDefaults: () => void;
+    onResetLevel: () => void;
     onResetScene: () => void;
     settings: SceneSettings;
   }> | null>(null);
@@ -97,6 +98,17 @@
 
   const resetScene = () => {
     sceneResetKey += 1;
+  };
+
+  const resetLevel = () => {
+    clearRunSave(seed);
+    collectedArtifactRooms = [];
+    floorIndex = 1;
+    gearCount = 0;
+    looseModules = [...startingDungeon.initialModules];
+    weaponEdges = defaultWeaponGraph.edges;
+    weaponNodes = defaultWeaponGraph.nodes;
+    resetScene();
   };
 
   const resetDefaults = () => {
@@ -311,6 +323,7 @@
     <DebugPane
       bind:settings
       onResetDefaults={resetDefaults}
+      onResetLevel={resetLevel}
       onResetScene={resetScene}
     />
   {:else if debugEnabled && paneLoadFailed}

@@ -143,15 +143,21 @@ export interface DoorMarker {
   args: Vec3;
   boss: boolean;
   color: string;
+  emissive?: string;
   id: string;
   position: Vec3;
+  style?: WallStyle;
+  trimColor?: string;
 }
 
 export interface DoorSeal {
   args: Vec3;
   color: string;
+  emissive?: string;
   id: string;
   position: Vec3;
+  style?: WallStyle;
+  trimColor?: string;
 }
 
 export interface DamagePopup {
@@ -165,11 +171,6 @@ export interface DamagePopup {
 export interface ProjectedDamagePopup extends DamagePopup {
   x: number;
   y: number;
-}
-
-export interface FloorTile {
-  even: boolean;
-  position: Vec3;
 }
 
 export interface RoomHazard {
@@ -188,12 +189,19 @@ export interface RoomPlatform {
   shape?: "box" | "hex";
 }
 
+export type WallFacing = "east" | "north" | "south" | "west";
+export type WallStyle = "mechanic" | "plain";
+
 export interface StaticWall {
   args: Vec3;
   color: string;
+  facing: WallFacing;
   id: string;
+  lamp?: boolean;
   opacity?: number;
   position: Vec3;
+  style?: WallStyle;
+  trimColor?: string;
 }
 
 export interface MinimapBounds {
@@ -251,6 +259,8 @@ export interface SceneOverlayProps {
   playerReloading: boolean;
   playerReloadRatio: number;
   projectedDamagePopups: ProjectedDamagePopup[];
+  roomTransitionProgress: number;
+  vignetteIntensity: number;
 }
 
 export interface RoomEnemyContext {

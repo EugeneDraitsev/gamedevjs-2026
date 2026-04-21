@@ -5,6 +5,7 @@
     "label": "Polygon",
     "environment": "training-range",
     "layout": "floor",
+    "skin": "foundry",
     "spawnPattern": "none",
     "enemyCount": 0
   },
@@ -149,6 +150,7 @@
     "label": "Treasure",
     "environment": "treasure-gears",
     "layout": "gear-floor",
+    "skin": "treasure",
     "spawnPattern": "none",
     "enemyCount": 0
   },
@@ -158,6 +160,7 @@
     "label": "Foundry",
     "environment": "boss-gears",
     "layout": "boss-foundry",
+    "skin": "boss",
     "spawnPattern": "boss",
     "enemyTemplateId": "iron-warden",
     "enemyCount": 1
@@ -168,6 +171,7 @@
     "label": "Mine Garden",
     "environment": "boss-gears",
     "layout": "boss-bomber",
+    "skin": "boss",
     "spawnPattern": "boss",
     "enemyTemplateId": "mine-herald",
     "enemyCount": 1

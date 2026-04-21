@@ -4,10 +4,44 @@ import { getRoomHazards, getRoomPlatforms } from "$lib/game/scene-layout";
 import type { ActivePickup, Vec3 } from "$lib/types/game";
 
 export class PickupStore {
-  items = $state<ActivePickup[]>([]);
+  currentRoomId = $state("");
+  itemsByRoomId = $state<Record<string, ActivePickup[]>>({});
   gears = $state(0);
 
+  readonly items = $derived(this.itemsByRoomId[this.currentRoomId] ?? []);
+  readonly countsByRoomId = $derived.by(() => {
+    const counts: Record<string, { gear: number; heal: number }> = {};
+
+    for (const [roomId, items] of Object.entries(this.itemsByRoomId)) {
+      let gear = 0;
+      let heal = 0;
+
+      for (const item of items) {
+        if (item.kind === "gear") {
+          gear += 1;
+        } else {
+          heal += 1;
+        }
+      }
+
+      if (gear > 0 || heal > 0) {
+        counts[roomId] = { gear, heal };
+      }
+    }
+
+    return counts;
+  });
+
+  enterRoom(roomId: string) {
+    this.currentRoomId = roomId;
+
+    if (!(roomId in this.itemsByRoomId)) {
+      this.itemsByRoomId = { ...this.itemsByRoomId, [roomId]: [] };
+    }
+  }
+
   dropRoom(roomId: string, template: RoomTemplate, now: number) {
+    const roomItems = this.itemsByRoomId[roomId] ?? [];
     const drops = createRoomPickups(
       roomId,
       template.enemyTemplateId,
@@ -16,12 +50,15 @@ export class PickupStore {
       {
         hazards: getRoomHazards(template.layout),
         obstacles: getRoomPlatforms(template.layout),
-        pickups: this.items,
+        pickups: roomItems,
       }
     );
 
     if (drops.length > 0) {
-      this.items = [...this.items, ...drops];
+      this.itemsByRoomId = {
+        ...this.itemsByRoomId,
+        [roomId]: [...roomItems, ...drops],
+      };
     }
   }
 
@@ -38,7 +75,10 @@ export class PickupStore {
     const result = collectPickups(this.items, position, health, maxHealth);
 
     if (result.pickups.length !== this.items.length) {
-      this.items = result.pickups;
+      this.itemsByRoomId = {
+        ...this.itemsByRoomId,
+        [this.currentRoomId]: result.pickups,
+      };
     }
 
     if (result.gearDelta > 0) {
@@ -49,6 +89,7 @@ export class PickupStore {
   }
 
   clear() {
-    this.items = [];
+    this.currentRoomId = "";
+    this.itemsByRoomId = {};
   }
 }

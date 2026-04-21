@@ -3,6 +3,7 @@ import {
   artifactPickupDurationMs,
   bossIntroDurationMs,
   floorIntroDurationMs,
+  roomTransitionDurationMs,
 } from "$lib/game/scene-layout";
 
 export class TimingStore {
@@ -13,6 +14,7 @@ export class TimingStore {
   enemyWakeUntil = $state(0);
   pickedArtifactAt = $state(0);
   pickedArtifactType = $state<WeaponNodeType | null>(null);
+  roomTransitionStartedAt = $state(0);
   lastHazardAt = 0;
 
   readonly bossIntroProgress = $derived(
@@ -47,6 +49,16 @@ export class TimingStore {
       : 0
   );
 
+  readonly roomTransitionProgress = $derived(
+    this.roomTransitionStartedAt > 0
+      ? Math.max(
+          0,
+          1 -
+            (this.now - this.roomTransitionStartedAt) / roomTransitionDurationMs
+        )
+      : 0
+  );
+
   beginBossIntro(title: string, at: number) {
     this.bossIntroStartedAt = at;
     this.bossIntroTitle = title;
@@ -57,6 +69,10 @@ export class TimingStore {
     this.pickedArtifactType = type;
   }
 
+  beginRoomTransition(at: number) {
+    this.roomTransitionStartedAt = at;
+  }
+
   resetForFloor() {
     this.floorIntroStartedAt =
       typeof performance === "undefined" ? 0 : performance.now();
@@ -65,6 +81,7 @@ export class TimingStore {
     this.bossIntroTitle = "";
     this.pickedArtifactAt = 0;
     this.pickedArtifactType = null;
+    this.roomTransitionStartedAt = 0;
     this.lastHazardAt = 0;
   }
 }

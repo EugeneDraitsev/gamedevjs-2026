@@ -11,10 +11,13 @@ export interface SceneSettings {
   cameraOrthographic: boolean;
   cameraSmoothing: number;
   floorTheme: FloorTheme;
+  fogFar: number;
+  fogNear: number;
   followDistance: number;
   followPitch: number;
   followYaw: number;
   gravityY: number;
+  hemisphereLightIntensity: number;
   jumpSpeed: number;
   lookHeight: number;
   meleeArcSpan: number;
@@ -51,20 +54,25 @@ export interface SceneSettings {
   sunPositionX: number;
   sunPositionY: number;
   sunPositionZ: number;
+  toneMappingExposure: number;
+  vignetteIntensity: number;
   wallTheme: WallTheme;
 }
 
 export const createSceneSettings = (): SceneSettings => ({
-  ambientLightIntensity: 0.52,
+  ambientLightIntensity: 1.13,
   cameraFov: 63,
   cameraMode: "follow",
   cameraOrthographic: false,
   cameraSmoothing: 8,
-  floorTheme: "check",
+  floorTheme: "ember",
+  fogFar: 27,
+  fogNear: 10,
   followDistance: 12.3,
   followPitch: 52,
   followYaw: 0,
   gravityY: -16,
+  hemisphereLightIntensity: 0.48,
   jumpSpeed: 7.6,
   lookHeight: 0.4,
   meleeArcSpan: 2.7,
@@ -90,18 +98,20 @@ export const createSceneSettings = (): SceneSettings => ({
   moveResponsiveness: 12,
   moveSpeed: 7,
   playerLinearDamping: 1.6,
-  shadowBias: -0.000_35,
-  shadowFar: 32,
-  shadowFrustum: 16,
+  shadowBias: -0.0002,
+  shadowFar: 30,
+  shadowFrustum: 14,
   shadowMapSize: 2048,
-  shadowNormalBias: 0.035,
+  shadowNormalBias: 0.06,
   showDebugGeometry: false,
   showPhysicsDebug: false,
-  sunIntensity: 2.35,
-  sunPositionX: 9,
-  sunPositionY: 14,
-  sunPositionZ: 7,
-  wallTheme: "aqua",
+  sunIntensity: 2.1,
+  sunPositionX: -5.4,
+  sunPositionY: 13.2,
+  sunPositionZ: 4.4,
+  toneMappingExposure: 0.94,
+  vignetteIntensity: 0.24,
+  wallTheme: "foundry",
 });
 
 export const loadSceneSettings = (): SceneSettings => {

@@ -41,3 +41,11 @@ export const saveRunSave = (seed: string, state: SavedRunState) => {
 
   localStorage.setItem(getRunSaveKey(seed), JSON.stringify(state));
 };
+
+export const clearRunSave = (seed: string) => {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+
+  localStorage.removeItem(getRunSaveKey(seed));
+};

@@ -21,6 +21,7 @@
 
   interface DebugPaneProps {
     onResetDefaults: () => void;
+    onResetLevel: () => void;
     onResetScene: () => void;
     settings: SceneSettings;
   }
@@ -43,6 +44,7 @@
   const formatAngle = (value: number) => `${value.toFixed(0)}°`;
   const formatFloat = (value: number) => value.toFixed(2);
   const formatShadowBias = (value: number) => value.toFixed(5);
+
   const resetCameraDefaults = () => {
     const defaults = createSceneSettings();
 
@@ -56,11 +58,86 @@
     settings.lookHeight = defaults.lookHeight;
   };
 
+  const resetPhysicsDefaults = () => {
+    const defaults = createSceneSettings();
+
+    settings.gravityY = defaults.gravityY;
+    settings.jumpSpeed = defaults.jumpSpeed;
+    settings.moveResponsiveness = defaults.moveResponsiveness;
+    settings.moveSpeed = defaults.moveSpeed;
+    settings.playerLinearDamping = defaults.playerLinearDamping;
+  };
+
+  const resetLightingDefaults = () => {
+    const defaults = createSceneSettings();
+
+    settings.ambientLightIntensity = defaults.ambientLightIntensity;
+    settings.fogFar = defaults.fogFar;
+    settings.fogNear = defaults.fogNear;
+    settings.hemisphereLightIntensity = defaults.hemisphereLightIntensity;
+    settings.shadowBias = defaults.shadowBias;
+    settings.shadowFar = defaults.shadowFar;
+    settings.shadowFrustum = defaults.shadowFrustum;
+    settings.shadowMapSize = defaults.shadowMapSize;
+    settings.shadowNormalBias = defaults.shadowNormalBias;
+    settings.sunIntensity = defaults.sunIntensity;
+    settings.sunPositionX = defaults.sunPositionX;
+    settings.sunPositionY = defaults.sunPositionY;
+    settings.sunPositionZ = defaults.sunPositionZ;
+    settings.toneMappingExposure = defaults.toneMappingExposure;
+    settings.vignetteIntensity = defaults.vignetteIntensity;
+  };
+
+  const resetMeleeDefaults = () => {
+    const defaults = createSceneSettings();
+
+    settings.meleeArcSpan = defaults.meleeArcSpan;
+    settings.meleeBand1Alpha = defaults.meleeBand1Alpha;
+    settings.meleeBand1Center = defaults.meleeBand1Center;
+    settings.meleeBand1Width = defaults.meleeBand1Width;
+    settings.meleeBand2Alpha = defaults.meleeBand2Alpha;
+    settings.meleeBand2Center = defaults.meleeBand2Center;
+    settings.meleeBand2Width = defaults.meleeBand2Width;
+    settings.meleeBand3Alpha = defaults.meleeBand3Alpha;
+    settings.meleeBand3Center = defaults.meleeBand3Center;
+    settings.meleeBand3Width = defaults.meleeBand3Width;
+    settings.meleeCooldownMs = defaults.meleeCooldownMs;
+    settings.meleeCoreColor = defaults.meleeCoreColor;
+    settings.meleeDurationMs = defaults.meleeDurationMs;
+    settings.meleeEdgeColor = defaults.meleeEdgeColor;
+    settings.meleeHitboxPadding = defaults.meleeHitboxPadding;
+    settings.meleeReach = defaults.meleeReach;
+    settings.meleeShowSword = defaults.meleeShowSword;
+    settings.meleeSwordOpacity = defaults.meleeSwordOpacity;
+    settings.meleeTailLength = defaults.meleeTailLength;
+  };
+
+  const resetMaterialDefaults = () => {
+    const defaults = createSceneSettings();
+
+    settings.floorTheme = defaults.floorTheme;
+    settings.wallTheme = defaults.wallTheme;
+  };
+
+  const resetDebugDefaults = () => {
+    const defaults = createSceneSettings();
+
+    settings.showDebugGeometry = defaults.showDebugGeometry;
+    settings.showPhysicsDebug = defaults.showPhysicsDebug;
+  };
+
   let {
     onResetDefaults,
+    onResetLevel,
     onResetScene,
     settings = $bindable(),
   }: DebugPaneProps = $props();
+
+  const resetAllDefaults = () => {
+    cheats.reset();
+    onResetDefaults();
+    onResetLevel();
+  };
 </script>
 
 <div class="debug-anchor">
@@ -163,15 +240,24 @@
         max={8}
         step={0.05}
       />
+      <Button on:click={resetPhysicsDefaults} title="Reset physics defaults" />
     </Folder>
 
-    <Folder title="Lighting" expanded={false}>
+    <Folder title="Lighting + Vibes" expanded={false}>
       <Slider
         bind:value={settings.sunIntensity}
         format={formatFloat}
         label="Sun"
         min={0}
-        max={4}
+        max={6}
+        step={0.05}
+      />
+      <Slider
+        bind:value={settings.hemisphereLightIntensity}
+        format={formatFloat}
+        label="Fill"
+        min={0}
+        max={2}
         step={0.05}
       />
       <Slider
@@ -181,6 +267,38 @@
         min={0}
         max={2}
         step={0.05}
+      />
+      <Slider
+        bind:value={settings.toneMappingExposure}
+        format={formatFloat}
+        label="Exposure"
+        min={0.4}
+        max={1.4}
+        step={0.02}
+      />
+      <Slider
+        bind:value={settings.fogNear}
+        format={formatFloat}
+        label="Fog near"
+        min={3}
+        max={18}
+        step={0.1}
+      />
+      <Slider
+        bind:value={settings.fogFar}
+        format={formatFloat}
+        label="Fog far"
+        min={12}
+        max={36}
+        step={0.1}
+      />
+      <Slider
+        bind:value={settings.vignetteIntensity}
+        format={formatFloat}
+        label="Vignette"
+        min={0}
+        max={1}
+        step={0.01}
       />
       <Slider
         bind:value={settings.sunPositionX}
@@ -244,6 +362,10 @@
         min={0}
         max={0.2}
         step={0.001}
+      />
+      <Button
+        on:click={resetLightingDefaults}
+        title="Reset lighting defaults"
       />
     </Folder>
 
@@ -381,6 +503,7 @@
         max={0.5}
         step={0.005}
       />
+      <Button on:click={resetMeleeDefaults} title="Reset melee defaults" />
     </Folder>
 
     <Folder title="Materials" expanded={false}>
@@ -394,6 +517,10 @@
         label="Walls"
         options={wallThemeOptions}
       />
+      <Button
+        on:click={resetMaterialDefaults}
+        title="Reset material defaults"
+      />
     </Folder>
 
     <Folder title="Cheats" expanded={false}>
@@ -403,6 +530,7 @@
         on:click={() => cheats.requestRevealMap()}
         title="Reveal Entire Map"
       />
+      <Button on:click={() => cheats.reset()} title="Reset cheat defaults" />
     </Folder>
 
     <Folder title="Debug" expanded={false}>
@@ -414,9 +542,11 @@
         bind:value={settings.showPhysicsDebug}
         label="Physics wireframe"
       />
+      <Button on:click={resetDebugDefaults} title="Reset debug defaults" />
       <Separator />
+      <Button on:click={onResetLevel} title="Reset level" />
       <Button on:click={onResetScene} title="Reset scene" />
-      <Button on:click={onResetDefaults} title="Reset defaults" />
+      <Button on:click={resetAllDefaults} title="Reset all defaults" />
     </Folder>
   </Pane>
 </div>

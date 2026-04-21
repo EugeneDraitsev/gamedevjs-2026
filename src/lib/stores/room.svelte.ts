@@ -14,6 +14,7 @@ export class RoomStore {
   unlockingRoomId = "";
   unlockStartedAt = 0;
   lastTransitionAt = 0;
+  transitionPending = false;
 
   readonly exploredSet = $derived(new Set(this.exploredIds));
   readonly clearedSet = $derived(new Set(this.clearedEnemyIds));
@@ -56,5 +57,6 @@ export class RoomStore {
     this.unlockingRoomId = "";
     this.unlockStartedAt = 0;
     this.lastTransitionAt = 0;
+    this.transitionPending = false;
   }
 }
