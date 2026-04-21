@@ -16,6 +16,7 @@
     SceneSettings,
     WallTheme,
   } from "$lib/config/scene-settings";
+  import { createSceneSettings } from "$lib/config/scene-settings";
   import { cheats } from "$lib/stores/cheats.svelte";
 
   interface DebugPaneProps {
@@ -42,6 +43,18 @@
   const formatAngle = (value: number) => `${value.toFixed(0)}°`;
   const formatFloat = (value: number) => value.toFixed(2);
   const formatShadowBias = (value: number) => value.toFixed(5);
+  const resetCameraDefaults = () => {
+    const defaults = createSceneSettings();
+
+    settings.cameraFov = defaults.cameraFov;
+    settings.cameraMode = defaults.cameraMode;
+    settings.cameraOrthographic = defaults.cameraOrthographic;
+    settings.cameraSmoothing = defaults.cameraSmoothing;
+    settings.followDistance = defaults.followDistance;
+    settings.followPitch = defaults.followPitch;
+    settings.followYaw = defaults.followYaw;
+    settings.lookHeight = defaults.lookHeight;
+  };
 
   let {
     onResetDefaults,
@@ -58,9 +71,10 @@
         label="Mode"
         options={cameraModeOptions}
       />
+      <Checkbox bind:value={settings.cameraOrthographic} label="Orthographic" />
       <Slider
         bind:value={settings.cameraFov}
-        label="FOV"
+        label={settings.cameraOrthographic ? "Zoom" : "FOV"}
         min={20}
         max={80}
         step={1}
@@ -105,6 +119,7 @@
         max={20}
         step={0.1}
       />
+      <Button on:click={resetCameraDefaults} title="Reset camera defaults" />
     </Folder>
 
     <Folder title="Physics" expanded={false}>

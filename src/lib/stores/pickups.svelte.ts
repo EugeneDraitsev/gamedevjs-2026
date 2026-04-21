@@ -1,5 +1,6 @@
 import type { RoomTemplate } from "$lib/config/room-templates";
 import { collectPickups, createRoomPickups } from "$lib/game/pickups";
+import { getRoomHazards, getRoomPlatforms } from "$lib/game/scene-layout";
 import type { ActivePickup, Vec3 } from "$lib/types/game";
 
 export class PickupStore {
@@ -11,7 +12,12 @@ export class PickupStore {
       roomId,
       template.enemyTemplateId,
       template.enemyCount,
-      now
+      now,
+      {
+        hazards: getRoomHazards(template.layout),
+        obstacles: getRoomPlatforms(template.layout),
+        pickups: this.items,
+      }
     );
 
     if (drops.length > 0) {

@@ -75,8 +75,12 @@
   const { combat, pickups, player, room, textures, timing } = scene;
 
   let orbitControls = $state<OrbitControlsInstance>();
-  let sceneCamera = $state<PerspectiveCamera>();
+  let orthographicCamera = $state<OrthographicCamera>();
+  let perspectiveCamera = $state<PerspectiveCamera>();
   let sunLight = $state<DirectionalLight>();
+  const sceneCamera = $derived(
+    scene.settings.cameraOrthographic ? orthographicCamera : perspectiveCamera
+  );
 
   setGameSceneContext(scene);
 
@@ -314,21 +318,33 @@
     <SceneRendererConfig />
     <T.Fog attach="fog" args={['#040816', 13, 24]} />
 
-    <T.PerspectiveCamera
-      bind:ref={sceneCamera}
-      makeDefault
-      position={[0, 9, 6.4]}
-      fov={scene.settings.cameraFov}
-    >
+    {#if scene.settings.cameraOrthographic}
+      <T.OrthographicCamera
+        bind:ref={orthographicCamera}
+        makeDefault
+        position={[0, 9, 6.4]}
+        zoom={scene.settings.cameraFov}
+      />
+    {:else}
+      <T.PerspectiveCamera
+        bind:ref={perspectiveCamera}
+        makeDefault
+        position={[0, 9, 6.4]}
+        fov={scene.settings.cameraFov}
+      />
+    {/if}
+
+    {#if sceneCamera}
       <OrbitControls
         bind:ref={orbitControls}
+        camera={sceneCamera}
         enabled={scene.settings.cameraMode === "orbit"}
         enableDamping
         enablePan
         maxDistance={26}
         minDistance={4}
       />
-    </T.PerspectiveCamera>
+    {/if}
 
     <T.HemisphereLight args={['#9fd6ff', '#081221', 1.15]} />
     <T.AmbientLight intensity={scene.settings.ambientLightIntensity} />

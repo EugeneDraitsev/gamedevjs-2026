@@ -1,4 +1,4 @@
-import type { PerspectiveCamera } from "three";
+import type { Camera } from "three";
 import type { SwingParams } from "$lib/combat/melee-swing";
 import { getHazardBrakeFactor } from "$lib/components/game/scene/utils";
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
@@ -55,7 +55,7 @@ export class GameSceneStore {
   meleeTrailSettings = $state.raw<MeleeTrailSettings>(null as never);
   settings = $state.raw<SceneSettings>(null as never);
   weaponBuild = $state.raw<WeaponBuild>(null as never);
-  camera = $state<PerspectiveCamera>();
+  camera = $state<Camera>();
 
   readonly roomList = $derived(Object.values(this.dungeon.rooms));
   readonly currentFloorPalette = $derived(

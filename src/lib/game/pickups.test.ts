@@ -26,25 +26,59 @@ describe("seededUnit", () => {
 });
 
 describe("createRoomPickups", () => {
-  it("drops one room pickup near room center", () => {
+  it("drops one weighted room pickup", () => {
     const drops = createRoomPickups("boss-room", "iron-warden", 1, 123);
     const drop = drops[0];
-    const distance = Math.hypot(
-      drop?.position[0] ?? 99,
-      drop?.position[2] ?? 99
-    );
 
     expect(drops).toHaveLength(1);
     expect(drop?.createdAt).toBe(123);
-    expect(distance).toBeLessThan(1);
+    expect(["gear", "heal"]).toContain(drop?.kind);
+    expect(drop?.value).toBe(1);
   });
 
-  it("falls back to one gear for rooms without a drop table", () => {
+  it("uses equal gear and heal weights", () => {
     const drops = createRoomPickups("plain-room", "scrap-runner", 4, 0);
 
     expect(drops).toHaveLength(1);
-    expect(drops[0].kind).toBe("gear");
+    expect(["gear", "heal"]).toContain(drops[0].kind);
     expect(drops[0].value).toBe(1);
+  });
+
+  it("keeps drops out of hazards and occupied footprints", () => {
+    const occupied = pickup("gear");
+    const drops = createRoomPickups("blocked-room", "scrap-runner", 4, 0, {
+      hazards: [
+        {
+          args: [4, 0.03, 4],
+          color: "#f00",
+          damage: 1,
+          id: "lava",
+          position: [0, 0.03, 0],
+        },
+      ],
+      obstacles: [
+        {
+          args: [1, 0.2, 1],
+          color: "#000",
+          id: "block",
+          position: [5, 0.2, 0],
+        },
+      ],
+      pickups: [occupied],
+    });
+    const drop = drops[0];
+
+    expect(drops).toHaveLength(1);
+    expect(
+      Math.abs(drop.position[0]) > 4 + drop.radius ||
+        Math.abs(drop.position[2]) > 4 + drop.radius
+    ).toBe(true);
+    expect(
+      Math.hypot(
+        drop.position[0] - occupied.position[0],
+        drop.position[2] - occupied.position[2]
+      )
+    ).toBeGreaterThan(drop.radius + occupied.radius);
   });
 });
 

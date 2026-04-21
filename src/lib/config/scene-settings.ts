@@ -8,6 +8,7 @@ export interface SceneSettings {
   ambientLightIntensity: number;
   cameraFov: number;
   cameraMode: CameraMode;
+  cameraOrthographic: boolean;
   cameraSmoothing: number;
   floorTheme: FloorTheme;
   followDistance: number;
@@ -57,6 +58,7 @@ export const createSceneSettings = (): SceneSettings => ({
   ambientLightIntensity: 0.52,
   cameraFov: 63,
   cameraMode: "follow",
+  cameraOrthographic: false,
   cameraSmoothing: 8,
   floorTheme: "check",
   followDistance: 12.3,

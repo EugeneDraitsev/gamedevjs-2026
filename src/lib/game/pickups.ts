@@ -1,14 +1,26 @@
 import { clampToRoom, playerRadius } from "$lib/game/scene-layout";
-import type { ActivePickup, PickupKind, Vec3 } from "$lib/types/game";
+import type {
+  ActivePickup,
+  PickupKind,
+  RoomHazard,
+  RoomPlatform,
+  Vec3,
+} from "$lib/types/game";
 
 interface PickupConfig {
   radius: number;
 }
 
 interface PickupDrop {
-  chance: number;
   kind: PickupKind;
   value: number;
+  weight: number;
+}
+
+interface PickupSpawnContext {
+  hazards?: RoomHazard[];
+  obstacles?: RoomPlatform[];
+  pickups?: ActivePickup[];
 }
 
 export const pickupConfigs = {
@@ -16,30 +28,10 @@ export const pickupConfigs = {
   heal: { radius: 0.46 },
 } satisfies Record<PickupKind, PickupConfig>;
 
-const roomDrops: Partial<Record<string, PickupDrop[]>> = {
-  "bolt-runner": [{ chance: 0.34, kind: "gear", value: 1 }],
-  "coil-sentry": [
-    { chance: 0.6, kind: "gear", value: 1 },
-    { chance: 0.12, kind: "heal", value: 1 },
-  ],
-  "ember-artillery": [{ chance: 0.48, kind: "gear", value: 1 }],
-  "iron-warden": [
-    { chance: 1, kind: "gear", value: 8 },
-    { chance: 0.55, kind: "heal", value: 2 },
-  ],
-  "mine-herald": [
-    { chance: 1, kind: "gear", value: 14 },
-    { chance: 0.75, kind: "heal", value: 2 },
-  ],
-  "rail-hunter": [
-    { chance: 0.78, kind: "gear", value: 2 },
-    { chance: 0.16, kind: "heal", value: 1 },
-  ],
-  "slag-brute": [
-    { chance: 0.72, kind: "gear", value: 2 },
-    { chance: 0.24, kind: "heal", value: 1 },
-  ],
-};
+const roomDrops: PickupDrop[] = [
+  { kind: "gear", value: 1, weight: 1 },
+  { kind: "heal", value: 1, weight: 1 },
+];
 
 export const seededUnit = (seed: string) => {
   const modulo = 1_000_000_007;
@@ -56,46 +48,67 @@ export const createRoomPickups = (
   roomId: string,
   enemyTemplateId: string | undefined,
   enemyCount: number,
-  now: number
+  now: number,
+  context: PickupSpawnContext = {}
 ): ActivePickup[] => {
-  const table = enemyTemplateId ? (roomDrops[enemyTemplateId] ?? []) : [];
-  const rolledDrops = table.filter((drop, index) => {
-    const chance = 1 - (1 - drop.chance) ** Math.max(1, enemyCount);
-
-    return seededUnit(`${roomId}:${drop.kind}:${index}`) <= chance;
-  });
-  const selected =
-    rolledDrops[
-      Math.floor(seededUnit(`${roomId}:pickup`) * rolledDrops.length)
-    ];
-
-  if (!selected) {
-    if (enemyCount <= 0) {
-      return [];
-    }
-
-    return [
-      {
-        createdAt: now,
-        id: crypto.randomUUID(),
-        kind: "gear",
-        position: [0, 0.54, 0],
-        radius: pickupConfigs.gear.radius,
-        value: 1,
-      },
-    ];
+  if (!(enemyTemplateId && enemyCount > 0)) {
+    return [];
   }
 
+  const totalWeight = roomDrops.reduce((sum, drop) => sum + drop.weight, 0);
+  let roll = seededUnit(`${roomId}:pickup`) * totalWeight;
+  const selected =
+    roomDrops.find((drop) => {
+      roll -= drop.weight;
+
+      return roll < 0;
+    }) ?? roomDrops[0];
   const config = pickupConfigs[selected.kind];
-  const yaw = seededUnit(`${roomId}:${selected.kind}:yaw`) * Math.PI * 2;
-  const position = clampToRoom(
-    [Math.sin(yaw) * 0.55, 0.54, Math.cos(yaw) * 0.55],
-    config.radius
+  let position: Vec3 | null = null;
+
+  const candidateCount = 81;
+  const startIndex = Math.floor(
+    seededUnit(`${roomId}:pickup:start`) * candidateCount
   );
-  const value =
-    selected.kind === "gear"
-      ? Math.max(1, Math.round(selected.value * enemyCount * selected.chance))
-      : selected.value;
+
+  for (let attempt = 0; attempt < candidateCount; attempt += 1) {
+    const index = (startIndex + attempt) % candidateCount;
+    const candidate = clampToRoom(
+      [-7.6 + (index % 9) * 1.9, 0.54, -5.8 + Math.floor(index / 9) * 1.45],
+      config.radius
+    );
+    const overlapsHazard = context.hazards?.some(
+      (hazard) =>
+        Math.abs(candidate[0] - hazard.position[0]) <=
+          hazard.args[0] + config.radius &&
+        Math.abs(candidate[2] - hazard.position[2]) <=
+          hazard.args[2] + config.radius
+    );
+    const overlapsObstacle = context.obstacles?.some(
+      (obstacle) =>
+        Math.abs(candidate[0] - obstacle.position[0]) <=
+          obstacle.args[0] + config.radius &&
+        Math.abs(candidate[2] - obstacle.position[2]) <=
+          obstacle.args[2] + config.radius
+    );
+    const overlapsPickup = context.pickups?.some(
+      (pickup) =>
+        Math.hypot(
+          candidate[0] - pickup.position[0],
+          candidate[2] - pickup.position[2]
+        ) <=
+        config.radius + pickup.radius + 0.25
+    );
+
+    if (!(overlapsHazard || overlapsObstacle || overlapsPickup)) {
+      position = candidate;
+      break;
+    }
+  }
+
+  if (!position) {
+    return [];
+  }
 
   return [
     {
@@ -104,7 +117,7 @@ export const createRoomPickups = (
       kind: selected.kind,
       position,
       radius: config.radius,
-      value,
+      value: selected.value,
     },
   ];
 };

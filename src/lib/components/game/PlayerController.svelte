@@ -10,6 +10,7 @@
     type BufferGeometry,
     type Group,
     MathUtils,
+    OrthographicCamera,
     PerspectiveCamera,
     Plane,
     Raycaster,
@@ -727,8 +728,7 @@
     if (
       settings.cameraMode !== "orbit" ||
       !orbitControls ||
-      orbitPressed.size === 0 ||
-      !(activeCamera instanceof PerspectiveCamera)
+      orbitPressed.size === 0
     ) {
       return;
     }
@@ -742,13 +742,27 @@
       return;
     }
 
-    const distance = activeCamera.position.distanceTo(orbitControls.target);
-    const verticalStep =
-      distance *
-      Math.tan(MathUtils.degToRad(activeCamera.fov * 0.5)) *
-      orbitKeyboardPanSpeed *
-      delta;
-    const horizontalStep = verticalStep * activeCamera.aspect;
+    let horizontalStep = 0;
+    let verticalStep = 0;
+
+    if (activeCamera instanceof PerspectiveCamera) {
+      const distance = activeCamera.position.distanceTo(orbitControls.target);
+      verticalStep =
+        distance *
+        Math.tan(MathUtils.degToRad(activeCamera.fov * 0.5)) *
+        orbitKeyboardPanSpeed *
+        delta;
+      horizontalStep = verticalStep * activeCamera.aspect;
+    } else if (activeCamera instanceof OrthographicCamera) {
+      verticalStep =
+        ((activeCamera.top - activeCamera.bottom) / activeCamera.zoom) *
+        orbitKeyboardPanSpeed *
+        delta;
+      horizontalStep =
+        ((activeCamera.right - activeCamera.left) / activeCamera.zoom) *
+        orbitKeyboardPanSpeed *
+        delta;
+    }
 
     activeCamera.updateMatrixWorld();
     orbitRight.setFromMatrixColumn(activeCamera.matrix, 0).normalize();

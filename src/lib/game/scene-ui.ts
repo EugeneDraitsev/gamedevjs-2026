@@ -1,4 +1,4 @@
-import type { PerspectiveCamera } from "three";
+import type { Camera } from "three";
 import { Vector3 } from "three";
 import type { DungeonRoom } from "$lib/config/dungeon-layout";
 import type {
@@ -36,7 +36,7 @@ export const getMinimapBounds = (rooms: DungeonRoom[]): MinimapBounds => {
 
 export const projectDamagePopups = (
   damagePopups: DamagePopup[],
-  camera: PerspectiveCamera,
+  camera: Camera,
   width: number,
   height: number
 ): ProjectedDamagePopup[] =>
