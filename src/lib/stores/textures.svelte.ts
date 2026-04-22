@@ -11,6 +11,7 @@ import bossFloorTextureUrl from "$lib/assets/boss-floor.svg";
 import environmentMapTextureUrl from "$lib/assets/environment-map.png";
 import foundryFloorTextureUrl from "$lib/assets/foundry-floor-atlas.png";
 import foundryFloorDecalsTextureUrl from "$lib/assets/foundry-floor-decals.png";
+import foundryWallTextureUrl from "$lib/assets/foundry-wall-panel.png";
 import lavaSurfaceTextureUrl from "$lib/assets/lava-surface.png";
 import treasureFloorTextureUrl from "$lib/assets/treasure-floor.svg";
 
@@ -44,6 +45,7 @@ export class TextureStore {
   environmentMap = $state<Texture | null>(null);
   foundryFloor = $state<Texture | null>(null);
   foundryFloorDecals = $state<Texture | null>(null);
+  foundryWall = $state<Texture | null>(null);
   lavaSurface = $state<Texture | null>(null);
   treasureFloor = $state<Texture | null>(null);
 
@@ -53,6 +55,7 @@ export class TextureStore {
     this.environmentMap = makeEnvironmentTexture(environmentMapTextureUrl);
     this.foundryFloor = makeTexture(foundryFloorTextureUrl, 4);
     this.foundryFloorDecals = makeTexture(foundryFloorDecalsTextureUrl);
+    this.foundryWall = makeTexture(foundryWallTextureUrl);
     this.lavaSurface = makeTexture(lavaSurfaceTextureUrl);
     this.treasureFloor = makeTexture(treasureFloorTextureUrl);
   }

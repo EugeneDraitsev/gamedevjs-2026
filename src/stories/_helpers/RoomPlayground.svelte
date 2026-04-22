@@ -33,7 +33,7 @@
 
   let settings = $state<SceneSettings>({
     ...createSceneSettings(),
-    cameraFov: 52,
+    cameraFov: 80,
     cameraMode: "orbit",
   });
   let templateId = $state("normal-furnace");
@@ -58,7 +58,7 @@
 
   const resetDefaults = () => {
     Object.assign(settings, createSceneSettings(), {
-      cameraFov: 52,
+      cameraFov: 80,
       cameraMode: "orbit",
     });
     restart();

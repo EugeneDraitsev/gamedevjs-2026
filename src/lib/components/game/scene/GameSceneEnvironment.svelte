@@ -21,7 +21,12 @@
   treasureFloorTexture={textures.treasureFloor}
 />
 
-<RoomWalls roomWalls={scene.roomWalls} />
+<RoomWalls
+  animationNow={timing.now}
+  foundryWallDecalTexture={textures.foundryFloorDecals}
+  foundryWallTexture={textures.foundryWall}
+  roomWalls={scene.roomWalls}
+/>
 
 <RoomDoors
   bossDoorTexture={textures.bossDoor}

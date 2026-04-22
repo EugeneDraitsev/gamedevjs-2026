@@ -84,8 +84,8 @@ export const wallThemes = {
     vertical: "#42321e",
   },
   foundry: {
-    horizontal: "#3b3025",
-    vertical: "#241d17",
+    horizontal: "#4b3828",
+    vertical: "#34261c",
   },
 } satisfies Record<WallTheme, SceneWallPalette>;
 
