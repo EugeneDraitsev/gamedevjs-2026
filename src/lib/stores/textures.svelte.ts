@@ -1,4 +1,5 @@
 import {
+  EquirectangularReflectionMapping,
   LinearFilter,
   RepeatWrapping,
   SRGBColorSpace,
@@ -7,6 +8,7 @@ import {
 } from "three";
 import bossDoorTextureUrl from "$lib/assets/boss-door.svg";
 import bossFloorTextureUrl from "$lib/assets/boss-floor.svg";
+import environmentMapTextureUrl from "$lib/assets/environment-map.png";
 import foundryFloorTextureUrl from "$lib/assets/foundry-floor-atlas.png";
 import foundryFloorDecalsTextureUrl from "$lib/assets/foundry-floor-decals.png";
 import lavaSurfaceTextureUrl from "$lib/assets/lava-surface.png";
@@ -25,9 +27,21 @@ const makeTexture = (url: string, repeat = 1): Texture => {
   return texture;
 };
 
+const makeEnvironmentTexture = (url: string): Texture => {
+  const texture = new TextureLoader().load(url);
+
+  texture.mapping = EquirectangularReflectionMapping;
+  texture.colorSpace = SRGBColorSpace;
+  texture.magFilter = LinearFilter;
+  texture.minFilter = LinearFilter;
+
+  return texture;
+};
+
 export class TextureStore {
   bossDoor = $state<Texture | null>(null);
   bossFloor = $state<Texture | null>(null);
+  environmentMap = $state<Texture | null>(null);
   foundryFloor = $state<Texture | null>(null);
   foundryFloorDecals = $state<Texture | null>(null);
   lavaSurface = $state<Texture | null>(null);
@@ -36,6 +50,7 @@ export class TextureStore {
   load() {
     this.bossDoor = makeTexture(bossDoorTextureUrl);
     this.bossFloor = makeTexture(bossFloorTextureUrl);
+    this.environmentMap = makeEnvironmentTexture(environmentMapTextureUrl);
     this.foundryFloor = makeTexture(foundryFloorTextureUrl, 4);
     this.foundryFloorDecals = makeTexture(foundryFloorDecalsTextureUrl);
     this.lavaSurface = makeTexture(lavaSurfaceTextureUrl);

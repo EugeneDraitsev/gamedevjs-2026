@@ -50,6 +50,13 @@
 
 {#each roomHazards as hazard, index (hazard.id)}
   <T.Group position={hazard.position}>
+    <T.PointLight
+      color="#ff6f2a"
+      distance={Math.max(hazard.args[0], hazard.args[2]) * 3}
+      intensity={0.65 + lavaPulse * 0.35}
+      position={[0, hazard.args[1] + 0.35, 0]}
+    />
+
     <T.Mesh receiveShadow>
       <T.BoxGeometry
         args={[hazard.args[0] * 2, hazard.args[1] * 2, hazard.args[2] * 2]}

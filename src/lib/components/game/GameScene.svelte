@@ -339,7 +339,11 @@
 
 <div class="scene">
   <Canvas shadows={PCFSoftShadowMap} dpr={2}>
-    <SceneRendererConfig exposure={scene.settings.toneMappingExposure} />
+    <SceneRendererConfig
+      environmentMap={textures.environmentMap}
+      exposure={scene.settings.toneMappingExposure}
+      showEnvironmentMap={scene.settings.showEnvironmentMap}
+    />
     <T.Fog
       attach="fog"
       args={['#080604', scene.settings.fogNear, scene.settings.fogFar]}

@@ -49,6 +49,7 @@ export interface SceneSettings {
   shadowMapSize: number;
   shadowNormalBias: number;
   showDebugGeometry: boolean;
+  showEnvironmentMap: boolean;
   showPhysicsDebug: boolean;
   sunIntensity: number;
   sunPositionX: number;
@@ -60,19 +61,19 @@ export interface SceneSettings {
 }
 
 export const createSceneSettings = (): SceneSettings => ({
-  ambientLightIntensity: 1.47,
+  ambientLightIntensity: 2,
   cameraFov: 63,
   cameraMode: "follow",
   cameraOrthographic: false,
   cameraSmoothing: 8,
   floorTheme: "ember",
   fogFar: 27,
-  fogNear: 10,
+  fogNear: 13.3,
   followDistance: 12.3,
   followPitch: 52,
   followYaw: 0,
   gravityY: -16,
-  hemisphereLightIntensity: 0.48,
+  hemisphereLightIntensity: 1.48,
   jumpSpeed: 7.6,
   lookHeight: 0.4,
   meleeArcSpan: 2.7,
@@ -104,8 +105,9 @@ export const createSceneSettings = (): SceneSettings => ({
   shadowMapSize: 2048,
   shadowNormalBias: 0.06,
   showDebugGeometry: false,
+  showEnvironmentMap: false,
   showPhysicsDebug: false,
-  sunIntensity: 2.1,
+  sunIntensity: 4.05,
   sunPositionX: -5.4,
   sunPositionY: 13.2,
   sunPositionZ: 4.4,

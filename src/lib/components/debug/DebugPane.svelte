@@ -123,6 +123,7 @@
     const defaults = createSceneSettings();
 
     settings.showDebugGeometry = defaults.showDebugGeometry;
+    settings.showEnvironmentMap = defaults.showEnvironmentMap;
     settings.showPhysicsDebug = defaults.showPhysicsDebug;
   };
 
@@ -542,6 +543,7 @@
         bind:value={settings.showPhysicsDebug}
         label="Physics wireframe"
       />
+      <Checkbox bind:value={settings.showEnvironmentMap} label="Show HDRI" />
       <Button on:click={resetDebugDefaults} title="Reset debug defaults" />
       <Separator />
       <Button on:click={onResetLevel} title="Reset level" />
