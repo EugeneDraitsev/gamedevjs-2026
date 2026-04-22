@@ -1,23 +1,107 @@
 <script lang="ts">
   import { T } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
-  import type { Texture } from "three";
+  import { PlaneGeometry, type Texture } from "three";
   import type { RoomTemplate } from "$lib/config/room-templates";
   import { floorHalfDepth, floorHalfWidth } from "$lib/game/scene-layout";
 
+  const roomNoise = (roomId: string, salt: number) => {
+    let hash = 17;
+    const key = `${roomId}:${salt}`;
+
+    for (let index = 0; index < key.length; index += 1) {
+      hash = (hash * 131 + key.charCodeAt(index) * (index + 7)) % 1_000_003;
+    }
+
+    const value = Math.sin(hash * 12.9898) * 43_758.5453;
+
+    return value - Math.floor(value);
+  };
+
+  const makeDecalGeometry = (
+    width: number,
+    depth: number,
+    u: number,
+    v: number,
+    uSize: number,
+    vSize: number
+  ) => {
+    const geometry = new PlaneGeometry(width, depth);
+    const uv = geometry.attributes.uv;
+
+    uv.setXY(0, u, v);
+    uv.setXY(1, u + uSize, v);
+    uv.setXY(2, u, v + vSize);
+    uv.setXY(3, u + uSize, v + vSize);
+    uv.needsUpdate = true;
+
+    return geometry;
+  };
+
+  const decalSources = [
+    { u: 0.02, v: 0.82, width: 0.18, height: 0.14 },
+    { u: 0.18, v: 0.78, width: 0.19, height: 0.2 },
+    { u: 0.45, v: 0.74, width: 0.26, height: 0.23 },
+    { u: 0.72, v: 0.78, width: 0.22, height: 0.18 },
+    { u: 0.44, v: 0.48, width: 0.31, height: 0.36 },
+    { u: 0.62, v: 0.5, width: 0.29, height: 0.34 },
+    { u: 0.02, v: 0.57, width: 0.2, height: 0.18 },
+    { u: 0.27, v: 0.52, width: 0.19, height: 0.2 },
+    { u: 0.78, v: 0.36, width: 0.2, height: 0.16 },
+  ];
+
   let {
     bossFloorTexture = null,
+    currentRoomId,
     currentRoomTemplate,
     foundryFloorDecalTexture = null,
     foundryFloorTexture = null,
     treasureFloorTexture = null,
   }: {
     bossFloorTexture?: Texture | null;
+    currentRoomId: string;
     currentRoomTemplate: RoomTemplate;
     foundryFloorDecalTexture?: Texture | null;
     foundryFloorTexture?: Texture | null;
     treasureFloorTexture?: Texture | null;
   } = $props();
+
+  const floorMarks = $derived.by(() =>
+    Array.from({ length: 54 }, (_, index) => {
+      const source =
+        decalSources[
+          Math.floor(
+            roomNoise(currentRoomId, 101 + index * 37) * decalSources.length
+          )
+        ];
+      const depth = 0.5 + roomNoise(currentRoomId, 307 + index * 41) * 1.35;
+      const width =
+        depth *
+        (source.width / source.height) *
+        (0.8 + roomNoise(currentRoomId, 509 + index * 43) * 0.55);
+
+      return {
+        geometry: makeDecalGeometry(
+          width,
+          depth,
+          source.u,
+          source.v,
+          source.width,
+          source.height
+        ),
+        opacity: 0.2 + roomNoise(currentRoomId, 701 + index * 47) * 0.16,
+        rotation: roomNoise(currentRoomId, 907 + index * 53) * Math.PI * 2,
+        x:
+          (roomNoise(currentRoomId, 1103 + index * 59) - 0.5) *
+          floorHalfWidth *
+          1.55,
+        z:
+          (roomNoise(currentRoomId, 1301 + index * 61) - 0.5) *
+          floorHalfDepth *
+          1.55,
+      };
+    })
+  );
 </script>
 
 <T.Group position={[0, -0.35, 0]}>
@@ -43,23 +127,24 @@
     </T.Mesh>
 
     {#if foundryFloorDecalTexture}
-      <T.Mesh
-        position={[0, 0.365, 0]}
-        receiveShadow
-        rotation={[-Math.PI / 2, 0, Math.PI]}
-      >
-        <T.PlaneGeometry args={[floorHalfWidth * 2, floorHalfDepth * 2]} />
-        <T.MeshBasicMaterial
-          map={foundryFloorDecalTexture}
-          color="#312a21"
-          transparent
-          alphaTest={0.05}
-          depthWrite={false}
-          opacity={0.26}
-          polygonOffset
-          polygonOffsetFactor={-1}
-        />
-      </T.Mesh>
+      {#each floorMarks as mark, index}
+        <T.Mesh
+          geometry={mark.geometry}
+          position={[mark.x, 0.365 + index * 0.0002, mark.z]}
+          rotation={[-Math.PI / 2, 0, mark.rotation]}
+        >
+          <T.MeshBasicMaterial
+            map={foundryFloorDecalTexture}
+            color="#312a21"
+            transparent
+            alphaTest={0.04}
+            depthWrite={false}
+            opacity={mark.opacity}
+            polygonOffset
+            polygonOffsetFactor={-1}
+          />
+        </T.Mesh>
+      {/each}
     {/if}
   </RigidBody>
 </T.Group>

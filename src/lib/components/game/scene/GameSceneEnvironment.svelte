@@ -14,6 +14,7 @@
 
 <RoomFloor
   bossFloorTexture={textures.bossFloor}
+  currentRoomId={scene.currentRoom.id}
   currentRoomTemplate={scene.currentRoomTemplate}
   foundryFloorDecalTexture={textures.foundryFloorDecals}
   foundryFloorTexture={textures.foundryFloor}
