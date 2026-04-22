@@ -50,13 +50,6 @@
 
 {#each roomHazards as hazard, index (hazard.id)}
   <T.Group position={hazard.position}>
-    <T.PointLight
-      color="#ff6f2a"
-      distance={Math.max(hazard.args[0], hazard.args[2]) * 3}
-      intensity={0.65 + lavaPulse * 0.35}
-      position={[0, hazard.args[1] + 0.35, 0]}
-    />
-
     <T.Mesh receiveShadow>
       <T.BoxGeometry
         args={[hazard.args[0] * 2, hazard.args[1] * 2, hazard.args[2] * 2]}
@@ -78,7 +71,7 @@
         <T.MeshStandardMaterial
           color={`hsl(${28 + lavaPulse * 4} 78% ${38 + lavaPulse * 6}%)`}
           emissive="#ff5a16"
-          emissiveIntensity={0.1 + lavaPulse * 0.08}
+          emissiveIntensity={0.34 + lavaPulse * 0.18}
           map={lavaSurfaceTexture}
           metalness={0.04}
           roughness={0.36}

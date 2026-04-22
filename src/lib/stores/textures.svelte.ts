@@ -62,7 +62,9 @@ export class TextureStore {
       return;
     }
 
-    this.lavaSurface.offset.x = (this.lavaSurface.offset.x + delta * 0.018) % 1;
-    this.lavaSurface.offset.y = (this.lavaSurface.offset.y + delta * 0.004) % 1;
+    this.lavaSurface.offset.x =
+      (this.lavaSurface.offset.x + delta * 0.0243) % 1;
+    this.lavaSurface.offset.y =
+      (this.lavaSurface.offset.y + delta * 0.0054) % 1;
   }
 }
