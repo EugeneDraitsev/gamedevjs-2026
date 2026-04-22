@@ -17,12 +17,15 @@
   >
     <div
       class="damage-popup"
+      class:heal={popup.variant === "heal"}
       class:player={popup.variant === "player"}
       style:opacity={Math.max(0, 1 - (animationNow - popup.createdAt) / damagePopupDurationMs)}
       style:transform={`scale(${popup.variant === "player" ? 1.02 + Math.min(0.42, (animationNow - popup.createdAt) / 220) : 0.9 + Math.min(0.35, (animationNow - popup.createdAt) / 240)})`}
     >
       {#if popup.variant === "player"}
         -{popup.amount}
+      {:else if popup.variant === "heal"}
+        +{popup.amount}
       {:else}
         {popup.amount}
       {/if}
@@ -54,6 +57,18 @@
     color: #ff5c5c;
     text-shadow:
       0 0 0.55rem rgba(255, 64, 64, 0.34),
+      0 0.18rem 0.7rem rgba(0, 0, 0, 0.42);
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .damage-popup.heal {
+    padding: 0.2rem 0.1rem;
+    font-size: 1.05rem;
+    color: #7dffd7;
+    text-shadow:
+      0 0 0.55rem rgba(68, 255, 214, 0.42),
       0 0.18rem 0.7rem rgba(0, 0, 0, 0.42);
     background: transparent;
     border: 0;

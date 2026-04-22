@@ -7,6 +7,7 @@ import {
 } from "$lib/components/game/scene/utils";
 import type { RoomTemplate } from "$lib/config/room-templates";
 import {
+  clampToRoom,
   floorHalfDepth,
   floorHalfWidth,
   getConveyorVelocity,
@@ -131,6 +132,42 @@ const getEnemyConveyorVelocity = (ctx: StepContext, enemy: ActiveEnemy): Vec3 =>
     enemy.radius * 0.2
   ) ?? [0, 0, 0];
 
+const pushEnemyFromPlatforms = (
+  position: Vec3,
+  radius: number,
+  platforms: RoomPlatform[]
+): Vec3 => {
+  let next = position;
+
+  for (const platform of platforms) {
+    const dx = next[0] - platform.position[0];
+    const dz = next[2] - platform.position[2];
+    const xOverlap = platform.args[0] + radius - Math.abs(dx);
+    const zOverlap = platform.args[2] + radius - Math.abs(dz);
+
+    if (xOverlap <= 0 || zOverlap <= 0) {
+      continue;
+    }
+
+    next =
+      xOverlap < zOverlap
+        ? [
+            platform.position[0] +
+              Math.sign(dx || 1) * (platform.args[0] + radius),
+            next[1],
+            next[2],
+          ]
+        : [
+            next[0],
+            next[1],
+            platform.position[2] +
+              Math.sign(dz || 1) * (platform.args[2] + radius),
+          ];
+  }
+
+  return clampToRoom(next, radius);
+};
+
 const countActiveBombs = (combat: CombatStore, originId: string) => {
   let count = 0;
 
@@ -228,6 +265,8 @@ const stepEnemy = (
   if (hp <= 0) {
     return { enemy: null, playerDamage, shots, bombs };
   }
+
+  position = pushEnemyFromPlatforms(position, enemy.radius, ctx.roomPlatforms);
 
   if (
     Math.hypot(playerPos[0] - position[0], playerPos[2] - position[2]) <=

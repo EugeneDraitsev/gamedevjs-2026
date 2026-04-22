@@ -23,15 +23,57 @@ interface PickupSpawnContext {
   pickups?: ActivePickup[];
 }
 
+interface PickupCollectContext {
+  obstacles?: RoomPlatform[];
+}
+
 export const pickupConfigs = {
   gear: { radius: 0.38 },
   heal: { radius: 0.46 },
 } satisfies Record<PickupKind, PickupConfig>;
 
+export const pickupCollectDurationMs = 360;
+
 const roomDrops: PickupDrop[] = [
   { kind: "gear", value: 1, weight: 1 },
   { kind: "heal", value: 1, weight: 1 },
 ];
+
+const overlapsObstacle = (
+  position: Vec3,
+  radius: number,
+  obstacles: RoomPlatform[] = []
+) =>
+  obstacles.some(
+    (obstacle) =>
+      Math.abs(position[0] - obstacle.position[0]) <=
+        obstacle.args[0] + radius &&
+      Math.abs(position[2] - obstacle.position[2]) <= obstacle.args[2] + radius
+  );
+
+const pushPickupAway = (
+  pickup: ActivePickup,
+  playerPosition: Vec3,
+  distance: number,
+  obstacles?: RoomPlatform[]
+): Vec3 => {
+  const pushX =
+    distance > 0 ? (pickup.position[0] - playerPosition[0]) / distance : 1;
+  const pushZ =
+    distance > 0 ? (pickup.position[2] - playerPosition[2]) / distance : 0;
+  const nextPosition = clampToRoom(
+    [
+      pickup.position[0] + pushX * 0.18,
+      pickup.position[1],
+      pickup.position[2] + pushZ * 0.18,
+    ],
+    pickup.radius
+  );
+
+  return overlapsObstacle(nextPosition, pickup.radius, obstacles)
+    ? pickup.position
+    : nextPosition;
+};
 
 export const seededUnit = (seed: string) => {
   const modulo = 1_000_000_007;
@@ -84,12 +126,10 @@ export const createRoomPickups = (
         Math.abs(candidate[2] - hazard.position[2]) <=
           hazard.args[2] + config.radius
     );
-    const overlapsObstacle = context.obstacles?.some(
-      (obstacle) =>
-        Math.abs(candidate[0] - obstacle.position[0]) <=
-          obstacle.args[0] + config.radius &&
-        Math.abs(candidate[2] - obstacle.position[2]) <=
-          obstacle.args[2] + config.radius
+    const blockedByObstacle = overlapsObstacle(
+      candidate,
+      config.radius,
+      context.obstacles
     );
     const overlapsPickup = context.pickups?.some(
       (pickup) =>
@@ -100,7 +140,7 @@ export const createRoomPickups = (
         config.radius + pickup.radius + 0.25
     );
 
-    if (!(overlapsHazard || overlapsObstacle || overlapsPickup)) {
+    if (!(overlapsHazard || blockedByObstacle || overlapsPickup)) {
       position = candidate;
       break;
     }
@@ -126,13 +166,23 @@ export const collectPickups = (
   pickups: ActivePickup[],
   playerPosition: Vec3,
   health: number,
-  maxHealth: number
+  maxHealth: number,
+  now = performance.now(),
+  context: PickupCollectContext = {}
 ) => {
   const remaining: ActivePickup[] = [];
   let gearDelta = 0;
   let nextHealth = health;
 
   for (const pickup of pickups) {
+    if (pickup.collectedAt !== undefined) {
+      if (now - pickup.collectedAt < pickupCollectDurationMs) {
+        remaining.push(pickup);
+      }
+
+      continue;
+    }
+
     const distance = Math.hypot(
       pickup.position[0] - playerPosition[0],
       pickup.position[2] - playerPosition[2]
@@ -145,17 +195,27 @@ export const collectPickups = (
 
     if (pickup.kind === "gear") {
       gearDelta += pickup.value;
+      remaining.push({ ...pickup, collectedAt: now });
       continue;
     }
 
     const heal = Math.min(pickup.value, maxHealth - nextHealth);
 
     if (heal <= 0) {
-      remaining.push(pickup);
+      remaining.push({
+        ...pickup,
+        position: pushPickupAway(
+          pickup,
+          playerPosition,
+          distance,
+          context.obstacles
+        ),
+      });
       continue;
     }
 
     nextHealth += heal;
+    remaining.push({ ...pickup, collectedAt: now });
   }
 
   return {

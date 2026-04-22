@@ -77,6 +77,11 @@
     treasureFloorTexture?: Texture | null;
   } = $props();
 
+  const isBossFloor = $derived(
+    currentRoomTemplate.layout === "boss-foundry" ||
+      currentRoomTemplate.layout === "boss-crucible" ||
+      currentRoomTemplate.layout === "boss-bomber"
+  );
   const floorMarks = $derived.by(() =>
     Array.from({ length: 54 }, (_, index) => {
       const source =
@@ -119,39 +124,41 @@
       restitution={0.08}
     />
 
-    <T.Mesh
-      position={[0, 0.36, 0]}
-      receiveShadow
-      rotation={[-Math.PI / 2, 0, 0]}
-    >
-      <T.PlaneGeometry args={[floorHalfWidth * 2, floorHalfDepth * 2]} />
-      <T.MeshStandardMaterial
-        map={foundryFloorTexture}
-        metalness={0.16}
-        roughness={0.78}
-      />
-    </T.Mesh>
+    {#if !isBossFloor}
+      <T.Mesh
+        position={[0, 0.36, 0]}
+        receiveShadow
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <T.PlaneGeometry args={[floorHalfWidth * 2, floorHalfDepth * 2]} />
+        <T.MeshStandardMaterial
+          map={foundryFloorTexture}
+          metalness={0.16}
+          roughness={0.78}
+        />
+      </T.Mesh>
 
-    {#if foundryFloorDecalTexture}
-      {#each floorMarks as mark, index}
-        <T.Mesh
-          geometry={mark.geometry}
-          position={[mark.x, 0.365 + index * 0.0002, mark.z]}
-          rotation={[-Math.PI / 2, 0, mark.rotation]}
-          scale={[mark.width, mark.depth, 1]}
-        >
-          <T.MeshBasicMaterial
-            map={foundryFloorDecalTexture}
-            color="#312a21"
-            transparent
-            alphaTest={0.04}
-            depthWrite={false}
-            opacity={mark.opacity}
-            polygonOffset
-            polygonOffsetFactor={-1}
-          />
-        </T.Mesh>
-      {/each}
+      {#if foundryFloorDecalTexture}
+        {#each floorMarks as mark, index}
+          <T.Mesh
+            geometry={mark.geometry}
+            position={[mark.x, 0.365 + index * 0.0002, mark.z]}
+            rotation={[-Math.PI / 2, 0, mark.rotation]}
+            scale={[mark.width, mark.depth, 1]}
+          >
+            <T.MeshBasicMaterial
+              map={foundryFloorDecalTexture}
+              color="#312a21"
+              transparent
+              alphaTest={0.04}
+              depthWrite={false}
+              opacity={mark.opacity}
+              polygonOffset
+              polygonOffsetFactor={-1}
+            />
+          </T.Mesh>
+        {/each}
+      {/if}
     {/if}
   </RigidBody>
 </T.Group>
@@ -174,26 +181,17 @@
   </T.Mesh>
 {/if}
 
-{#if (currentRoomTemplate.layout === "boss-foundry" ||
-  currentRoomTemplate.layout === "boss-crucible" ||
-  currentRoomTemplate.layout === "boss-bomber") &&
-  bossFloorTexture}
+{#if isBossFloor && bossFloorTexture}
   <T.Mesh
-    position={[0, 0.032, 0]}
+    position={[0, 0.031, 0]}
     receiveShadow
     rotation={[-Math.PI / 2, 0, 0]}
   >
     <T.PlaneGeometry args={[floorHalfWidth * 2, floorHalfDepth * 2]} />
     <T.MeshStandardMaterial
       map={bossFloorTexture}
-      color="#ffd0b2"
-      emissive="#ff8f70"
-      emissiveIntensity={0.18}
-      transparent
-      alphaTest={0.08}
-      metalness={0.26}
-      opacity={0.94}
-      roughness={0.66}
+      metalness={0.24}
+      roughness={0.7}
     />
   </T.Mesh>
 {/if}

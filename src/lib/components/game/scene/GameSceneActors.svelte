@@ -1,6 +1,5 @@
 <script lang="ts">
   import { T } from "@threlte/core";
-  import { onMount } from "svelte";
   import BombActor from "$lib/components/game/scene/BombActor.svelte";
   import EnemyActor from "$lib/components/game/scene/EnemyActor.svelte";
   import PickupActor from "$lib/components/game/scene/PickupActor.svelte";
@@ -14,16 +13,9 @@
   } from "$lib/types/game";
 
   const scene = getGameSceneContext();
-  const { combat, pickups, timing } = scene;
-  const enemyWarmups: ActiveEnemy[] = [
-    "scrap-runner",
-    "coil-sentry",
-    "iron-warden",
-    "mine-herald",
-  ].map((templateId, index) => {
-    const template = enemyTemplateById[templateId];
-
-    return {
+  const { combat, pickups, player, timing } = scene;
+  const enemyWarmups: ActiveEnemy[] = Object.values(enemyTemplateById).map(
+    (template, index) => ({
       behavior: template.behavior,
       bombArmMs: template.bombArmMs,
       bombColor: template.bombColor,
@@ -38,7 +30,7 @@
       bombTtlMs: template.bombTtlMs,
       color: template.color,
       hp: template.hp,
-      id: `enemy-warmup-${templateId}`,
+      id: `enemy-warmup-${template.id}`,
       knockbackVelocity: [0, 0, 0],
       lastBombAt: 0,
       lastHitAt: 0,
@@ -55,8 +47,8 @@
       templateId: template.id,
       touchDamage: template.touchDamage,
       touchIntervalMs: template.touchIntervalMs,
-    };
-  });
+    })
+  );
   const bombWarmups: ActiveBomb[] = [
     {
       armAt: 1200,
@@ -105,24 +97,14 @@
     },
   ];
 
-  let actorWarmupVisible = $state(true);
-
-  onMount(() => {
-    let secondFrame = 0;
-    const firstFrame = requestAnimationFrame(() => {
-      secondFrame = requestAnimationFrame(() => {
-        actorWarmupVisible = false;
-      });
-    });
-
-    return () => {
-      cancelAnimationFrame(firstFrame);
-      cancelAnimationFrame(secondFrame);
-    };
-  });
+  const playerHealPosition = $derived([
+    player.lastPosition[0],
+    player.lastPosition[1],
+    player.lastPosition[2],
+  ] as [number, number, number]);
 </script>
 
-<T.Group visible={actorWarmupVisible} position={[0, -80, 0]}>
+<T.Group position={[0, 0.42, 0]} scale={[0.001, 0.001, 0.001]}>
   {#each enemyWarmups as enemy (enemy.id)}
     <EnemyActor animationNow={0} {enemy} />
   {/each}
@@ -149,6 +131,28 @@
       </T.Mesh>
     </T.Group>
   {/each}
+
+  <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
+    <T.TorusGeometry args={[0.44, 0.018, 8, 42]} />
+    <T.MeshBasicMaterial
+      color="#7dffd7"
+      depthWrite={false}
+      opacity={0.01}
+      toneMapped={false}
+      transparent
+    />
+  </T.Mesh>
+
+  <T.Mesh>
+    <T.SphereGeometry args={[1, 10, 10]} />
+    <T.MeshBasicMaterial
+      color="#9defff"
+      depthWrite={false}
+      opacity={0.01}
+      toneMapped={false}
+      transparent
+    />
+  </T.Mesh>
 </T.Group>
 
 {#each combat.enemies as enemy (enemy.id)}
@@ -197,6 +201,40 @@
           color={burst.color}
           depthWrite={false}
           opacity={burst.fade}
+          transparent
+        />
+      </T.Mesh>
+    {/each}
+  </T.Group>
+{/each}
+
+{#each scene.healBurstsRendered as burst (burst.id)}
+  <T.Group position={playerHealPosition}>
+    <T.Mesh
+      position={[0, 0.92 + burst.age * 0.52, 0]}
+      rotation={[-Math.PI / 2, 0, burst.age * 4.8]}
+      scale={[1 + burst.age * 0.55, 1 + burst.age * 0.55, 1]}
+    >
+      <T.TorusGeometry args={[0.44, 0.018, 8, 42]} />
+      <T.MeshBasicMaterial
+        color="#7dffd7"
+        depthWrite={false}
+        opacity={burst.fade * 0.46}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+    {#each burst.particles as particle, index (index)}
+      <T.Mesh
+        position={particle.position}
+        scale={[particle.scale, particle.scale, particle.scale]}
+      >
+        <T.SphereGeometry args={[1, 10, 10]} />
+        <T.MeshBasicMaterial
+          color={particle.color}
+          depthWrite={false}
+          opacity={particle.opacity}
+          toneMapped={false}
           transparent
         />
       </T.Mesh>

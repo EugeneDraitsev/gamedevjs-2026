@@ -36,6 +36,8 @@
   const gateSides = [-1, 1];
   const gateBarOffsets = [-0.28, 0, 0.28];
   const gateRails = [-1.24, 0.92];
+  const gateRivetOffsets = [-0.34, 0.34];
+  const gateRivetRows = [-0.72, 0.42];
 </script>
 
 {#each roomDoors as door (door.id)}
@@ -194,6 +196,45 @@
                   depthWrite={sealSolid(seal)}
                 />
               </T.Mesh>
+            {/each}
+
+            <T.Mesh
+              castShadow={sealSolid(seal)}
+              receiveShadow
+              position={sealPosition(seal, 0, -0.38)}
+            >
+              <T.BoxGeometry args={sealBox(seal, 0.38, 0.28, 0.18)} />
+              <T.MeshStandardMaterial
+                color={seal.trimColor ?? "#5d4528"}
+                emissive={seal.emissive ?? "#1b130c"}
+                emissiveIntensity={0.12}
+                metalness={0.76}
+                opacity={sealOpacity(seal)}
+                roughness={0.3}
+                transparent={!sealSolid(seal)}
+                depthWrite={sealSolid(seal)}
+              />
+            </T.Mesh>
+
+            {#each gateRivetRows as y}
+              {#each gateRivetOffsets as offset}
+                <T.Mesh
+                  castShadow={sealSolid(seal)}
+                  position={sealPosition(seal, offset, y)}
+                >
+                  <T.BoxGeometry args={sealBox(seal, 0.11, 0.11, 0.2)} />
+                  <T.MeshStandardMaterial
+                    color="#d18b3e"
+                    emissive="#5d2d08"
+                    emissiveIntensity={0.16}
+                    metalness={0.78}
+                    opacity={sealOpacity(seal)}
+                    roughness={0.26}
+                    transparent={!sealSolid(seal)}
+                    depthWrite={sealSolid(seal)}
+                  />
+                </T.Mesh>
+              {/each}
             {/each}
           </T.Group>
         {/each}

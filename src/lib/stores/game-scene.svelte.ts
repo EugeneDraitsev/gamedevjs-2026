@@ -20,6 +20,7 @@ import {
   getMinimapBounds,
   projectDamagePopups,
   renderDeflectBursts,
+  renderHealBursts,
 } from "$lib/game/scene-ui";
 import { CombatStore } from "$lib/stores/combat.svelte";
 import { CrosshairStore } from "$lib/stores/crosshair.svelte";
@@ -182,6 +183,9 @@ export class GameSceneStore {
   });
   readonly deflectBurstsRendered = $derived(
     renderDeflectBursts(this.combat.deflectBursts, this.timing.now)
+  );
+  readonly healBurstsRendered = $derived(
+    renderHealBursts(this.combat.healBursts, this.timing.now)
   );
   readonly overlays = $derived.by<SceneOverlayProps>(() => ({
     animationNow: this.timing.now,

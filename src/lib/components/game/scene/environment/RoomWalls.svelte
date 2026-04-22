@@ -3,19 +3,30 @@
   import { Collider, RigidBody } from "@threlte/rapier";
   import type { Texture } from "three";
   import FoundryWallKit from "$lib/components/game/scene/environment/walls/FoundryWallKit.svelte";
-  import type { StaticWall } from "$lib/types/game";
+  import type { StaticWall, WallFacing } from "$lib/types/game";
 
   let {
     animationNow = 0,
+    decoratedWallFacings = null,
+    gearlessWallFacings = null,
     foundryWallDecalTexture = null,
     foundryWallTexture = null,
     roomWalls,
+    showWallKit = true,
   }: {
     animationNow?: number;
+    decoratedWallFacings?: WallFacing[] | null;
+    gearlessWallFacings?: WallFacing[] | null;
     foundryWallDecalTexture?: Texture | null;
     foundryWallTexture?: Texture | null;
     roomWalls: StaticWall[];
+    showWallKit?: boolean;
   } = $props();
+
+  const showDecor = (wall: StaticWall) =>
+    !decoratedWallFacings || decoratedWallFacings.includes(wall.facing);
+  const showGears = (wall: StaticWall) =>
+    !gearlessWallFacings?.includes(wall.facing);
 </script>
 
 {#each roomWalls as wall (wall.id)}
@@ -46,9 +57,13 @@
         />
       </T.Mesh>
 
-      {#if wall.style === "mechanic" && (!wall.opacity || wall.opacity >= 1)}
+      {#if showWallKit &&
+        wall.style === "mechanic" &&
+        (!wall.opacity || wall.opacity >= 1)}
         <FoundryWallKit
           {animationNow}
+          showDecor={showDecor(wall)}
+          showGears={showGears(wall)}
           {wall}
           wallDecalTexture={foundryWallDecalTexture}
           wallTexture={foundryWallTexture}

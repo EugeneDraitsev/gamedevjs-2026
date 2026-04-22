@@ -83,22 +83,41 @@ describe("createRoomPickups", () => {
 });
 
 describe("collectPickups", () => {
-  it("collects gears and removes them", () => {
-    const result = collectPickups([pickup("gear", 3)], [0, 1, 0], 4, 6);
+  it("collects gears after the pickup animation", () => {
+    const result = collectPickups([pickup("gear", 3)], [0, 1, 0], 4, 6, 100);
 
     expect(result.gearDelta).toBe(3);
     expect(result.healthDelta).toBe(0);
-    expect(result.pickups).toEqual([]);
+    expect(result.pickups[0].collectedAt).toBe(100);
+    expect(
+      collectPickups(result.pickups, [0, 1, 0], 4, 6, 500).pickups
+    ).toEqual([]);
   });
 
   it("heals only when health is missing", () => {
-    const full = collectPickups([pickup("heal", 2)], [0, 1, 0], 6, 6);
-    const hurt = collectPickups([pickup("heal", 2)], [0, 1, 0], 5, 6);
+    const full = collectPickups([pickup("heal", 2)], [0, 1, 0], 6, 6, 100);
+    const hurt = collectPickups([pickup("heal", 2)], [0, 1, 0], 5, 6, 100);
 
     expect(full.healthDelta).toBe(0);
     expect(full.pickups).toHaveLength(1);
+    expect(full.pickups[0].position[0]).toBeGreaterThan(0.2);
     expect(hurt.healthDelta).toBe(1);
     expect(hurt.nextHealth).toBe(6);
-    expect(hurt.pickups).toEqual([]);
+    expect(hurt.pickups[0].collectedAt).toBe(100);
+  });
+
+  it("does not push full-health heals into platforms", () => {
+    const full = collectPickups([pickup("heal")], [0, 1, 0], 6, 6, 100, {
+      obstacles: [
+        {
+          args: [0.2, 0.2, 0.4],
+          color: "#000",
+          id: "block",
+          position: [0.52, 0.2, 0.1],
+        },
+      ],
+    });
+
+    expect(full.pickups[0].position).toEqual([0.2, 0.54, 0.1]);
   });
 });

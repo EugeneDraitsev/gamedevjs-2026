@@ -8,11 +8,15 @@
 
   let {
     animationNow = 0,
+    showDecor = true,
+    showGears = true,
     wall,
     wallDecalTexture = null,
     wallTexture = null,
   }: {
     animationNow?: number;
+    showDecor?: boolean;
+    showGears?: boolean;
     wall: StaticWall;
     wallDecalTexture?: Texture | null;
     wallTexture?: Texture | null;
@@ -86,6 +90,11 @@
 
     return "plain";
   };
+  const decorVariant = (index: number): FoundryWallVariant => {
+    const variant = moduleVariant(index);
+
+    return showGears || variant !== "gear" ? variant : "plain";
+  };
 </script>
 
 <T.Group position={facePosition(wall)} rotation={faceRotation(wall)}>
@@ -101,10 +110,13 @@
         {animationNow}
         baseColor={wall.color}
         decalSeed={wallSeed + index * 19}
-        light={Boolean(wall.lamp && index === Math.floor(moduleCount / 2))}
-        showLamp
+        light={Boolean(
+          showDecor && wall.lamp && index === Math.floor(moduleCount / 2)
+        )}
+        {showDecor}
+        showLamp={showDecor}
         trimColor={wall.trimColor ?? "#7b4b22"}
-        variant={moduleVariant(index)}
+        variant={decorVariant(index)}
         {wallDecalTexture}
         {wallTexture}
         width={moduleWidth}

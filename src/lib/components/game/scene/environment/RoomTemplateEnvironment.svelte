@@ -1,22 +1,24 @@
 <script lang="ts">
   import { T } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
+  import { DoubleSide, type Texture } from "three";
   import ShootingTarget from "$lib/components/game/ShootingTarget.svelte";
   import type { RoomEnvironmentId } from "$lib/config/room-templates";
-  import {
-    bossGearMounts,
-    gearTeeth,
-    treasureGearMounts,
-  } from "$lib/game/scene-layout";
+  import { gearTeeth, treasureGearMounts } from "$lib/game/scene-layout";
   import type { SceneFloorPalette } from "$lib/types/game";
 
   let {
+    bossBannerTexture = null,
     currentFloorPalette,
     environment = null,
   }: {
+    bossBannerTexture?: Texture | null;
     currentFloorPalette: SceneFloorPalette;
     environment?: RoomEnvironmentId | null;
   } = $props();
+
+  const bannerFallbackColor = (index: number) =>
+    index === 1 ? "#5b1718" : "#342016";
 </script>
 
 <T.Mesh position={[0, -0.39, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
@@ -215,6 +217,55 @@
 {/if}
 
 {#if environment === "treasure-gears"}
+  <T.Group position={[0, 0.18, 0]}>
+    <T.Mesh castShadow receiveShadow>
+      <T.CylinderGeometry args={[1.55, 1.92, 0.36, 8]} />
+      <T.MeshStandardMaterial
+        color="#10283a"
+        metalness={0.42}
+        roughness={0.58}
+      />
+    </T.Mesh>
+
+    <T.Mesh
+      receiveShadow
+      position={[0, 0.21, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
+      <T.RingGeometry args={[1.68, 2.12, 8]} />
+      <T.MeshBasicMaterial color="#ffd166" opacity={0.42} transparent />
+    </T.Mesh>
+
+    <T.Mesh position={[0, 0.25, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <T.RingGeometry args={[0.72, 0.9, 48]} />
+      <T.MeshBasicMaterial color="#8ac6ff" opacity={0.62} transparent />
+    </T.Mesh>
+
+    {#each [-1, 1] as x}
+      {#each [-1, 1] as z}
+        <T.Group position={[x * 2.55, 0.15, z * 2.2]}>
+          <T.Mesh castShadow receiveShadow>
+            <T.CylinderGeometry args={[0.22, 0.34, 0.5, 6]} />
+            <T.MeshStandardMaterial
+              color="#183142"
+              metalness={0.48}
+              roughness={0.48}
+            />
+          </T.Mesh>
+          <T.Mesh castShadow position={[0, 0.39, 0]}>
+            <T.SphereGeometry args={[0.18, 14, 10]} />
+            <T.MeshStandardMaterial
+              color="#8ac6ff"
+              emissive="#8ac6ff"
+              emissiveIntensity={0.46}
+              roughness={0.18}
+            />
+          </T.Mesh>
+        </T.Group>
+      {/each}
+    {/each}
+  </T.Group>
+
   {#each treasureGearMounts as mount, index}
     <T.Group position={mount.position}>
       <T.Mesh receiveShadow>
@@ -229,8 +280,8 @@
       <T.Mesh castShadow position={[0, 0, 0.2]}>
         <T.TorusGeometry args={[mount.size, 0.16, 12, 30]} />
         <T.MeshStandardMaterial
-          color={index < 2 ? "#ffd166" : "#8ac6ff"}
-          emissive={index < 2 ? "#ffd166" : "#8ac6ff"}
+          color={mount.position[2] < 0 ? "#ffd166" : "#8ac6ff"}
+          emissive={mount.position[2] < 0 ? "#ffd166" : "#8ac6ff"}
           emissiveIntensity={0.08}
           metalness={0.74}
           roughness={0.34}
@@ -265,51 +316,84 @@
 {/if}
 
 {#if environment === "boss-gears"}
-  {#each bossGearMounts as gear, index}
-    <T.Group position={gear.position}>
-      <T.Mesh receiveShadow>
-        <T.BoxGeometry args={[gear.size * 2.4, gear.size * 2.4, 0.22]} />
-        <T.MeshStandardMaterial
-          color="#152737"
-          metalness={0.48}
-          roughness={0.72}
-        />
-      </T.Mesh>
+  <T.Group position={[0, 2.25, -7.28]}>
+    <T.Mesh castShadow receiveShadow position={[0, 1.62, 0.12]}>
+      <T.BoxGeometry args={[15.2, 0.18, 0.18]} />
+      <T.MeshStandardMaterial
+        color="#7b5430"
+        metalness={0.72}
+        roughness={0.32}
+      />
+    </T.Mesh>
 
-      <T.Mesh castShadow position={[0, 0, 0.18]}>
-        <T.TorusGeometry args={[gear.size, 0.18, 14, 34]} />
-        <T.MeshStandardMaterial
-          color={gear.color}
-          emissive={gear.color}
-          emissiveIntensity={0.14}
-          metalness={0.76}
-          roughness={0.28}
-        />
-      </T.Mesh>
-
-      {#each gearTeeth as tooth, toothIndex}
-        <T.Mesh
-          castShadow
-          position={[tooth.x * gear.size, tooth.y * gear.size, 0.18]}
-          rotation={[0, 0, tooth.rotation + (index + toothIndex) * 0.05]}
-        >
-          <T.BoxGeometry args={[0.28, 0.5, 0.16]} />
+    {#each [-5.2, 0, 5.2] as x, index}
+      <T.Group position={[x, 0, 0.15]}>
+        <T.Mesh castShadow receiveShadow position={[0, 0.04, 0]}>
+          <T.PlaneGeometry
+            args={[index === 1 ? 2.7 : 2.35, index === 1 ? 3.25 : 2.85]}
+          />
           <T.MeshStandardMaterial
-            color={gear.color}
-            metalness={0.74}
-            roughness={0.3}
+            color={index === 1 && bossBannerTexture
+              ? "#ffffff"
+              : bannerFallbackColor(index)}
+            emissive={index === 1 ? "#210708" : "#120907"}
+            emissiveIntensity={0.12}
+            map={index === 1 ? bossBannerTexture : null}
+            metalness={0.02}
+            roughness={0.92}
+            side={DoubleSide}
           />
         </T.Mesh>
-      {/each}
+        {#each [-1, 1] as side}
+          <T.Mesh castShadow receiveShadow position={[side * 0.98, 0.03, 0.03]}>
+            <T.BoxGeometry args={[0.08, index === 1 ? 2.92 : 2.52, 0.08]} />
+            <T.MeshStandardMaterial
+              color="#9b6938"
+              metalness={0.68}
+              roughness={0.38}
+            />
+          </T.Mesh>
+        {/each}
+        <T.Mesh castShadow receiveShadow position={[0, -1.33, 0.04]}>
+          <T.BoxGeometry args={[1.75, 0.08, 0.08]} />
+          <T.MeshStandardMaterial
+            color="#c08545"
+            metalness={0.7}
+            roughness={0.34}
+          />
+        </T.Mesh>
+      </T.Group>
+    {/each}
+  </T.Group>
+
+  {#each [-1, 1] as side}
+    <T.Group position={[side * 6.4, 0.46, -4.95]}>
+      <T.Mesh castShadow receiveShadow>
+        <T.CylinderGeometry args={[0.46, 0.62, 0.38, 6]} />
+        <T.MeshStandardMaterial
+          color="#22160f"
+          metalness={0.5}
+          roughness={0.62}
+        />
+      </T.Mesh>
+      <T.Mesh castShadow receiveShadow position={[0, 0.62, 0]}>
+        <T.BoxGeometry args={[0.72, 0.9, 0.72]} />
+        <T.MeshStandardMaterial
+          color="#382516"
+          metalness={0.42}
+          roughness={0.58}
+        />
+      </T.Mesh>
+      <T.Mesh castShadow receiveShadow position={[0, 1.18, 0]}>
+        <T.ConeGeometry args={[0.38, 0.58, 6]} />
+        <T.MeshStandardMaterial
+          color="#af6b32"
+          emissive="#5d190c"
+          emissiveIntensity={0.16}
+          metalness={0.54}
+          roughness={0.42}
+        />
+      </T.Mesh>
     </T.Group>
   {/each}
-
-  <T.Mesh
-    position={[0, 0.04, -5.4]}
-    receiveShadow
-    rotation={[-Math.PI / 2, 0, 0]}
-  >
-    <T.RingGeometry args={[2.2, 3.25, 44]} />
-    <T.MeshBasicMaterial color="#ffd166" opacity={0.8} transparent />
-  </T.Mesh>
 {/if}

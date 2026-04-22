@@ -1,22 +1,30 @@
 import {
-  EquirectangularReflectionMapping,
   LinearFilter,
   RepeatWrapping,
   SRGBColorSpace,
   type Texture,
   TextureLoader,
 } from "three";
+import artifactFloorTextureUrl from "$lib/assets/artifact-floor-foundry.png";
+import bossBannerTextureUrl from "$lib/assets/boss-banner-foundry.png";
 import bossDoorTextureUrl from "$lib/assets/boss-door.svg";
-import bossFloorTextureUrl from "$lib/assets/boss-floor.svg";
-import environmentMapTextureUrl from "$lib/assets/environment-map.png";
+import bossFloorTextureUrl from "$lib/assets/boss-floor-foundry.png";
 import foundryFloorTextureUrl from "$lib/assets/foundry-floor-atlas.png";
 import foundryFloorDecalsTextureUrl from "$lib/assets/foundry-floor-decals.png";
 import foundryWallTextureUrl from "$lib/assets/foundry-wall-panel.png";
 import lavaSurfaceTextureUrl from "$lib/assets/lava-surface.png";
-import treasureFloorTextureUrl from "$lib/assets/treasure-floor.svg";
+
+const textureCache = new Map<string, Texture>();
+const textureLoader = new TextureLoader();
 
 const makeTexture = (url: string, repeat = 1): Texture => {
-  const texture = new TextureLoader().load(url);
+  const cached = textureCache.get(url);
+
+  if (cached) {
+    return cached;
+  }
+
+  const texture = textureLoader.load(url);
 
   texture.wrapS = RepeatWrapping;
   texture.wrapT = RepeatWrapping;
@@ -24,22 +32,13 @@ const makeTexture = (url: string, repeat = 1): Texture => {
   texture.colorSpace = SRGBColorSpace;
   texture.magFilter = LinearFilter;
   texture.minFilter = LinearFilter;
-
-  return texture;
-};
-
-const makeEnvironmentTexture = (url: string): Texture => {
-  const texture = new TextureLoader().load(url);
-
-  texture.mapping = EquirectangularReflectionMapping;
-  texture.colorSpace = SRGBColorSpace;
-  texture.magFilter = LinearFilter;
-  texture.minFilter = LinearFilter;
+  textureCache.set(url, texture);
 
   return texture;
 };
 
 export class TextureStore {
+  bossBanner = $state<Texture | null>(null);
   bossDoor = $state<Texture | null>(null);
   bossFloor = $state<Texture | null>(null);
   environmentMap = $state<Texture | null>(null);
@@ -50,14 +49,15 @@ export class TextureStore {
   treasureFloor = $state<Texture | null>(null);
 
   load() {
+    this.bossBanner = makeTexture(bossBannerTextureUrl);
     this.bossDoor = makeTexture(bossDoorTextureUrl);
     this.bossFloor = makeTexture(bossFloorTextureUrl);
-    this.environmentMap = makeEnvironmentTexture(environmentMapTextureUrl);
+    this.environmentMap = null;
     this.foundryFloor = makeTexture(foundryFloorTextureUrl, 4);
     this.foundryFloorDecals = makeTexture(foundryFloorDecalsTextureUrl);
     this.foundryWall = makeTexture(foundryWallTextureUrl);
     this.lavaSurface = makeTexture(lavaSurfaceTextureUrl);
-    this.treasureFloor = makeTexture(treasureFloorTextureUrl);
+    this.treasureFloor = makeTexture(artifactFloorTextureUrl);
   }
 
   advanceLava(delta: number) {

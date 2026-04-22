@@ -37,7 +37,10 @@
     doorOpenDelayMs,
     doorOpenDurationMs,
   } from "$lib/game/scene-layout";
-  import { deflectBurstDurationMs } from "$lib/game/scene-ui";
+  import {
+    deflectBurstDurationMs,
+    healBurstDurationMs,
+  } from "$lib/game/scene-ui";
   import { cheats } from "$lib/stores/cheats.svelte";
   import { GameSceneStore } from "$lib/stores/game-scene.svelte";
   import { setGameSceneContext } from "$lib/stores/scene-context";
@@ -60,10 +63,11 @@
   }: GameSceneProps = $props();
 
   const scene = new GameSceneStore();
+  let sceneReady = $state(false);
   const syncSceneInputs = () =>
     scene.syncInputs({
       collectedArtifactRoomIds,
-      controlsLocked,
+      controlsLocked: controlsLocked || !sceneReady,
       dungeon,
       meleeParams,
       meleeTrailSettings,
@@ -82,6 +86,19 @@
   const sceneCamera = $derived(
     scene.settings.cameraOrthographic ? orthographicCamera : perspectiveCamera
   );
+  const preloadTextures = $derived([
+    textures.bossBanner,
+    textures.bossDoor,
+    textures.bossFloor,
+    textures.foundryFloor,
+    textures.foundryFloorDecals,
+    textures.foundryWall,
+    textures.lavaSurface,
+    textures.treasureFloor,
+  ]);
+  const markSceneReady = () => {
+    sceneReady = true;
+  };
 
   setGameSceneContext(scene);
 
@@ -203,11 +220,17 @@
     const pickupResult = pickups.collectAt(
       position,
       player.health,
-      player.maxHealth
+      player.maxHealth,
+      scene.roomPlatforms
     );
 
     if (pickupResult.healthDelta > 0) {
       player.health = pickupResult.nextHealth;
+      combat.popHeal(pickupResult.healthDelta, [
+        position[0],
+        position[1] + 1.05,
+        position[2],
+      ]);
     }
 
     if (pickupResult.gearDelta > 0) {
@@ -238,7 +261,8 @@
       time,
       beamDurationMs,
       damagePopupDurationMs,
-      deflectBurstDurationMs
+      deflectBurstDurationMs,
+      healBurstDurationMs
     );
     textures.advanceLava(delta);
 
@@ -316,13 +340,14 @@
     let previousTime = performance.now();
 
     const frame = (time: number) => {
-      if (scene.controlsLocked) {
-        previousTime = time;
-        timing.now = time;
-      } else {
-        const delta = Math.min(0.05, (time - previousTime) / 1000);
+      const delta = Math.min(0.05, (time - previousTime) / 1000);
 
-        previousTime = time;
+      previousTime = time;
+
+      if (scene.controlsLocked) {
+        timing.now = time;
+        textures.advanceLava(delta);
+      } else {
         tick(time, delta);
       }
 
@@ -342,6 +367,8 @@
     <SceneRendererConfig
       environmentMap={textures.environmentMap}
       exposure={scene.settings.toneMappingExposure}
+      onReady={markSceneReady}
+      {preloadTextures}
       showEnvironmentMap={scene.settings.showEnvironmentMap}
     />
     <T.Fog
@@ -427,6 +454,13 @@
 
     <GameHud {onOpenSettings} {onOpenWeaponLab} />
   {/if}
+
+  {#if !sceneReady}
+    <div class="scene-loader">
+      <div class="scene-loader-ring"></div>
+      <span>Loading Foundry</span>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -434,5 +468,36 @@
     position: relative;
     inline-size: 100%;
     block-size: 100%;
+  }
+
+  .scene-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    gap: 0.8rem;
+    place-content: center;
+    justify-items: center;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: rgba(239, 247, 255, 0.9);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    background: #050403;
+  }
+
+  .scene-loader-ring {
+    inline-size: 3.2rem;
+    block-size: 3.2rem;
+    border: 0.18rem solid rgba(255, 191, 118, 0.18);
+    border-top-color: #ffbd76;
+    border-radius: 999px;
+    animation: scene-loader-spin 0.8s linear infinite;
+  }
+
+  @keyframes scene-loader-spin {
+    to {
+      transform: rotate(1turn);
+    }
   }
 </style>

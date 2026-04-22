@@ -6,6 +6,7 @@ import type {
   ActiveProjectile,
   DamagePopup,
   DeflectBurst,
+  HealBurst,
   MeleeFrame,
   Vec3,
 } from "$lib/types/game";
@@ -17,6 +18,7 @@ export class CombatStore {
   enemyShots = $state<ActiveEnemyShot[]>([]);
   projectiles = $state<ActiveProjectile[]>([]);
   deflectBursts = $state<DeflectBurst[]>([]);
+  healBursts = $state<HealBurst[]>([]);
   damagePopups = $state<DamagePopup[]>([]);
 
   readonly projectilePositions = new Map<string, Vec3>();
@@ -30,6 +32,24 @@ export class CombatStore {
       id: crypto.randomUUID(),
       position,
       variant,
+    });
+  }
+
+  popHeal(amount: number, position: Vec3) {
+    const createdAt = performance.now();
+
+    this.damagePopups.push({
+      amount,
+      createdAt,
+      id: crypto.randomUUID(),
+      position,
+      variant: "heal",
+    });
+    this.healBursts.push({
+      createdAt,
+      id: crypto.randomUUID(),
+      position,
+      radius: 1,
     });
   }
 
@@ -74,7 +94,8 @@ export class CombatStore {
     now: number,
     beamDurationMs: number,
     popupDurationMs: number,
-    burstDurationMs: number
+    burstDurationMs: number,
+    healBurstDurationMs: number
   ) {
     this.beams = this.beams.filter(
       (beam) => now - beam.createdAt < beamDurationMs
@@ -84,6 +105,9 @@ export class CombatStore {
     );
     this.deflectBursts = this.deflectBursts.filter(
       (burst) => now - burst.createdAt < burstDurationMs
+    );
+    this.healBursts = this.healBursts.filter(
+      (burst) => now - burst.createdAt < healBurstDurationMs
     );
   }
 
@@ -95,6 +119,7 @@ export class CombatStore {
     this.projectiles = [];
     this.damagePopups = [];
     this.deflectBursts = [];
+    this.healBursts = [];
     this.projectilePositions.clear();
     this.meleeHitEnemies.clear();
     this.currentMeleeFrame = null;
@@ -107,6 +132,7 @@ export class CombatStore {
     this.enemyShots = [];
     this.projectiles = [];
     this.damagePopups = [];
+    this.healBursts = [];
     this.projectilePositions.clear();
   }
 }

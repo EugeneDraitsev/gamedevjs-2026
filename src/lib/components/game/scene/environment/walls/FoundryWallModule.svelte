@@ -15,6 +15,7 @@
     baseColor = "#2f332f",
     decalSeed = 0,
     light = false,
+    showDecor = true,
     showLamp = true,
     trimColor = "#7b4b22",
     variant = "plain",
@@ -26,6 +27,7 @@
     baseColor?: string;
     decalSeed?: number;
     light?: boolean;
+    showDecor?: boolean;
     showLamp?: boolean;
     trimColor?: string;
     variant?: FoundryWallVariant;
@@ -45,36 +47,38 @@
     {width}
   />
 
-  {#if variant === "gear"}
-    <FoundryGearSet
-      {animationNow}
-      paired={false}
-      scale={0.68}
-      speed={1.35}
-      {trimColor}
-      x={-width * 0.16}
-      y={0.66}
-    />
-    {#if showLamp}
-      <FoundryLamp {light} {trimColor} x={width * 0.18} y={-0.78} />
+  {#if showDecor}
+    {#if variant === "gear"}
+      <FoundryGearSet
+        {animationNow}
+        paired={false}
+        scale={0.68}
+        speed={1.35}
+        {trimColor}
+        x={-width * 0.16}
+        y={0.66}
+      />
+      {#if showLamp}
+        <FoundryLamp {light} {trimColor} y={-0.78} />
+      {/if}
+      <FoundryVent {trimColor} width={width * 0.28} x={width * 0.23} y={0.2} />
+    {:else if variant === "valve"}
+      <FoundryValveSet scale={0.82} {trimColor} x={-width * 0.18} y={0.45} />
+      {#if showLamp}
+        <FoundryLamp {light} {trimColor} y={-0.78} />
+      {/if}
+      <FoundryVent {trimColor} width={width * 0.28} x={width * 0.25} y={0.0} />
+    {:else if variant === "pipe"}
+      <FoundryPipeCluster {trimColor} x={-width * 0.22} y={0.12} />
+      {#if showLamp}
+        <FoundryLamp {light} {trimColor} y={-0.78} />
+      {/if}
+      <FoundryVent {trimColor} width={width * 0.3} x={width * 0.25} y={0.54} />
+    {:else}
+      {#if showLamp}
+        <FoundryLamp {light} {trimColor} y={-0.78} />
+      {/if}
+      <FoundryVent {trimColor} width={width * 0.34} x={width * 0.24} y={-0.8} />
     {/if}
-    <FoundryVent {trimColor} width={width * 0.28} x={width * 0.23} y={0.2} />
-  {:else if variant === "valve"}
-    <FoundryValveSet scale={0.82} {trimColor} x={-width * 0.18} y={0.45} />
-    {#if showLamp}
-      <FoundryLamp {light} {trimColor} x={width * 0.22} y={-0.78} />
-    {/if}
-    <FoundryVent {trimColor} width={width * 0.28} x={width * 0.25} y={0.0} />
-  {:else if variant === "pipe"}
-    <FoundryPipeCluster {trimColor} x={-width * 0.22} y={0.12} />
-    {#if showLamp}
-      <FoundryLamp {light} {trimColor} x={width * 0.22} y={-0.78} />
-    {/if}
-    <FoundryVent {trimColor} width={width * 0.3} x={width * 0.25} y={0.54} />
-  {:else}
-    {#if showLamp}
-      <FoundryLamp {light} {trimColor} x={-width * 0.08} y={-0.78} />
-    {/if}
-    <FoundryVent {trimColor} width={width * 0.34} x={width * 0.24} y={-0.8} />
   {/if}
 </T.Group>

@@ -4,18 +4,26 @@ import type { DungeonRoom } from "$lib/config/dungeon-layout";
 import type {
   DamagePopup,
   DeflectBurst,
+  HealBurst,
   MinimapBounds,
   ProjectedDamagePopup,
   RenderedDeflectBurst,
+  RenderedHealBurst,
   Vec3,
 } from "$lib/types/game";
 
 export const deflectBurstDurationMs = 240;
+export const healBurstDurationMs = 820;
 
 const deflectBurstShardCount = 4;
 const deflectBurstShardAngles = Array.from(
   { length: deflectBurstShardCount },
   (_unused, index) => (index / deflectBurstShardCount) * Math.PI * 2
+);
+const healParticleCount = 14;
+const healParticleAngles = Array.from(
+  { length: healParticleCount },
+  (_unused, index) => (index / healParticleCount) * Math.PI * 2
 );
 const popupProjection = new Vector3();
 
@@ -86,5 +94,38 @@ export const renderDeflectBursts = (
         ] as Vec3,
         scale: Math.max(0, 1 - age),
       })),
+    };
+  });
+
+export const renderHealBursts = (
+  healBursts: HealBurst[],
+  animationNow: number
+): RenderedHealBurst[] =>
+  healBursts.map((burst) => {
+    const age = Math.min(
+      1,
+      (animationNow - burst.createdAt) / healBurstDurationMs
+    );
+    const fade = 1 - age;
+
+    return {
+      ...burst,
+      age,
+      fade,
+      particles: healParticleAngles.map((angle, index) => {
+        const spin = angle + age * 5.6 + index * 0.18;
+        const radius = burst.radius * (0.22 + age * 0.38);
+
+        return {
+          color: index % 3 === 0 ? "#7dffd7" : "#9defff",
+          opacity: fade * (0.48 + (index % 4) * 0.12),
+          position: [
+            Math.cos(spin) * radius,
+            0.35 + age * 1.2 + Math.sin(age * Math.PI + index) * 0.16,
+            Math.sin(spin) * radius,
+          ] as Vec3,
+          scale: burst.radius * (0.06 + fade * 0.06),
+        };
+      }),
     };
   });

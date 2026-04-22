@@ -109,7 +109,7 @@ export const roomSkins = {
     trimColor: "#6f5532",
     wallLamps: true,
     wallStyle: "mechanic",
-    wallTheme: "foundry",
+    wallTheme: "aqua",
   },
   foundry: {
     doorColor: "#d49a55",
@@ -163,28 +163,7 @@ export const gearTeeth: SceneGearTooth[] = Array.from(
   }
 );
 
-export const treasureGearMounts: SceneTreasureGearMount[] = [
-  {
-    panel: [3.2, 3.2, 0.24],
-    position: [-6.2, 3.1, -7.72],
-    size: 1.28,
-  },
-  {
-    panel: [3.2, 3.2, 0.24],
-    position: [6.2, 3.1, -7.72],
-    size: 1.28,
-  },
-  {
-    panel: [2.6, 2.6, 0.24],
-    position: [-4.5, 2.3, 7.72],
-    size: 0.94,
-  },
-  {
-    panel: [2.6, 2.6, 0.24],
-    position: [4.5, 2.3, 7.72],
-    size: 0.94,
-  },
-];
+export const treasureGearMounts: SceneTreasureGearMount[] = [];
 
 export const bossGearMounts: SceneBossGearMount[] = [
   { color: "#ffd166", position: [-5.4, 3.3, -7.72], size: 1.56 },
@@ -677,7 +656,7 @@ export const createEnemyPositions = (
   }
 
   if (pattern === "boss") {
-    return [[0, enemyFloorY, -5.6]];
+    return [[0, enemyFloorY, -3]];
   }
 
   if (pattern === "crossfire") {
