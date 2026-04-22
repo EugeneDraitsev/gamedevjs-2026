@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { DungeonRoom } from "../config/dungeon-layout";
 import {
   clampToRoom,
+  getConveyorVelocity,
+  getRoomPlatforms,
   getTransition,
   playerRadius,
   roomTransitionInsetX,
@@ -43,6 +45,20 @@ describe("clampToRoom", () => {
       -roomTransitionInsetZ,
       6
     );
+  });
+});
+
+describe("getConveyorVelocity", () => {
+  it("returns catwalk conveyor velocity on top of a conveyor", () => {
+    expect(
+      getConveyorVelocity(getRoomPlatforms("catwalk"), [0, 0.7, 0])
+    ).toEqual([0, 0, 3.74]);
+  });
+
+  it("ignores points below the conveyor top", () => {
+    expect(
+      getConveyorVelocity(getRoomPlatforms("catwalk"), [0, 0.38, 0])
+    ).toBeNull();
   });
 });
 

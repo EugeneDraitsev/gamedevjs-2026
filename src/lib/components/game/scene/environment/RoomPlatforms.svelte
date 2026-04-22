@@ -3,7 +3,21 @@
   import { Collider, RigidBody } from "@threlte/rapier";
   import type { RoomPlatform } from "$lib/types/game";
 
-  let { roomPlatforms }: { roomPlatforms: RoomPlatform[] } = $props();
+  let {
+    animationNow = 0,
+    roomPlatforms,
+  }: { animationNow?: number; roomPlatforms: RoomPlatform[] } = $props();
+
+  const beltSlots = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+  const beltSlotZ = (slot: number, platform: RoomPlatform) => {
+    const spacing = 0.14;
+    const conveyorZ = platform.conveyor?.[2] ?? 0;
+    const offset =
+      (((animationNow * conveyorZ) / (1000 * platform.args[2])) % spacing) +
+      spacing;
+
+    return (slot * spacing + (offset % spacing)) * platform.args[2];
+  };
 </script>
 
 {#each roomPlatforms as platform (platform.id)}
@@ -82,65 +96,88 @@
           />
         </T.Mesh>
 
-        <T.Mesh
-          castShadow
-          receiveShadow
-          position={[0, platform.args[1] + 0.065, 0]}
-        >
-          <T.BoxGeometry args={[platform.args[0] * 1.2, 0.03, 0.045]} />
-          <T.MeshStandardMaterial
-            color="#314c5d"
-            metalness={0.42}
-            roughness={0.58}
-          />
-        </T.Mesh>
-        <T.Mesh
-          castShadow
-          receiveShadow
-          position={[0, platform.args[1] + 0.065, 0]}
-        >
-          <T.BoxGeometry args={[0.045, 0.03, platform.args[2] * 1.2]} />
-          <T.MeshStandardMaterial
-            color="#314c5d"
-            metalness={0.42}
-            roughness={0.58}
-          />
-        </T.Mesh>
-
-        {#if platform.args[2] > platform.args[0] * 2}
-          {#each [-0.48, 0, 0.48] as slot}
+        {#if platform.conveyor}
+          {#each [-1, 1] as end}
             <T.Mesh
               castShadow
               receiveShadow
-              position={[0, platform.args[1] + 0.115, slot * platform.args[2]]}
+              position={[0, platform.args[1] + 0.12, end * platform.args[2] * 0.88]}
+              rotation={[0, 0, Math.PI / 2]}
             >
-              <T.BoxGeometry args={[platform.args[0] * 1.72, 0.09, 0.11]} />
+              <T.CylinderGeometry
+                args={[0.16, 0.16, platform.args[0] * 1.72, 14]}
+              />
               <T.MeshStandardMaterial
-                color="#9a6334"
-                metalness={0.7}
-                roughness={0.36}
+                color="#b06f38"
+                metalness={0.78}
+                roughness={0.3}
               />
             </T.Mesh>
-
-            {#each [-1, 1] as x}
-              <T.Mesh
-                castShadow
-                receiveShadow
-                position={[
-                  x * platform.args[0] * 0.66,
-                  platform.args[1] + 0.18,
-                  slot * platform.args[2],
-                ]}
-              >
-                <T.BoxGeometry args={[0.16, 0.09, 0.16]} />
-                <T.MeshStandardMaterial
-                  color="#c18445"
-                  metalness={0.72}
-                  roughness={0.32}
-                />
-              </T.Mesh>
-            {/each}
           {/each}
+
+          {#each beltSlots as slot}
+            <T.Mesh
+              castShadow
+              receiveShadow
+              position={[0, platform.args[1] + 0.145, beltSlotZ(slot, platform)]}
+            >
+              <T.BoxGeometry args={[platform.args[0] * 1.42, 0.08, 0.08]} />
+              <T.MeshStandardMaterial
+                color="#b06f38"
+                emissive="#6b2f10"
+                emissiveIntensity={0.16}
+                metalness={0.68}
+                roughness={0.34}
+              />
+            </T.Mesh>
+          {/each}
+
+          {#each [-1, 1] as side}
+            <T.Mesh
+              castShadow
+              receiveShadow
+              position={[
+                side * platform.args[0] * 1.04,
+                platform.args[1] + 0.02,
+                0,
+              ]}
+              rotation={[Math.PI / 2, 0, 0]}
+            >
+              <T.CylinderGeometry
+                args={[0.05, 0.05, platform.args[2] * 1.64, 8]}
+              />
+              <T.MeshStandardMaterial
+                color="#8f5a30"
+                metalness={0.72}
+                roughness={0.34}
+              />
+            </T.Mesh>
+          {/each}
+        {:else}
+          <T.Mesh
+            castShadow
+            receiveShadow
+            position={[0, platform.args[1] + 0.065, 0]}
+          >
+            <T.BoxGeometry args={[platform.args[0] * 1.2, 0.03, 0.045]} />
+            <T.MeshStandardMaterial
+              color="#314c5d"
+              metalness={0.42}
+              roughness={0.58}
+            />
+          </T.Mesh>
+          <T.Mesh
+            castShadow
+            receiveShadow
+            position={[0, platform.args[1] + 0.065, 0]}
+          >
+            <T.BoxGeometry args={[0.045, 0.03, platform.args[2] * 1.2]} />
+            <T.MeshStandardMaterial
+              color="#314c5d"
+              metalness={0.42}
+              roughness={0.58}
+            />
+          </T.Mesh>
         {/if}
 
         {#each [-1, 1] as side}

@@ -9,6 +9,7 @@ import type { RoomTemplate } from "$lib/config/room-templates";
 import {
   floorHalfDepth,
   floorHalfWidth,
+  getConveyorVelocity,
   hazardTickMs,
   playerRadius,
 } from "$lib/game/scene-layout";
@@ -22,6 +23,7 @@ import type {
   ActiveEnemy,
   ActiveEnemyShot,
   RoomHazard,
+  RoomPlatform,
   Vec3,
 } from "$lib/types/game";
 
@@ -34,6 +36,7 @@ interface StepContext {
   player: PlayerStore;
   room: RoomStore;
   roomHazards: RoomHazard[];
+  roomPlatforms: RoomPlatform[];
   timing: TimingStore;
 }
 
@@ -121,6 +124,13 @@ const applyProjectileHits = (
   };
 };
 
+const getEnemyConveyorVelocity = (ctx: StepContext, enemy: ActiveEnemy): Vec3 =>
+  getConveyorVelocity(
+    ctx.roomPlatforms,
+    enemy.position,
+    enemy.radius * 0.2
+  ) ?? [0, 0, 0];
+
 const countActiveBombs = (combat: CombatStore, originId: string) => {
   let count = 0;
 
@@ -154,17 +164,18 @@ const stepEnemy = (
         delta *
         0.82
       : 0;
+  const conveyor = getEnemyConveyorVelocity(ctx, enemy);
   let knockbackVelocity = enemy.knockbackVelocity;
   let position: Vec3 = [
     enemy.position[0] +
       (dx / distance) * step +
       (-dz / distance) * strafeStep +
-      knockbackVelocity[0] * delta,
+      (knockbackVelocity[0] + conveyor[0]) * delta,
     enemy.position[1],
     enemy.position[2] +
       (dz / distance) * step +
       (dx / distance) * strafeStep +
-      knockbackVelocity[2] * delta,
+      (knockbackVelocity[2] + conveyor[2]) * delta,
   ];
   let hp = enemy.hp;
   let lastBombAt = enemy.lastBombAt ?? 0;

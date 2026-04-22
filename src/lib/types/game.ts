@@ -184,6 +184,7 @@ export interface RoomHazard {
 export interface RoomPlatform {
   args: Vec3;
   color: string;
+  conveyor?: Vec3;
   id: string;
   position: Vec3;
   shape?: "box" | "hex";

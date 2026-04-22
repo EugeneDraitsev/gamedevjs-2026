@@ -38,7 +38,7 @@
   import PlayerDebugMarkers from "$lib/components/game/player/PlayerDebugMarkers.svelte";
   import PlayerMeleeVisuals from "$lib/components/game/player/PlayerMeleeVisuals.svelte";
   import { getDesiredHorizontalVelocity as resolveHorizontalVelocity } from "$lib/game/player-controls";
-  import { clampToRoom } from "$lib/game/scene-layout";
+  import { clampToRoom, getConveyorVelocity } from "$lib/game/scene-layout";
   import { mobileInput } from "$lib/stores/mobile-input.svelte";
   import { getGameSceneContext } from "$lib/stores/scene-context";
   import type { CameraMode, Vec3 } from "$lib/types/game";
@@ -363,6 +363,25 @@
     if (settings.cameraMode !== "orbit" && !scene.sceneControlsLocked) {
       const response = Math.min(1, delta * settings.moveResponsiveness);
       const desiredVelocity = getDesiredHorizontalVelocity(velocity);
+      const translation = body.translation();
+      const conveyor = isGroundedState
+        ? getConveyorVelocity(
+            scene.roomPlatforms,
+            [translation.x, translation.y, translation.z],
+            playerBodyRadius * 0.2
+          )
+        : null;
+      const moving =
+        pressed.has("KeyW") ||
+        pressed.has("KeyS") ||
+        pressed.has("KeyA") ||
+        pressed.has("KeyD") ||
+        pressed.has("ArrowUp") ||
+        pressed.has("ArrowDown") ||
+        pressed.has("ArrowLeft") ||
+        pressed.has("ArrowRight") ||
+        mobileInput.moveVector.x !== 0 ||
+        mobileInput.moveVector.y !== 0;
       let nextVelocityY = velocity.y;
 
       if (jumpRequested && isGroundedState) {
@@ -370,10 +389,17 @@
         nextVelocityY = settings.jumpSpeed;
       }
 
+      const targetVelocityX = conveyor
+        ? (moving ? desiredVelocity.x : 0) + conveyor[0]
+        : desiredVelocity.x;
+      const targetVelocityZ = conveyor
+        ? (moving ? desiredVelocity.z : 0) + conveyor[2]
+        : desiredVelocity.z;
+
       jumpVelocity.set(
-        MathUtils.lerp(velocity.x, desiredVelocity.x, response),
+        MathUtils.lerp(velocity.x, targetVelocityX, response),
         nextVelocityY,
-        MathUtils.lerp(velocity.z, desiredVelocity.z, response)
+        MathUtils.lerp(velocity.z, targetVelocityZ, response)
       );
       body.setLinvel(jumpVelocity, true);
     }

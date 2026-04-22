@@ -285,6 +285,7 @@
       player,
       room,
       roomHazards: scene.roomHazards,
+      roomPlatforms: scene.roomPlatforms,
       timing,
     });
 

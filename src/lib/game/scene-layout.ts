@@ -212,18 +212,21 @@ export const getRoomPlatforms = (
       {
         args: [1.1, 0.18, 4.5],
         color: "#38556f",
+        conveyor: [0, 0, 3.74],
         id: "catwalk-center",
         position: [0, 0.18, 0],
       },
       {
         args: [0.9, 0.16, 3.6],
         color: "#31495f",
+        conveyor: [0, 0, -3.3],
         id: "catwalk-left",
         position: [-3.8, 0.16, -0.4],
       },
       {
         args: [0.9, 0.16, 3.6],
         color: "#31495f",
+        conveyor: [0, 0, -3.3],
         id: "catwalk-right",
         position: [3.8, 0.16, 0.4],
       },
@@ -470,12 +473,14 @@ export const getRoomPlatforms = (
       {
         args: [1.15, 0.18, 2.2],
         color: "#31495f",
+        conveyor: [0, 0, 3.08],
         id: "crucible-left",
         position: [-4.1, 0.18, 1.6],
       },
       {
         args: [1.15, 0.18, 2.2],
         color: "#31495f",
+        conveyor: [0, 0, -3.08],
         id: "crucible-right",
         position: [4.1, 0.18, 1.6],
       },
@@ -483,6 +488,34 @@ export const getRoomPlatforms = (
   }
 
   return [];
+};
+
+export const getConveyorVelocity = (
+  platforms: RoomPlatform[],
+  position: Vec3,
+  radius = 0
+): Vec3 | null => {
+  for (const platform of platforms) {
+    if (!platform.conveyor) {
+      continue;
+    }
+
+    const top = platform.position[1] + platform.args[1];
+
+    if (
+      position[1] < top + 0.1 ||
+      position[1] > top + 1.15 ||
+      Math.abs(position[0] - platform.position[0]) >
+        platform.args[0] + radius ||
+      Math.abs(position[2] - platform.position[2]) > platform.args[2] + radius
+    ) {
+      continue;
+    }
+
+    return platform.conveyor;
+  }
+
+  return null;
 };
 
 export const getRoomHazards = (

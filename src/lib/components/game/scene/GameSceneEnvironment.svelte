@@ -35,7 +35,7 @@
   roomHazards={scene.roomHazards}
 />
 
-<RoomPlatforms roomPlatforms={scene.roomPlatforms} />
+<RoomPlatforms animationNow={timing.now} roomPlatforms={scene.roomPlatforms} />
 
 <RoomTemplateEnvironment
   currentFloorPalette={scene.currentFloorPalette}
