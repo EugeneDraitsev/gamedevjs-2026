@@ -20,6 +20,7 @@
   import GameSceneEnvironment from "$lib/components/game/scene/GameSceneEnvironment.svelte";
   import { roomTemplateById } from "$lib/config/room-templates";
   import { stepEnemies } from "$lib/game/enemy-stepper";
+  import { setOutsideChunkSeed } from "$lib/game/outside-chunk-context";
   import {
     applyMeleeDeflects,
     applyMeleeHitsToBombs,
@@ -99,6 +100,13 @@
 
   $effect(() => {
     scene.camera = sceneCamera;
+  });
+
+  // Push the URL-derived dungeon seed into the outside-chunk pipeline
+  // so every consumer (terrain, road, foliage, minimap, enemy spawn)
+  // regenerates when the player starts a new run.
+  $effect(() => {
+    setOutsideChunkSeed(`outside-${dungeon.seed}`);
   });
 
   $effect(() => {
