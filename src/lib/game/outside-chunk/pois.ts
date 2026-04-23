@@ -19,6 +19,7 @@ export interface PoiParams {
   biome: Uint8Array;
   height: Float32Array;
   flow: Float32Array;
+  playable?: Uint8Array;
   seedHash: number;
   maxCamps: number;
   maxShrines: number;
@@ -44,33 +45,27 @@ export const buildPois = (p: PoiParams): ChunkFeature[] => {
     return true;
   };
 
-  // Score clearings: grass/forest with low neighbourhood variance
+  // Score clearings — inside playable zone only so POIs don't spawn
+  // in the decorative mountain ring.
   const clearingScore = new Float32Array(total);
   for (let r = 2; r < rows - 2; r++) {
     for (let c = 2; c < cols - 2; c++) {
       const i = r * cols + c;
+      if (p.playable && !p.playable[i]) continue;
       if (biome[i] !== grass && biome[i] !== forest) continue;
-      let sum = 0;
-      let sumSq = 0;
-      let count = 0;
-      for (let dr = -2; dr <= 2; dr++) {
-        for (let dc = -2; dc <= 2; dc++) {
-          const h = height[(r + dr) * cols + (c + dc)];
-          sum += h;
-          sumSq += h * h;
-          count++;
-        }
-      }
-      const mean = sum / count;
-      const variance = sumSq / count - mean * mean;
-      clearingScore[i] = 1 / (1 + variance * 8);
+      // Deprioritise cells adjacent to water so camps don't materialise on
+      // a river bank and confuse the shrine logic below.
+      clearingScore[i] = 1;
+      // Jitter score with a stable hash so deterministic but spread out
+      const hash = Math.sin(i * 12.9898) * 43758.5453;
+      clearingScore[i] += (hash - Math.floor(hash)) * 0.5;
     }
   }
 
-  // 1) Camps: best N clearings
+  // 1) Camps: pick from clearings (jittered stable ordering).
   const clearingCandidates: Array<{ i: number; s: number }> = [];
   for (let i = 0; i < total; i++) {
-    if (clearingScore[i] > 0.6) clearingCandidates.push({ i, s: clearingScore[i] });
+    if (clearingScore[i] > 0) clearingCandidates.push({ i, s: clearingScore[i] });
   }
   clearingCandidates.sort((a, b) => b.s - a.s);
   let camps = 0;
@@ -92,17 +87,19 @@ export const buildPois = (p: PoiParams): ChunkFeature[] => {
     camps++;
   }
 
-  // 2) Shrines at river confluences (high flow, non-water cell adjacent to water)
+  // 2) Shrines at river banks — any non-water, non-mountain cell
+  //    that is adjacent to water counts. Flow is zero now that
+  //    hydrology carves rivers explicitly; the adjacency check alone
+  //    is enough.
   const confluenceCandidates: Array<{ i: number; f: number }> = [];
   for (let i = 0; i < total; i++) {
     if (biome[i] === biomeIndex("water")) continue;
-    if (flow[i] < 60) continue;
-    // adjacent to water?
+    if (p.playable && !p.playable[i]) continue;
     const col = i % cols;
     const row = (i - col) / cols;
     let nearWater = false;
-    for (let dr = -1; dr <= 1 && !nearWater; dr++) {
-      for (let dc = -1; dc <= 1 && !nearWater; dc++) {
+    for (let dr = -2; dr <= 2 && !nearWater; dr++) {
+      for (let dc = -2; dc <= 2 && !nearWater; dc++) {
         if (dr === 0 && dc === 0) continue;
         const nc = col + dc;
         const nr = row + dr;
@@ -110,7 +107,10 @@ export const buildPois = (p: PoiParams): ChunkFeature[] => {
         if (biome[nr * cols + nc] === biomeIndex("water")) nearWater = true;
       }
     }
-    if (nearWater) confluenceCandidates.push({ i, f: flow[i] });
+    if (nearWater) {
+      const hash = Math.sin(i * 53.1337) * 129.7531;
+      confluenceCandidates.push({ i, f: hash - Math.floor(hash) });
+    }
   }
   confluenceCandidates.sort((a, b) => b.f - a.f);
   let shrines = 0;
@@ -132,11 +132,17 @@ export const buildPois = (p: PoiParams): ChunkFeature[] => {
     shrines++;
   }
 
-  // 3) Landmarks at high lookouts — a cliff cell with good sight lines
+  // 3) Landmarks — any scree / cliff-ish cell inside playable zone.
+  //    Since the playable floor is flat, there are no cliffs inside;
+  //    fall back to high grassland patches for visual markers.
   const lookoutCandidates: Array<{ i: number; h: number }> = [];
   for (let i = 0; i < total; i++) {
-    if (biome[i] !== cliff) continue;
-    lookoutCandidates.push({ i, h: height[i] });
+    if (p.playable && !p.playable[i]) continue;
+    if (biome[i] === biomeIndex("water")) continue;
+    if (biome[i] === grass || biome[i] === forest || biome[i] === cliff) {
+      const hash = Math.sin(i * 91.7717) * 89.4513;
+      lookoutCandidates.push({ i, h: (hash - Math.floor(hash)) * height[i] });
+    }
   }
   lookoutCandidates.sort((a, b) => b.h - a.h);
   let landmarks = 0;

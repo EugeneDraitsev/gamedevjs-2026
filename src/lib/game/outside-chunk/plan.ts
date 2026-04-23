@@ -19,11 +19,19 @@ import {
 export interface BuildChunkConfig {
   seed: string;
   size: ChunkSize;
+  // Playable zone (flat area) extents. Outside this rectangle the
+  // terrain ramps up into the decorative mountain ring.
+  playableHalfWidth: number;
+  playableHalfDepth: number;
+  groundY: number;
+  platformDensity: number;
+  platformPeakHeight: number;
+  transitionBand: number;
   waterLevel: number;
   mountainPeakHeight: number;
   snowLine: number;
-  floorHalfWidth: number;
-  axisMeander: number;
+  riverHalfWidth: number;
+  riverDepth: number;
   roadWidthHalf: number;
   riverbankRadius: number;
   cliffSlope: number;
@@ -45,22 +53,28 @@ export interface BuildChunkConfig {
 
 export const DEFAULT_CHUNK_CONFIG: BuildChunkConfig = {
   seed: "outside-polygon-001",
-  // Square-ish chunk so roads can branch in all directions; still
-  // slightly taller than wide because the game-logic room wall is.
-  size: { width: 168, depth: 168, cols: 144, rows: 144 },
+  // Full chunk (including mountain ring). Playable rectangle sits
+  // inside this and matches the game-logic room bounds.
+  size: { width: 180, depth: 180, cols: 144, rows: 144 },
+  playableHalfWidth: 34,
+  playableHalfDepth: 80,
+  groundY: 0.28,
+  platformDensity: 0.12,
+  platformPeakHeight: 1.3,
+  transitionBand: 0.35,
   waterLevel: 0,
   mountainPeakHeight: 55,
   snowLine: 10,
-  floorHalfWidth: 22,
-  axisMeander: 10,
-  roadWidthHalf: 1.9,
+  riverHalfWidth: 2.6,
+  riverDepth: 0.9,
+  roadWidthHalf: 2.1,
   riverbankRadius: 2.8,
   cliffSlope: 0.55,
   screeSlope: 0.22,
   minTreeSpacing: 3.2,
   minBushSpacing: 1.3,
   minRockSpacing: 2.6,
-  minPoiSpacing: 22,
+  minPoiSpacing: 18,
   maxCamps: 4,
   maxShrines: 3,
   maxLandmarks: 3,
@@ -78,24 +92,28 @@ export const buildOutsideChunkPlan = (
   const seedHash = hashSeed(config.seed);
   const { size } = config;
 
-  // 1) Heightmap (+ slope + axis)
-  const { height, slope, axisX } = buildHeightmap({
+  // 1) Heightmap — flat playable rectangle + decorative mountain ring.
+  const { height, slope, playable } = buildHeightmap({
     seedHash,
     size,
+    playableHalfWidth: config.playableHalfWidth,
+    playableHalfDepth: config.playableHalfDepth,
+    groundY: config.groundY,
+    platformDensity: config.platformDensity,
+    platformPeakHeight: config.platformPeakHeight,
+    transitionBand: config.transitionBand,
     mountainPeakHeight: config.mountainPeakHeight,
-    floorHalfWidth: config.floorHalfWidth,
-    axisMeander: config.axisMeander,
   });
 
-  // 2) Hydrology (mutates height, emits water mask + rivers)
+  // 2) Hydrology — explicit river channels carved inside playable zone
   const hydro = buildHydrology({
     size,
     height,
-    riverThreshold: (size.cols * size.rows) / 320,
-    maxRivers: 3,
-    carveDepth: 1.0,
-    carveHalfWidth: 2.4,
+    playable,
+    seedHash,
     waterLevel: config.waterLevel,
+    riverHalfWidth: config.riverHalfWidth,
+    riverDepth: config.riverDepth,
   });
 
   // 3) Biome classification (reads height, slope, water)
@@ -119,6 +137,7 @@ export const buildOutsideChunkPlan = (
     biome,
     height,
     flow: hydro.flow,
+    playable,
     seedHash,
     maxCamps: config.maxCamps,
     maxShrines: config.maxShrines,
@@ -126,18 +145,18 @@ export const buildOutsideChunkPlan = (
     minPoiSpacing: config.minPoiSpacing,
   });
 
-  // Main spine — south spawn corridor to north exit corridor, offset
-  // from the river axis on alternating sides.
-  const halfD = size.depth * 0.5;
+  // Main spine — south spawn corridor to north exit corridor along
+  // the centre of the playable zone with a slight wiggle driven by
+  // the chunk seed.
+  const halfD = config.playableHalfDepth * 0.95;
   const spineRows = 5;
   const spine: Array<[number, number]> = [];
   for (let i = 0; i < spineRows; i++) {
     const t = i / (spineRows - 1);
-    const row = Math.round(t * size.rows);
-    const z = -halfD + t * size.depth;
-    const side = i % 2 === 0 ? 1 : -1;
-    const x = axisX[Math.min(size.rows, row)] + side * 5.0;
-    spine.push([x, z]);
+    const z = -halfD + t * halfD * 2;
+    // gentle wiggle — keep well inside playable rect
+    const wiggle = Math.sin((t + seedHash / 1e9) * Math.PI * 1.3) * 6;
+    spine.push([wiggle, z]);
   }
 
   // Branch routes — straight from the nearest spine waypoint to each POI.
@@ -161,6 +180,7 @@ export const buildOutsideChunkPlan = (
     slope,
     biome,
     water: hydro.water,
+    playable,
     routes: [spine, ...branches],
     widthHalf: config.roadWidthHalf,
     branchWidthHalf: config.roadWidthHalf * 0.7,
@@ -171,6 +191,7 @@ export const buildOutsideChunkPlan = (
     size,
     height,
     biome,
+    playable,
     seedHash,
     minTreeSpacing: config.minTreeSpacing,
     minBushSpacing: config.minBushSpacing,
@@ -187,6 +208,7 @@ export const buildOutsideChunkPlan = (
     flow: hydro.flow,
     biome,
     water: hydro.water,
+    playable,
     roadCost: roads.cost,
   };
 
@@ -221,6 +243,8 @@ export const buildOutsideChunkPlan = (
     height,
     biome,
     water: hydro.water,
+    playable,
+    sampleHeight,
     spawn,
     guardsPerCamp: config.guardsPerCamp,
     guardsPerShrine: config.guardsPerShrine,

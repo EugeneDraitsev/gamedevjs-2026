@@ -14,6 +14,7 @@ export interface RoadsParams {
   slope: Float32Array;
   biome: Uint8Array; // mutated — road cells get tagged
   water: Uint8Array;
+  playable: Uint8Array; // A* only walks inside playable cells
   // Each route is a list of (x, z) world anchors; A* connects them
   // in sequence. Multiple routes = a network of branches.
   routes: Array<Array<[number, number]>>;
@@ -96,9 +97,14 @@ export const buildRoads = (p: RoadsParams): RoadsResult => {
   const total = cols * rows;
   const roadIdx = biomeIndex("road");
 
-  // 1) Cost grid — penalise steep terrain, water and cliffs.
+  // 1) Cost grid — inside playable zone only. Mountain cells get
+  //    an astronomical cost so A* never climbs them.
   const cost = new Float32Array(total);
   for (let i = 0; i < total; i++) {
+    if (!p.playable[i]) {
+      cost[i] = 1e6;
+      continue;
+    }
     const s = slope[i];
     let c = 1 + s * 4.2;
     if (water[i]) c += 20;

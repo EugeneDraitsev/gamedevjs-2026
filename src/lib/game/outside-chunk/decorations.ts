@@ -13,6 +13,7 @@ export interface DecorationParams {
   size: ChunkSize;
   height: Float32Array;
   biome: Uint8Array;
+  playable: Uint8Array;
   seedHash: number;
   minTreeSpacing: number; // world units
   minBushSpacing: number;
@@ -76,6 +77,7 @@ export const buildDecorations = (p: DecorationParams): DecorationResult => {
   for (let row = 0; row <= size.rows; row++) {
     for (let col = 0; col <= size.cols; col++) {
       const idx = row * stride + col;
+      if (!p.playable[idx]) continue;
       const b = biome[idx];
       const { x, z } = cellToWorld(size, col, row);
       const y = height[idx];

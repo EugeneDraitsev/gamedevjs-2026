@@ -1,23 +1,23 @@
-// Stage 2 — hydrology
+// Stage 2 — hydrology (explicit rivers for the flat playable zone)
 //
-// Simple flow-accumulation pass. For every grid cell we pick the
-// steepest-downhill neighbour; each cell contributes 1 unit of rain
-// to its descendants (transitively). High-accumulation cells are
-// rivers. We then trace the strongest flows into polylines and
-// gently carve the heightmap along them so water actually sits in
-// channels.
+// Now that the playable zone is near-flat, flow-accumulation no
+// longer produces interesting rivers on its own (no gradients). We
+// instead carve a few hand-picked river polylines directly through
+// the zone — seeded but deterministic — so water always shows up as
+// a gameplay obstacle rather than as ocean pools at the mountain foot.
 
 import { cellToWorld } from "./heightmap";
+import { makeNoise2D } from "./rng";
 import type { ChunkSize, PolyPath } from "./types";
 
 export interface HydrologyParams {
   size: ChunkSize;
   height: Float32Array; // mutated (carved)
-  riverThreshold: number; // min accumulation to be a river
-  maxRivers: number;
-  carveDepth: number;
-  carveHalfWidth: number; // world units
+  playable: Uint8Array; // only carve inside
+  seedHash: number;
   waterLevel: number;
+  riverHalfWidth: number; // world units
+  riverDepth: number; // how deep to carve below waterLevel
 }
 
 export interface HydrologyResult {
@@ -26,130 +26,113 @@ export interface HydrologyResult {
   rivers: PolyPath[];
 }
 
+const pointOnRiver = (
+  t: number,
+  startX: number,
+  startZ: number,
+  endX: number,
+  endZ: number,
+  meanderNoise: (x: number, y: number) => number,
+  meanderAmp: number
+): [number, number] => {
+  // Linear interpolation between endpoints with a perpendicular
+  // meander driven by noise along the parametric axis.
+  const x = startX + (endX - startX) * t;
+  const z = startZ + (endZ - startZ) * t;
+  const dx = endX - startX;
+  const dz = endZ - startZ;
+  const len = Math.hypot(dx, dz) || 1;
+  const nx = -dz / len;
+  const nz = dx / len;
+  const wave =
+    meanderNoise(t * 3, 1.7) * 0.7 + meanderNoise(t * 7, 5.1) * 0.3;
+  return [x + nx * wave * meanderAmp, z + nz * wave * meanderAmp];
+};
+
 export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
-  const { size, height } = p;
-  const cols = size.cols + 1;
-  const rows = size.rows + 1;
-  const total = cols * rows;
-
-  // 1) Sort cells by height descending (BFS from peaks downhill).
-  const indices = new Int32Array(total);
-  for (let i = 0; i < total; i++) indices[i] = i;
-  indices.sort((a, b) => height[b] - height[a]);
-
-  // 2) For each cell compute steepest-descent neighbour (or -1 if sink).
-  const next = new Int32Array(total);
-  next.fill(-1);
-  const nOffsets = [
-    [-1, -1],
-    [0, -1],
-    [1, -1],
-    [-1, 0],
-    [1, 0],
-    [-1, 1],
-    [0, 1],
-    [1, 1],
-  ];
-  for (let i = 0; i < total; i++) {
-    const col = i % cols;
-    const row = (i - col) / cols;
-    let bestDrop = 0;
-    let bestIdx = -1;
-    const hHere = height[i];
-    for (const [dx, dz] of nOffsets) {
-      const nc = col + dx;
-      const nr = row + dz;
-      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
-      const ni = nr * cols + nc;
-      const drop = hHere - height[ni];
-      if (drop > bestDrop) {
-        bestDrop = drop;
-        bestIdx = ni;
-      }
-    }
-    next[i] = bestIdx;
-  }
-
-  // 3) Flow accumulation — walk peaks → sinks, each cell passes its
-  //    accumulated flow to its descendant.
-  const flow = new Float32Array(total);
-  flow.fill(1); // uniform rain
-  for (let k = 0; k < total; k++) {
-    const i = indices[k];
-    const n = next[i];
-    if (n >= 0) flow[n] += flow[i];
-  }
-
-  // 4) River tracing — start at cells that exceed the threshold and
-  //    don't have an even-stronger descendant, follow next[] downhill.
-  const visited = new Uint8Array(total);
-  type TraceHead = { index: number; flow: number };
-  const heads: TraceHead[] = [];
-  for (let i = 0; i < total; i++) {
-    if (flow[i] < p.riverThreshold) continue;
-    const n = next[i];
-    // Head if no descendant or descendant has MUCH larger flow (tributary root)
-    if (n < 0 || flow[n] > flow[i] * 1.4) {
-      heads.push({ index: i, flow: flow[i] });
-    }
-  }
-  heads.sort((a, b) => b.flow - a.flow);
-  const rivers: PolyPath[] = [];
-  for (const head of heads) {
-    if (rivers.length >= p.maxRivers) break;
-    const points: Array<[number, number]> = [];
-    let cur = head.index;
-    let steps = 0;
-    let maxFlow = 0;
-    while (cur >= 0 && steps < total && !visited[cur]) {
-      visited[cur] = 1;
-      const col = cur % cols;
-      const row = (cur - col) / cols;
-      const { x, z } = cellToWorld(size, col, row);
-      points.push([x, z]);
-      if (flow[cur] > maxFlow) maxFlow = flow[cur];
-      cur = next[cur];
-      steps++;
-    }
-    if (points.length >= 6) {
-      const widthHalf = Math.max(
-        1.2,
-        Math.min(3.6, 0.08 * Math.sqrt(maxFlow))
-      );
-      rivers.push({ points, widthHalf });
-    }
-  }
-
-  // 5) Carve the heightmap gently along rivers.
+  const { size, height, playable } = p;
+  const stride = size.cols + 1;
+  const total = (size.cols + 1) * (size.rows + 1);
   const water = new Uint8Array(total);
-  for (const river of rivers) {
-    for (const [wx, wz] of river.points) {
-      const radius = river.widthHalf + 0.4;
-      const colC = ((wx + size.width * 0.5) / size.width) * size.cols;
-      const rowC = ((wz + size.depth * 0.5) / size.depth) * size.rows;
-      const r = Math.ceil((radius / size.width) * size.cols) + 1;
-      for (let dr = -r; dr <= r; dr++) {
-        for (let dc = -r; dc <= r; dc++) {
-          const col = Math.round(colC + dc);
-          const row = Math.round(rowC + dr);
-          if (col < 0 || col >= cols || row < 0 || row >= rows) continue;
-          const { x, z } = cellToWorld(size, col, row);
-          const distWorld = Math.hypot(x - wx, z - wz);
-          if (distWorld > radius) continue;
-          const t = 1 - distWorld / radius;
-          const depth = Math.pow(t, 1.4) * p.carveDepth;
-          const i = row * cols + col;
-          height[i] -= depth;
-          if (height[i] < p.waterLevel) water[i] = 2;
-        }
+  const flow = new Float32Array(total);
+
+  const meanderNoise = makeNoise2D(p.seedHash ^ 0x1eadbeef);
+  const halfW = size.width * 0.5;
+  const halfD = size.depth * 0.5;
+
+  // Pick two rivers: one runs N→S on the east side, another W→E on the
+  // south side. Endpoints are chosen well inside the playable zone so
+  // rivers always cross the arena rather than hugging the mountain edge.
+  const rivers: { a: [number, number]; b: [number, number]; meanderAmp: number }[] = [
+    {
+      a: [halfW * 0.45, -halfD * 0.6],
+      b: [halfW * 0.25, halfD * 0.65],
+      meanderAmp: 6,
+    },
+    {
+      a: [-halfW * 0.55, halfD * 0.2],
+      b: [halfW * 0.1, halfD * 0.55],
+      meanderAmp: 5,
+    },
+  ];
+
+  const riverPaths: PolyPath[] = [];
+  const samplesPerRiver = 56;
+
+  for (const spec of rivers) {
+    const pts: Array<[number, number]> = [];
+    for (let i = 0; i <= samplesPerRiver; i++) {
+      const t = i / samplesPerRiver;
+      pts.push(
+        pointOnRiver(t, spec.a[0], spec.a[1], spec.b[0], spec.b[1], meanderNoise, spec.meanderAmp)
+      );
+    }
+    riverPaths.push({ points: pts, widthHalf: p.riverHalfWidth });
+  }
+
+  // Carve each river: dip terrain below waterLevel within riverHalfWidth.
+  const carveRadius = p.riverHalfWidth + 0.5;
+  const carve = (wx: number, wz: number) => {
+    const colCenter = ((wx + halfW) / size.width) * size.cols;
+    const rowCenter = ((wz + halfD) / size.depth) * size.rows;
+    const r = Math.ceil((carveRadius / size.width) * size.cols) + 1;
+    for (let dr = -r; dr <= r; dr++) {
+      for (let dc = -r; dc <= r; dc++) {
+        const col = Math.round(colCenter + dc);
+        const row = Math.round(rowCenter + dr);
+        if (col < 0 || col > size.cols || row < 0 || row > size.rows) continue;
+        const idx = row * stride + col;
+        if (!playable[idx]) continue; // never carve into mountain
+        const { x, z } = cellToWorld(size, col, row);
+        const d = Math.hypot(x - wx, z - wz);
+        if (d > carveRadius) continue;
+        const t = 1 - d / carveRadius;
+        const depth = Math.pow(t, 1.3) * p.riverDepth;
+        const target = p.waterLevel - depth * 0.45; // river bed sits below waterLevel
+        if (height[idx] > target) height[idx] = target;
+      }
+    }
+  };
+
+  for (const river of riverPaths) {
+    // Walk finely between sampled points so the carving is seamless.
+    for (let i = 0; i < river.points.length - 1; i++) {
+      const [ax, az] = river.points[i];
+      const [bx, bz] = river.points[i + 1];
+      const steps = 8;
+      for (let s = 0; s < steps; s++) {
+        const t = s / steps;
+        const x = ax + (bx - ax) * t;
+        const z = az + (bz - az) * t;
+        carve(x, z);
       }
     }
   }
 
-  // 6) Mark any still-below-waterLevel cell as flooded.
+  // Tag flooded cells
   for (let i = 0; i < total; i++) {
-    if (water[i] === 0 && height[i] < p.waterLevel) water[i] = 1;
+    if (height[i] < p.waterLevel) water[i] = 1;
   }
 
-  return { flow, water, rivers };
+  return { flow, water, rivers: riverPaths };
 };

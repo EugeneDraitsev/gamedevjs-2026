@@ -14,12 +14,14 @@
   const plan = outsidePlan();
 
   const material = new MeshStandardMaterial({
-    color: new Color("#6b543a"),
-    roughness: 0.96,
-    metalness: 0.01,
+    color: new Color("#8c6f46"),
+    roughness: 0.98,
+    metalness: 0.0,
     polygonOffset: true,
-    polygonOffsetFactor: -1,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
     transparent: true,
+    depthWrite: false,
   });
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
@@ -82,7 +84,7 @@
         nx = -dz / len;
         nz = dx / len;
       }
-      const y = plan.sampleHeight(x, z) + 0.06;
+      const y = plan.sampleHeight(x, z) + 0.12;
       verts.push(x + nx * widthHalf, y, z + nz * widthHalf);
       verts.push(x - nx * widthHalf, y, z - nz * widthHalf);
       uvs.push(0, i);
@@ -107,5 +109,10 @@
 </script>
 
 {#each geometries as road (road.id)}
-  <T.Mesh geometry={road.geometry} {material} receiveShadow />
+  <T.Mesh
+    geometry={road.geometry}
+    {material}
+    receiveShadow
+    renderOrder={1}
+  />
 {/each}

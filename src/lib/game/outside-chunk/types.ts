@@ -34,6 +34,8 @@ export interface ChunkGrids {
   biome: Uint8Array; // indices into BIOME_ORDER
   // Mask of cells that have been carved by a river (1) or flooded (2)
   water: Uint8Array;
+  // 1 where the player can actually be (flat zone), 0 on mountains.
+  playable: Uint8Array;
   // Road cost grid used by A* (higher = worse to traverse)
   roadCost: Float32Array;
 }

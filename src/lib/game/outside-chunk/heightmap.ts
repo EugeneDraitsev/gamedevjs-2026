@@ -1,13 +1,17 @@
 // Stage 1 — heightmap
 //
-// Build a canyon-biome heightmap on a regular grid. The canyon has:
-//   • A meandering central axis (low-freq noise)
-//   • Flat floor along the axis
-//   • Transition slopes
-//   • Steep ridged-multifractal walls
-//   • Snow-capped peaks above altitude
+// The world uses three functional tiers inside a **rectangular
+// playable zone** and a decorative mountain ring around it:
 //
-// Output: height[row * cols + col] in world-up units.
+//   Tier 0 (water):     y < waterLevel   — sparse river channels
+//   Tier 1 (ground):    y ≈ 0.28         — flat walkable plane
+//   Tier 2 (platform):  y ≈ 0.9–1.4      — scattered raised stones
+//   Mountains:          y ≫ waterLevel   — outside the playable zone,
+//                                          unreachable, purely visual
+//
+// This keeps gameplay on a near-flat surface (bumpy terrain was
+// breaking the roll-ball character), while water and platform stones
+// give verticality and natural obstacles.
 
 import { fbm2, makeNoise2D, ridged2 } from "./rng";
 import type { ChunkSize } from "./types";
@@ -15,15 +19,21 @@ import type { ChunkSize } from "./types";
 export interface HeightmapParams {
   seedHash: number;
   size: ChunkSize;
-  mountainPeakHeight: number;
-  floorHalfWidth: number;
-  axisMeander: number;
+  playableHalfWidth: number; // world units — flat zone half-extent X
+  playableHalfDepth: number; // world units — flat zone half-extent Z
+  groundY: number; // flat walkable height
+  mountainPeakHeight: number; // canyon rim amplitude
+  transitionBand: number; // distance over which flat → mountain ramp
+  platformDensity: number; // 0..1 probability-like knob
+  platformPeakHeight: number; // max local rise for a platform
 }
 
 export interface HeightmapResult {
   height: Float32Array;
   slope: Float32Array;
-  axisX: Float32Array; // axisX[row] — canyon axis X for each row
+  // Mask: 1 inside playable zone, 0 outside. Roads / scatter / POIs
+  // consult this so they stay on flat ground.
+  playable: Uint8Array;
 }
 
 const cellToWorld = (size: ChunkSize, col: number, row: number) => {
@@ -33,103 +43,105 @@ const cellToWorld = (size: ChunkSize, col: number, row: number) => {
 };
 
 export const buildHeightmap = (p: HeightmapParams): HeightmapResult => {
-  const { size, mountainPeakHeight } = p;
+  const { size, mountainPeakHeight, transitionBand } = p;
   const nBase = makeNoise2D(p.seedHash);
   const nWarp = makeNoise2D(p.seedHash ^ 0x1a2b3c4d);
   const nRidge = makeNoise2D(p.seedHash ^ 0xdeadbeef);
   const nAxis = makeNoise2D(p.seedHash ^ 0xcafebabe);
-  const nDetail = makeNoise2D(p.seedHash ^ 0x1e1e1e1e);
+  const nPlatform = makeNoise2D(p.seedHash ^ 0x9c1fca2e);
 
-  const halfW = size.width * 0.5;
-  const halfD = size.depth * 0.5;
+  const stride = size.cols + 1;
+  const totalVerts = (size.cols + 1) * (size.rows + 1);
+  const height = new Float32Array(totalVerts);
+  const playable = new Uint8Array(totalVerts);
 
-  // 1) Compute canyon axis X(row) — smooth meander along Z
-  const axisX = new Float32Array(size.rows + 1);
+  // How far "inside" the playable zone we are. 1 at very edge, 0 well
+  // inside, negative outside (used to compute the mountain ramp).
+  const insideT = (x: number, z: number): number => {
+    const tx = Math.abs(x) / p.playableHalfWidth;
+    const tz = Math.abs(z) / p.playableHalfDepth;
+    return Math.max(tx, tz);
+  };
+
   for (let row = 0; row <= size.rows; row++) {
-    const z = -halfD + (row / size.rows) * size.depth;
-    const m1 = nAxis(z * 0.008, 11.7) * p.axisMeander;
-    const m2 = nAxis(z * 0.021, 33.1) * p.axisMeander * 0.4;
-    axisX[row] = m1 + m2;
-  }
-
-  const height = new Float32Array((size.cols + 1) * (size.rows + 1));
-  // 2) Height function evaluated per vertex
-  for (let row = 0; row <= size.rows; row++) {
-    const z = -halfD + (row / size.rows) * size.depth;
-    const cAxis = axisX[row];
+    const z = -size.depth * 0.5 + (row / size.rows) * size.depth;
     for (let col = 0; col <= size.cols; col++) {
-      const x = -halfW + (col / size.cols) * size.width;
+      const x = -size.width * 0.5 + (col / size.cols) * size.width;
+      const idx = row * stride + col;
 
-      const d = Math.abs(x - cAxis);
-      const dNorm = d / halfW;
+      const t = insideT(x, z); // <1 inside, >1 outside
+      const inside = t < 1;
+      if (inside) playable[idx] = 1;
 
-      // Domain-warped coords for organic carving
-      const wx = x + nWarp(x * 0.04, z * 0.04) * 3.2;
-      const wz = z + nWarp(x * 0.04 + 19, z * 0.04 + 7) * 3.2;
-      const floorNoise = fbm2(nBase, wx * 0.04, wz * 0.04, 4) * 0.6;
+      // --- Platform stones — Poisson-like via noise peaks ---
+      // Only raise the ground where nPlatform peaks above a threshold.
+      // Gives discrete stone-shaped plateaus scattered through the
+      // flat zone so the arena isn't a featureless pancake.
+      const pNoise =
+        nPlatform(x * 0.12, z * 0.12) * 0.55 +
+        nPlatform(x * 0.35 + 3.1, z * 0.35 + 7.2) * 0.45;
+      const platformMask = Math.max(0, pNoise - (1 - p.platformDensity));
+      const platformShape =
+        platformMask > 0
+          ? Math.pow(platformMask / Math.max(0.0001, p.platformDensity), 1.5)
+          : 0;
+      const platformH = platformShape * p.platformPeakHeight;
 
-      let h: number;
-      if (dNorm < 0.18) {
-        // Flat canyon floor
-        h = 0.2 + floorNoise * 0.3;
-      } else if (dNorm < 0.45) {
-        // Transition — gentle slope
-        const t = (dNorm - 0.18) / 0.27;
-        const shape = Math.pow(t, 0.85);
-        const cliffDetail = ridged2(nRidge, x * 0.05, z * 0.05, 3) * 0.6;
-        h = 0.25 + floorNoise * 0.25 + shape * (3.5 + cliffDetail * 2.5);
+      let groundH: number;
+      if (inside) {
+        // Flat ground with subtle micro-texture so shadows catch.
+        const micro = nBase(x * 0.4, z * 0.4) * 0.03;
+        groundH = p.groundY + micro + platformH;
       } else {
-        // Canyon wall — steep with ridged multifractal
-        const t = (dNorm - 0.45) / 0.55;
-        const ramp = Math.pow(t, 0.5);
-        const r = ridged2(nRidge, x * 0.045, z * 0.045, 5);
+        // Outside the playable zone — ramp up to mountain silhouette.
+        const tBand = Math.min(1, (t - 1) / transitionBand);
+        // Steep-ish ramp so walls read as cliffs, softened by an
+        // along-perimeter undulation so it's not a clean box.
+        const ramp = Math.pow(tBand, 0.45);
+
+        // Domain-warped ridged noise for actual rocky silhouette
+        const wx = x + nWarp(x * 0.03, z * 0.03) * 4;
+        const wz = z + nWarp(x * 0.03 + 17, z * 0.03 + 9) * 4;
+        const r = ridged2(nRidge, wx * 0.045, wz * 0.045, 5);
         const broad =
-          0.5 +
-          0.3 * nBase(z * 0.04, x * 0.04) +
-          0.2 * nBase(z * 0.1, 7.3);
+          0.55 +
+          0.25 * nBase(z * 0.04, x * 0.04) +
+          0.2 * nAxis(x * 0.06, z * 0.02);
         const peakShape = broad * (0.45 + 0.55 * r);
-        h = 4.2 + ramp * peakShape * mountainPeakHeight;
-        const boulder = Math.max(0, nDetail(z * 0.35, x * 0.32) - 0.2);
-        h += ramp * boulder * mountainPeakHeight * 0.3;
-        const saddle = Math.max(0, 0.5 - Math.abs(nAxis(z * 0.025, 3.1)));
-        h -= ramp * saddle * mountainPeakHeight * 0.22;
+        const mountainH = 4 + ramp * peakShape * mountainPeakHeight;
+
+        // Blend between flat edge and mountain to avoid a visible
+        // step right at the zone boundary.
+        const flatEdge = p.groundY + platformH;
+        const mixT = Math.pow(Math.min(1, (t - 1) / 0.18), 1.2);
+        groundH = flatEdge * (1 - mixT) + mountainH * mixT;
       }
 
-      // Softer bluffs at N/S chunk ends
-      const ez = Math.abs(z) / halfD;
-      if (ez > 0.85) {
-        const tz = (ez - 0.85) / 0.15;
-        const bluff = 0.6 + 0.4 * nAxis(x * 0.05 + 19, z * 0.02);
-        h += Math.pow(tz, 1.3) * bluff * mountainPeakHeight * 0.28;
-      }
-
-      if (h < -0.8) h = -0.8;
-      height[row * (size.cols + 1) + col] = h;
+      height[idx] = groundH;
     }
   }
 
-  // 3) Slope magnitude via central differences
-  const slope = new Float32Array((size.cols + 1) * (size.rows + 1));
+  // Slope via central differences (cheap, good enough for cost grid)
+  const slope = new Float32Array(totalVerts);
   const cellDx = size.width / size.cols;
   const cellDz = size.depth / size.rows;
   for (let row = 0; row <= size.rows; row++) {
     for (let col = 0; col <= size.cols; col++) {
-      const i = row * (size.cols + 1) + col;
-      const hCenter = height[i];
-      const hL = col > 0 ? height[i - 1] : hCenter;
-      const hR = col < size.cols ? height[i + 1] : hCenter;
-      const hU = row > 0 ? height[i - (size.cols + 1)] : hCenter;
-      const hD = row < size.rows ? height[i + (size.cols + 1)] : hCenter;
+      const i = row * stride + col;
+      const hC = height[i];
+      const hL = col > 0 ? height[i - 1] : hC;
+      const hR = col < size.cols ? height[i + 1] : hC;
+      const hU = row > 0 ? height[i - stride] : hC;
+      const hD = row < size.rows ? height[i + stride] : hC;
       const dx = (hR - hL) / (2 * cellDx);
       const dz = (hD - hU) / (2 * cellDz);
       slope[i] = Math.hypot(dx, dz);
     }
   }
 
-  return { height, slope, axisX };
+  return { height, slope, playable };
 };
 
-// Bilinear height sampler at any world-space (x, z)
 export const heightSampler = (size: ChunkSize, height: Float32Array) => {
   const halfW = size.width * 0.5;
   const halfD = size.depth * 0.5;
