@@ -21,7 +21,11 @@
   // Each wall is sliced into vertical bricks so the collider roughly
   // matches the jagged terrain silhouette rather than pretending to be
   // a perfect plane.
-  const wallX = halfW * (c.mountainInnerFactor + 0.04);
+  // Wall collider sits at ~60% of half-width — matches where the
+  // ridged canyon wall ramps into "can't climb" territory in the
+  // heightmap. Extra safety so the player can't phase out if they
+  // manage to gain speed up the wall.
+  const wallX = halfW * 0.62;
   const brickLen = (halfD * 2) / segments;
   const wallHeight = c.mountainPeakHeight * 0.9;
 

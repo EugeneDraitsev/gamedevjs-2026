@@ -4,7 +4,6 @@
   import { Color, type Texture } from "three";
   import ShootingTarget from "$lib/components/game/ShootingTarget.svelte";
   import OutsideAtmosphere from "$lib/components/game/scene/environment/OutsideAtmosphere.svelte";
-  import OutsideDistantPeaks from "$lib/components/game/scene/environment/OutsideDistantPeaks.svelte";
   import OutsideDecal from "$lib/components/game/scene/environment/OutsideDecal.svelte";
   import OutsideFoliage from "$lib/components/game/scene/environment/OutsideFoliage.svelte";
   import OutsideMountainCollider from "$lib/components/game/scene/environment/OutsideMountainCollider.svelte";
@@ -659,7 +658,6 @@
        we only need the invisible collider wall so the player can't walk
        out of the chunk. -->
   <OutsideMountainCollider />
-  <OutsideDistantPeaks />
 
   <!-- Winding procedural road ribbon following the seed-driven centerline -->
   <OutsideRoad />

@@ -1,7 +1,13 @@
-// Shared procedural heightmap + scatter sampler for the outside-start
-// chunk. Everything here is reproducible from a string seed so the
-// terrain, road, water, foliage and mountains all agree on the shape
-// of the world.
+// Canyon chunk generator for the outside-start room.
+//
+// Approach: instead of sampling a plain heightmap, we model a *canyon
+// axis* — a meandering spline running along Z — and derive everything
+// else from distance to that axis. The canyon floor hugs the axis,
+// the walls ramp up with ridged multifractal for realistic jagged
+// rock, and a river is carved in the lowest seam of the floor. Roads
+// and points-of-interest are then placed deterministically on the
+// natural shelves that fall out of the heightmap, so everything is
+// seed-driven and reproducible.
 
 const hashSeed = (seed: string): number => {
   let h = 2166136261;
@@ -12,6 +18,7 @@ const hashSeed = (seed: string): number => {
   return h >>> 0;
 };
 
+// Classic Perlin-style gradient noise, 2D, output in [-1, 1].
 const makeNoise = (seed: number) => {
   const gx = new Float32Array(256);
   const gy = new Float32Array(256);
@@ -32,9 +39,7 @@ const makeNoise = (seed: number) => {
     [perm[i], perm[j]] = [perm[j], perm[i]];
   }
   for (let i = 0; i < 256; i++) perm[i + 256] = perm[i];
-
   const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
-
   return (x: number, y: number) => {
     const xi = Math.floor(x) & 255;
     const yi = Math.floor(y) & 255;
@@ -42,20 +47,16 @@ const makeNoise = (seed: number) => {
     const yf = y - Math.floor(y);
     const u = fade(xf);
     const v = fade(yf);
-
     const aa = perm[xi + perm[yi]];
     const ab = perm[xi + perm[yi + 1]];
     const ba = perm[xi + 1 + perm[yi]];
     const bb = perm[xi + 1 + perm[yi + 1]];
-
     const d = (ix: number, fx: number, fy: number) =>
       gx[ix] * fx + gy[ix] * fy;
-
     const n00 = d(aa, xf, yf);
     const n10 = d(ba, xf - 1, yf);
     const n01 = d(ab, xf, yf - 1);
     const n11 = d(bb, xf - 1, yf - 1);
-
     const nx0 = n00 * (1 - u) + n10 * u;
     const nx1 = n01 * (1 - u) + n11 * u;
     return nx0 * (1 - v) + nx1 * v;
@@ -75,12 +76,13 @@ export interface OutsideChunkParams {
   width: number;
   depth: number;
   waterLevel: number;
-  roadHalfWidth: number;
-  // Mountain ring — inner radius where mountains start rising,
-  // outer radius where they cap off. Game-play collider sits at
-  // inner.
-  mountainInnerFactor: number;
+  // How wide the flat canyon floor is (in world units)
+  floorHalfWidth: number;
+  // Max amplitude the canyon axis meanders by
+  axisMeander: number;
+  // How tall the canyon walls can get
   mountainPeakHeight: number;
+  // Y-height where snow appears
   snowLineY: number;
 }
 
@@ -89,18 +91,10 @@ export const DEFAULT_CHUNK: OutsideChunkParams = {
   width: 112,
   depth: 196,
   waterLevel: 0,
-  roadHalfWidth: 4.5,
-  // Player's own game-logic wall is roughly 34 units from center on x
-  // and 79.5 on z. Ramp the mountain silhouette up right at that wall
-  // so the player sees towering peaks pressing in whenever they bump
-  // against the invisible boundary.
-  // Canyon wall ramps up starting at 45% of half-width (≈x=25) so the
-  // cliffs are already imposing by the time the player hits the
-  // game-logic boundary at x=34. Peaks tower to ~60 units and the
-  // top third of every wall is snow-capped.
-  mountainInnerFactor: 0.45,
-  mountainPeakHeight: 60,
-  snowLineY: 5,
+  floorHalfWidth: 16,
+  axisMeander: 7,
+  mountainPeakHeight: 55,
+  snowLineY: 10,
 };
 
 export interface ScatterSample {
@@ -108,6 +102,7 @@ export interface ScatterSample {
   z: number;
   y: number;
   slope: number;
+  distToAxis: number;
   rand: number;
   angle: number;
   scale: number;
@@ -115,108 +110,135 @@ export interface ScatterSample {
 
 export const createOutsideChunkSampler = (params: OutsideChunkParams) => {
   const seedHash = hashSeed(params.seed);
-  const n1 = makeNoise(seedHash);
-  const n2 = makeNoise(seedHash ^ 0x9e3779b9);
-  const n3 = makeNoise(seedHash ^ 0x7f4a7c15);
-  const nMountain = makeNoise(seedHash ^ 0xdeadbeef);
+  // Layered noise functions for different purposes
+  const nBase = makeNoise(seedHash); // primary ground undulation
+  const nWarpX = makeNoise(seedHash ^ 0x1a2b3c4d); // domain warp X
+  const nWarpZ = makeNoise(seedHash ^ 0x4d3c2b1a); // domain warp Z
+  const nRidge = makeNoise(seedHash ^ 0xdeadbeef); // ridged multifractal
+  const nAxis = makeNoise(seedHash ^ 0xcafebabe); // canyon axis meander
+  const nRiver = makeNoise(seedHash ^ 0x0badf00d); // river width/flow
+  const nDetail = makeNoise(seedHash ^ 0x1e1e1e1e); // fine detail
+
   const halfW = params.width * 0.5;
   const halfD = params.depth * 0.5;
 
-  // Road follows a gentle seed-driven sine wave so it isn't a straight
-  // line down the middle; returned value is the world x-offset of the
-  // road centerline at a given z.
-  const roadCenterX = (z: number): number => {
-    const a = n1(z * 0.012, 3.7) * 5.5;
-    const b = n2(z * 0.03, 11.3) * 2.5;
-    return a + b;
+  // --- Canyon axis: a spline running along Z that meanders in X ---
+  const canyonAxisX = (z: number): number => {
+    // Low-frequency meander so the canyon doesn't thrash
+    const m1 = nAxis(z * 0.008, 11.7) * params.axisMeander;
+    const m2 = nAxis(z * 0.02, 33.1) * params.axisMeander * 0.35;
+    return m1 + m2;
   };
 
-  // Distance (world units) from a point to the road centerline
-  const distToRoad = (x: number, z: number): number =>
-    Math.abs(x - roadCenterX(z));
+  const distToAxis = (x: number, z: number): number =>
+    Math.abs(x - canyonAxisX(z));
 
-  // Height at world (x, z). Output roughly [-0.6, mountainPeak].
+  // --- Ridged multifractal: summed octaves of (1 - |noise|)^2 ---
+  const ridgedMulti = (x: number, z: number, octaves = 4): number => {
+    let sum = 0;
+    let amp = 0.5;
+    let freq = 1;
+    let weight = 1;
+    for (let o = 0; o < octaves; o++) {
+      let signal = 1 - Math.abs(nRidge(x * freq, z * freq));
+      signal *= signal;
+      signal *= weight;
+      weight = Math.max(0, Math.min(1, signal * 2));
+      sum += signal * amp;
+      freq *= 2.03;
+      amp *= 0.55;
+    }
+    return sum;
+  };
+
+  // --- Standard FBM ---
+  const fbm = (
+    noise: (x: number, z: number) => number,
+    x: number,
+    z: number,
+    octaves = 4
+  ): number => {
+    let sum = 0;
+    let amp = 0.5;
+    let freq = 1;
+    for (let o = 0; o < octaves; o++) {
+      sum += noise(x * freq, z * freq) * amp;
+      freq *= 2.01;
+      amp *= 0.5;
+    }
+    return sum;
+  };
+
+  // Domain-warped coords — shift sample position by a noise vector so
+  // the resulting terrain looks less "noise-y" and more organically
+  // carved.
+  const warp = (x: number, z: number, strength = 4): [number, number] => {
+    const wx = nWarpX(x * 0.04, z * 0.04) * strength;
+    const wz = nWarpZ(x * 0.04 + 19, z * 0.04 + 7) * strength;
+    return [x + wx, z + wz];
+  };
+
+  // --- Main height function ---
   const heightAt = (x: number, z: number): number => {
-    const nx = x * 0.03;
-    const nz = z * 0.03;
-    let h = 0.45;
-    h += n1(nx, nz) * 0.55;
-    h += n2(nx * 2.3 + 10, nz * 2.3 + 10) * 0.22;
-    h += n3(nx * 6.1 + 50, nz * 6.1 + 50) * 0.1;
+    const d = distToAxis(x, z);
+    const dNorm = d / halfW; // 0 at axis, 1 at chunk edge
 
-    // Carved winding river
-    const ridge = 1 - Math.abs(n2(nx * 1.1, nz * 0.9 + 1.7));
-    const riverMask = Math.pow(Math.max(0, ridge - 0.72), 2) * 6;
-    h -= riverMask * 0.85;
+    // Canyon floor stays flat-ish with gentle domain-warped noise
+    const [wx, wz] = warp(x, z, 3.5);
+    const floorNoise = fbm(nBase, wx * 0.04, wz * 0.04, 4) * 0.6;
 
-    // Lake basin in lower-left
-    const lakeCenter = { x: -20, z: 40 };
-    const dLx = x - lakeCenter.x;
-    const dLz = z - lakeCenter.z;
-    const lakeDist = Math.hypot(dLx / 9, dLz / 8);
-    const lake = Math.max(0, 1 - lakeDist) * (0.9 + 0.2 * n3(x * 0.2, z * 0.2));
-    h -= Math.pow(lake, 1.3) * 1.2;
+    let h: number;
 
-    // Secondary pond
-    const pondC = { x: 22, z: -20 };
-    const pDist = Math.hypot((x - pondC.x) / 6.5, (z - pondC.z) / 5.5);
-    const pond = Math.max(0, 1 - pDist);
-    h -= Math.pow(pond, 1.4) * 0.9;
-
-    // Canyon walls rise only on the X sides (east + west). The north
-    // and south ends stay open so the player can traverse the chunk
-    // without getting crushed into a peak at the boundary. The walls
-    // are shaped with multi-octave ridged noise so they read as real
-    // jagged cliffs instead of a smooth bowl.
-    const ex = Math.abs(x) / halfW;
-    if (ex > params.mountainInnerFactor) {
-      const t = (ex - params.mountainInnerFactor) /
-        (1 - params.mountainInnerFactor);
-
-      // Along-canyon undulation: tall peaks vs. lower saddles
-      const along =
-        0.55 +
-        0.28 * nMountain(z * 0.05, 0) +
-        0.17 * nMountain(z * 0.12 + 7, 1.3);
-      // Ridged noise adds sharp ridge-and-valley carving into each cliff
-      const ridge1 = 1 - Math.abs(nMountain(z * 0.07, ex * 2.2));
-      const ridge2 = 1 - Math.abs(nMountain(z * 0.2 + 5, ex * 4.4));
-      const ridged = ridge1 * 0.7 + ridge2 * 0.3;
-
-      // Very steep ramp near the boundary so the cliff walls come up
-      // fast and feel vertical rather than a gentle slope.
-      const ramp = Math.pow(t, 0.38);
-      const peakShape = along * (0.6 + 0.4 * ridged);
-      h += ramp * peakShape * params.mountainPeakHeight;
-
-      // Boulders and outcrops poking out of the cliff face
+    if (dNorm < 0.18) {
+      // canyon floor — near-flat, slight undulation
+      h = 0.2 + floorNoise * 0.35;
+    } else if (dNorm < 0.45) {
+      // transition slope — gentle rise with some ridging
+      const t = (dNorm - 0.18) / 0.27;
+      const slopeShape = Math.pow(t, 0.85);
+      const cliffDetail = ridgedMulti(x * 0.05, z * 0.05, 3) * 0.5;
+      h = 0.2 + floorNoise * 0.3 + slopeShape * (3.5 + cliffDetail * 2.5);
+    } else {
+      // canyon wall — ridged multifractal + steep ramp
+      const t = (dNorm - 0.45) / 0.55;
+      const ramp = Math.pow(t, 0.48);
+      const ridged = ridgedMulti(x * 0.045, z * 0.045, 5);
+      const broadShape =
+        0.5 + 0.3 * nBase(z * 0.04, x * 0.04) + 0.2 * nBase(z * 0.1, 7.3);
+      const peakShape = broadShape * (0.45 + 0.55 * ridged);
+      h = 4.2 + ramp * peakShape * params.mountainPeakHeight;
+      // Boulders poking out of cliff face
       const boulder = Math.max(
         0,
-        nMountain(z * 0.45, ex * 10) - 0.25
+        nDetail(z * 0.35, x * 0.32) - 0.2
       );
-      h += ramp * boulder * params.mountainPeakHeight * 0.4;
-
-      // Occasional saddle gaps so the ridge has passes
-      const gap = Math.max(0, 0.55 - Math.abs(nMountain(z * 0.03, 3.7))) * 0.9;
-      h -= ramp * gap * params.mountainPeakHeight * 0.3;
+      h += ramp * boulder * params.mountainPeakHeight * 0.3;
+      // Occasional saddle gaps so ridge has natural passes
+      const saddle = Math.max(0, 0.5 - Math.abs(nAxis(z * 0.025, 3.1)));
+      h -= ramp * saddle * params.mountainPeakHeight * 0.22;
     }
 
-    // Distant N/S rise — gentler bluffs at the north and south ends so
-    // the chunk still feels enclosed but stays walkable.
+    // --- Carve the river along the axis ---
+    // River strength varies along z so the stream widens and narrows
+    const riverFlow = 0.55 + 0.45 * nRiver(z * 0.04, 2.1);
+    const riverHalfWidth = 3.2 * riverFlow; // world units
+    if (d < riverHalfWidth) {
+      const dn = d / riverHalfWidth;
+      // Deep near axis, shallow at edges. Cubic falloff for soft banks.
+      const depth = Math.pow(1 - dn, 1.5) * 1.0;
+      h -= depth;
+    }
+
+    // --- Far-N/S buffer bluffs so chunk ends don't feel cut off ---
     const ez = Math.abs(z) / halfD;
-    if (ez > 0.82) {
-      const tz = (ez - 0.82) / 0.18;
-      const bluffNoise = 0.6 + 0.4 * nMountain(x * 0.06 + 19, z * 0.02);
-      h += Math.pow(tz, 1.3) * bluffNoise * params.mountainPeakHeight * 0.35;
+    if (ez > 0.85) {
+      const tz = (ez - 0.85) / 0.15;
+      const bluffNoise = 0.6 + 0.4 * nAxis(x * 0.05 + 19, z * 0.02);
+      h += Math.pow(tz, 1.3) * bluffNoise * params.mountainPeakHeight * 0.3;
     }
 
-    // Flatten road corridor so the winding path stays walkable
-    const dRoad = distToRoad(x, z);
-    const roadFalloff = Math.max(0, 1 - dRoad / (params.roadHalfWidth + 1.8));
-    const flattened = 0.22 + n3(x * 0.5, z * 0.35) * 0.03;
-    h = h * (1 - roadFalloff * 0.9) + flattened * roadFalloff * 0.9;
-
-    if (h < -0.6) h = -0.6;
+    // Clamp lower bound
+    if (h < -0.7) h = -0.7;
     return h;
   };
 
@@ -230,14 +252,24 @@ export const createOutsideChunkSampler = (params: OutsideChunkParams) => {
     return Math.hypot(dx, dz);
   };
 
-  // Scatter up to `target` instances of something, rejecting samples
-  // that fail the predicate. Returns grounded positions with their
-  // local height, slope, and seeded random attributes.
+  // Road runs along the bank of the river (offset from axis) — higher
+  // ground but still flat, simulating a natural path walked along
+  // the canyon floor.
+  const roadCenterX = (z: number): number => {
+    const axis = canyonAxisX(z);
+    // offset road 4.5 units to one side of the river, side flips with
+    // a slow noise so the path occasionally crosses the stream.
+    const side = Math.sign(nAxis(z * 0.015 + 7, 3.3)) || 1;
+    return axis + side * 4.5;
+  };
+  const distToRoad = (x: number, z: number): number =>
+    Math.abs(x - roadCenterX(z));
+
   interface ScatterOpts {
     target: number;
     seedOffset: number;
-    innerBounds?: number; // shrink area by this much from walls
-    margin?: number; // min distance from road
+    innerBounds?: number;
+    margin?: number;
     predicate?: (s: ScatterSample) => boolean;
     attempts?: number;
   }
@@ -245,7 +277,7 @@ export const createOutsideChunkSampler = (params: OutsideChunkParams) => {
   const scatter = (opts: ScatterOpts): ScatterSample[] => {
     const rng = createRng(seedHash + opts.seedOffset);
     const innerB = opts.innerBounds ?? 2;
-    const minFromRoad = opts.margin ?? 2;
+    const minFromRoad = opts.margin ?? 1.5;
     const maxAttempts = opts.attempts ?? opts.target * 8;
     const out: ScatterSample[] = [];
     let attempts = 0;
@@ -256,47 +288,18 @@ export const createOutsideChunkSampler = (params: OutsideChunkParams) => {
       const y = heightAt(x, z);
       const slope = slopeAt(x, z);
       if (distToRoad(x, z) < minFromRoad) continue;
-      const sample: ScatterSample = {
+      const s: ScatterSample = {
         x,
         z,
         y,
         slope,
+        distToAxis: distToAxis(x, z),
         rand: rng(),
         angle: rng() * Math.PI * 2,
         scale: 0.8 + rng() * 0.4,
       };
-      if (opts.predicate && !opts.predicate(sample)) continue;
-      out.push(sample);
-    }
-    return out;
-  };
-
-  // Mountain-ring sample points for building the mountain ring mesh
-  // or collider. Given N angular slices around the chunk boundary,
-  // return a point on the peak ridge for each.
-  const mountainRing = (slices: number): ScatterSample[] => {
-    const rng = createRng(seedHash + 987);
-    const out: ScatterSample[] = [];
-    for (let i = 0; i < slices; i++) {
-      const angle = (i / slices) * Math.PI * 2;
-      // Place along rectangular perimeter at the mountain inner factor
-      const cosA = Math.cos(angle);
-      const sinA = Math.sin(angle);
-      const f = params.mountainInnerFactor + 0.12;
-      // Find point where rectangle-aligned ray hits the inner ring
-      const tx = f / Math.max(Math.abs(cosA) / halfW, Math.abs(sinA) / halfD);
-      const x = cosA * tx;
-      const z = sinA * tx;
-      const y = heightAt(x, z);
-      out.push({
-        x,
-        z,
-        y,
-        slope: slopeAt(x, z),
-        rand: rng(),
-        angle,
-        scale: 0.85 + rng() * 0.3,
-      });
+      if (opts.predicate && !opts.predicate(s)) continue;
+      out.push(s);
     }
     return out;
   };
@@ -305,10 +308,11 @@ export const createOutsideChunkSampler = (params: OutsideChunkParams) => {
     heightAt,
     isUnderwater,
     slopeAt,
+    canyonAxisX,
+    distToAxis,
     roadCenterX,
     distToRoad,
     scatter,
-    mountainRing,
     params,
   };
 };
