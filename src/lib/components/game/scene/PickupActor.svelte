@@ -30,14 +30,26 @@
         )
   );
   const collectEase = $derived(1 - (1 - collect) ** 2);
-  const actorOpacity = $derived(spawnEase * (1 - collectEase));
-  const actorScale = $derived(spawnScale * (1 + collectEase * 0.22));
-  const actorY = $derived(collectEase * 0.76);
+  const collectFade = $derived(
+    Math.max(0, Math.min(1, (collect - 0.68) / 0.32))
+  );
+  const collectFly = $derived(collect * collect * (3 - 2 * collect));
+  const collectTarget = $derived(pickup.collectedTo ?? pickup.position);
+  const actorOpacity = $derived(spawnEase * (1 - collectFade));
+  const actorScale = $derived(spawnScale * (1 - collectEase * 0.72));
+  const actorX = $derived(
+    pickup.position[0] + (collectTarget[0] - pickup.position[0]) * collectFly
+  );
+  const actorY = $derived(
+    (collectTarget[1] + 0.6 - pickup.position[1]) * collectFly +
+      Math.sin(collect * Math.PI) * 0.14
+  );
+  const actorZ = $derived(
+    pickup.position[2] + (collectTarget[2] - pickup.position[2]) * collectFly
+  );
 </script>
 
-<T.Group
-  position={[pickup.position[0], pickup.position[1] + actorY, pickup.position[2]]}
->
+<T.Group position={[actorX, pickup.position[1] + actorY, actorZ]}>
   {#if pickup.kind === "gear"}
     <GearPickupActor
       {animationNow}

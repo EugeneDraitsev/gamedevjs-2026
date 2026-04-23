@@ -111,6 +111,7 @@ export type PickupKind = "gear" | "heal";
 
 export interface ActivePickup {
   collectedAt?: number;
+  collectedTo?: Vec3;
   createdAt: number;
   id: string;
   kind: PickupKind;

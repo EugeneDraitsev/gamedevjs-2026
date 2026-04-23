@@ -3,22 +3,22 @@
   import { Collider, RigidBody } from "@threlte/rapier";
   import { DoubleSide, type Texture } from "three";
   import ShootingTarget from "$lib/components/game/ShootingTarget.svelte";
+  import FoundryGearSet from "$lib/components/game/scene/environment/walls/FoundryGearSet.svelte";
   import type { RoomEnvironmentId } from "$lib/config/room-templates";
   import { gearTeeth, treasureGearMounts } from "$lib/game/scene-layout";
   import type { SceneFloorPalette } from "$lib/types/game";
 
   let {
+    animationNow = 0,
     bossBannerTexture = null,
     currentFloorPalette,
     environment = null,
   }: {
+    animationNow?: number;
     bossBannerTexture?: Texture | null;
     currentFloorPalette: SceneFloorPalette;
     environment?: RoomEnvironmentId | null;
   } = $props();
-
-  const bannerFallbackColor = (index: number) =>
-    index === 1 ? "#5b1718" : "#342016";
 </script>
 
 <T.Mesh position={[0, -0.39, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
@@ -326,19 +326,15 @@
       />
     </T.Mesh>
 
-    {#each [-5.2, 0, 5.2] as x, index}
+    {#each [-5.2, 0, 5.2] as x}
       <T.Group position={[x, 0, 0.15]}>
         <T.Mesh castShadow receiveShadow position={[0, 0.04, 0]}>
-          <T.PlaneGeometry
-            args={[index === 1 ? 2.7 : 2.35, index === 1 ? 3.25 : 2.85]}
-          />
+          <T.PlaneGeometry args={[2.7, 3.25]} />
           <T.MeshStandardMaterial
-            color={index === 1 && bossBannerTexture
-              ? "#ffffff"
-              : bannerFallbackColor(index)}
-            emissive={index === 1 ? "#210708" : "#120907"}
+            color={bossBannerTexture ? "#ffffff" : "#5b1718"}
+            emissive="#210708"
             emissiveIntensity={0.12}
-            map={index === 1 ? bossBannerTexture : null}
+            map={bossBannerTexture}
             metalness={0.02}
             roughness={0.92}
             side={DoubleSide}
@@ -346,7 +342,7 @@
         </T.Mesh>
         {#each [-1, 1] as side}
           <T.Mesh castShadow receiveShadow position={[side * 0.98, 0.03, 0.03]}>
-            <T.BoxGeometry args={[0.08, index === 1 ? 2.92 : 2.52, 0.08]} />
+            <T.BoxGeometry args={[0.08, 2.92, 0.08]} />
             <T.MeshStandardMaterial
               color="#9b6938"
               metalness={0.68}
@@ -365,6 +361,21 @@
       </T.Group>
     {/each}
   </T.Group>
+
+  {#each [-1, 1] as side}
+    <T.Group
+      position={[side * 9.54, 2.78, -4.65]}
+      rotation={[0, (-side * Math.PI) / 2, 0]}
+    >
+      <FoundryGearSet
+        {animationNow}
+        paired={false}
+        scale={0.58}
+        speed={side}
+        trimColor="#9b6938"
+      />
+    </T.Group>
+  {/each}
 
   {#each [-1, 1] as side}
     <T.Group position={[side * 6.4, 0.46, -4.95]}>

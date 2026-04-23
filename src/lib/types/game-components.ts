@@ -30,6 +30,7 @@ export interface GameSceneProps {
   collectedArtifactRoomIds?: string[];
   controlsLocked?: boolean;
   dungeon: DungeonLayout;
+  floorReliefMaps?: boolean;
   gearCount?: number;
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;
@@ -44,6 +45,8 @@ export interface GameSceneProps {
 export interface GameSceneEnvironmentProps {
   animationNow: number;
   bossDoorTexture: Texture | null;
+  bossFloorHeightTexture: Texture | null;
+  bossFloorNormalTexture: Texture | null;
   bossFloorTexture: Texture | null;
   currentArtifactTemplate: WeaponNodeTemplate | null;
   currentRoom: DungeonRoom;
@@ -58,6 +61,8 @@ export interface GameSceneEnvironmentProps {
   roomHazards: RoomHazard[];
   roomPlatforms: RoomPlatform[];
   roomWalls: StaticWall[];
+  treasureFloorHeightTexture: Texture | null;
+  treasureFloorNormalTexture: Texture | null;
   treasureFloorTexture: Texture | null;
 }
 

@@ -51,6 +51,7 @@
     collectedArtifactRoomIds = [],
     controlsLocked = false,
     dungeon,
+    floorReliefMaps = true,
     gearCount = 0,
     meleeParams,
     meleeTrailSettings,
@@ -69,6 +70,7 @@
       collectedArtifactRoomIds,
       controlsLocked: controlsLocked || !sceneReady,
       dungeon,
+      floorReliefMaps,
       meleeParams,
       meleeTrailSettings,
       settings,
@@ -217,11 +219,19 @@
   };
 
   const handlePositionChange = (position: Vec3) => {
+    const meleeFrame = combat.currentMeleeFrame;
     const pickupResult = pickups.collectAt(
       position,
       player.health,
       player.maxHealth,
-      scene.roomPlatforms
+      scene.roomPlatforms,
+      meleeFrame ?? undefined,
+      meleeFrame
+        ? {
+            ...scene.meleeParams,
+            reach: scene.meleeParams.reach + settings.meleeHitboxPadding,
+          }
+        : undefined
     );
 
     if (pickupResult.healthDelta > 0) {

@@ -1,7 +1,11 @@
 <script lang="ts">
   import { T } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
-  import { PlaneGeometry, type Texture } from "three";
+  import {
+    type MeshStandardMaterial,
+    PlaneGeometry,
+    type Texture,
+  } from "three";
   import type { RoomTemplate } from "$lib/config/room-templates";
   import { floorHalfDepth, floorHalfWidth } from "$lib/game/scene-layout";
 
@@ -62,21 +66,35 @@
   }));
 
   let {
+    bossFloorHeightTexture = null,
+    bossFloorNormalTexture = null,
     bossFloorTexture = null,
     currentRoomId,
     currentRoomTemplate,
     foundryFloorDecalTexture = null,
     foundryFloorTexture = null,
+    treasureFloorHeightTexture = null,
+    treasureFloorNormalTexture = null,
     treasureFloorTexture = null,
   }: {
+    bossFloorHeightTexture?: Texture | null;
+    bossFloorNormalTexture?: Texture | null;
     bossFloorTexture?: Texture | null;
     currentRoomId: string;
     currentRoomTemplate: RoomTemplate;
     foundryFloorDecalTexture?: Texture | null;
     foundryFloorTexture?: Texture | null;
+    treasureFloorHeightTexture?: Texture | null;
+    treasureFloorNormalTexture?: Texture | null;
     treasureFloorTexture?: Texture | null;
   } = $props();
 
+  const bossBumpScale = 18;
+  const bossNormalScale: [number, number] = [2.2, 2.2];
+  const treasureBumpScale = 16;
+  const treasureNormalScale: [number, number] = [2, 2];
+  let bossFloorMaterial = $state<MeshStandardMaterial>();
+  let treasureFloorMaterial = $state<MeshStandardMaterial>();
   const isBossFloor = $derived(
     currentRoomTemplate.layout === "boss-foundry" ||
       currentRoomTemplate.layout === "boss-crucible" ||
@@ -113,6 +131,22 @@
       };
     })
   );
+
+  $effect(() => {
+    bossFloorHeightTexture;
+    bossFloorNormalTexture;
+    if (bossFloorMaterial) {
+      bossFloorMaterial.needsUpdate = true;
+    }
+  });
+
+  $effect(() => {
+    treasureFloorHeightTexture;
+    treasureFloorNormalTexture;
+    if (treasureFloorMaterial) {
+      treasureFloorMaterial.needsUpdate = true;
+    }
+  });
 </script>
 
 <T.Group position={[0, -0.35, 0]}>
@@ -171,27 +205,37 @@
   >
     <T.PlaneGeometry args={[floorHalfWidth * 2, floorHalfDepth * 2]} />
     <T.MeshStandardMaterial
+      bind:ref={treasureFloorMaterial}
       map={treasureFloorTexture}
+      bumpMap={treasureFloorHeightTexture}
+      bumpScale={treasureBumpScale}
+      normalMap={treasureFloorHeightTexture ? null : treasureFloorNormalTexture}
+      normalScale={treasureNormalScale}
       transparent
       alphaTest={0.08}
       metalness={0.22}
       opacity={0.92}
-      roughness={0.72}
+      roughness={0.66}
     />
   </T.Mesh>
 {/if}
 
 {#if isBossFloor && bossFloorTexture}
   <T.Mesh
-    position={[0, 0.031, 0]}
+    position={[0, 0.045, 0]}
     receiveShadow
     rotation={[-Math.PI / 2, 0, 0]}
   >
     <T.PlaneGeometry args={[floorHalfWidth * 2, floorHalfDepth * 2]} />
     <T.MeshStandardMaterial
+      bind:ref={bossFloorMaterial}
       map={bossFloorTexture}
+      bumpMap={bossFloorHeightTexture}
+      bumpScale={bossBumpScale}
       metalness={0.24}
-      roughness={0.7}
+      normalMap={bossFloorHeightTexture ? null : bossFloorNormalTexture}
+      normalScale={bossNormalScale}
+      roughness={0.64}
     />
   </T.Mesh>
 {/if}

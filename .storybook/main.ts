@@ -12,10 +12,7 @@ const ignoredWatchDirs = [
 const config: StorybookConfig = {
   stories: ["../src/stories/**/*.stories.@(ts|svelte)"],
   addons: ["@storybook/addon-svelte-csf"],
-  staticDirs: [
-    { from: "./assets", to: "/" },
-    { from: "../static", to: "/" },
-  ],
+  staticDirs: [{ from: "./assets", to: "/" }],
   core: {
     disableWhatsNewNotifications: true,
   },

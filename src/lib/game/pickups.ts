@@ -1,6 +1,8 @@
+import { isPointInSwing, type SwingParams } from "$lib/combat/melee-swing";
 import { clampToRoom, playerRadius } from "$lib/game/scene-layout";
 import type {
   ActivePickup,
+  MeleeFrame,
   PickupKind,
   RoomHazard,
   RoomPlatform,
@@ -24,6 +26,8 @@ interface PickupSpawnContext {
 }
 
 interface PickupCollectContext {
+  meleeFrame?: MeleeFrame;
+  meleeParams?: SwingParams;
   obstacles?: RoomPlatform[];
 }
 
@@ -187,15 +191,37 @@ export const collectPickups = (
       pickup.position[0] - playerPosition[0],
       pickup.position[2] - playerPosition[2]
     );
+    const slashed =
+      context.meleeFrame?.active === true &&
+      context.meleeParams !== undefined &&
+      isPointInSwing(
+        pickup.position,
+        context.meleeFrame.t,
+        context.meleeFrame.center,
+        context.meleeFrame.facingYaw,
+        {
+          ...context.meleeParams,
+          innerRadius: Math.max(
+            0,
+            context.meleeParams.innerRadius - pickup.radius
+          ),
+          reach: context.meleeParams.reach + pickup.radius,
+          thickness: context.meleeParams.thickness + 0.12,
+        }
+      );
 
-    if (distance > playerRadius + pickup.radius) {
+    if (distance > playerRadius + pickup.radius && !slashed) {
       remaining.push(pickup);
       continue;
     }
 
     if (pickup.kind === "gear") {
       gearDelta += pickup.value;
-      remaining.push({ ...pickup, collectedAt: now });
+      remaining.push({
+        ...pickup,
+        collectedAt: now,
+        collectedTo: [playerPosition[0], playerPosition[1], playerPosition[2]],
+      });
       continue;
     }
 
@@ -215,7 +241,11 @@ export const collectPickups = (
     }
 
     nextHealth += heal;
-    remaining.push({ ...pickup, collectedAt: now });
+    remaining.push({
+      ...pickup,
+      collectedAt: now,
+      collectedTo: [playerPosition[0], playerPosition[1], playerPosition[2]],
+    });
   }
 
   return {

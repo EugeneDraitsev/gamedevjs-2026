@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Button, Folder, List, Pane } from "svelte-tweakpane-ui";
+  import { Button, Checkbox, Folder, List, Pane } from "svelte-tweakpane-ui";
   import GameScene from "$lib/components/game/GameScene.svelte";
   import { type RoomTemplate, roomTemplates } from "$lib/config/room-templates";
   import {
@@ -36,6 +36,7 @@
     cameraFov: 80,
     cameraMode: "orbit",
   });
+  let floorReliefMaps = $state(true);
   let templateId = $state("normal-furnace");
   let restartTick = $state(0);
   let DebugPane = $state<
@@ -83,6 +84,7 @@
       collectedArtifactRoomIds={[]}
       controlsLocked
       {dungeon}
+      {floorReliefMaps}
       {meleeParams}
       meleeTrailSettings={trailSettings}
       onCollectArtifact={noop}
@@ -97,6 +99,7 @@
     <Pane position="inline" title="Room Preview" width={300}>
       <Folder title="Room">
         <List bind:value={templateId} label="Template" options={roomOptions} />
+        <Checkbox bind:value={floorReliefMaps} label="Relief maps" />
         <Button on:click={restart} title="Restart preview" />
       </Folder>
       <p class="hint">

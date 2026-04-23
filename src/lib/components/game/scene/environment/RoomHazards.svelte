@@ -55,7 +55,7 @@
         args={[hazard.args[0] * 2, hazard.args[1] * 2, hazard.args[2] * 2]}
       />
       <T.MeshStandardMaterial
-        color="#351008"
+        color="#090100"
         metalness={0.12}
         roughness={0.24}
       />
@@ -69,12 +69,12 @@
         rotation={[-Math.PI / 2, 0, 0]}
       >
         <T.MeshStandardMaterial
-          color={`hsl(${28 + lavaPulse * 4} 78% ${38 + lavaPulse * 6}%)`}
-          emissive="#ff5a16"
-          emissiveIntensity={0.34 + lavaPulse * 0.18}
+          color={`hsl(${20 + lavaPulse * 8} 100% ${22 + lavaPulse * 10}%)`}
+          emissive="#ff3200"
+          emissiveIntensity={0.38 + lavaPulse * 0.3}
           map={lavaSurfaceTexture}
           metalness={0.04}
-          roughness={0.36}
+          roughness={0.28}
         />
       </T.Mesh>
     {/if}

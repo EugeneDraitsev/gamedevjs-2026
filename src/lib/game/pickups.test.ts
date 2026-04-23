@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_SWING } from "$lib/combat/melee-swing";
 import {
   collectPickups,
   createRoomPickups,
@@ -92,6 +93,36 @@ describe("collectPickups", () => {
     expect(
       collectPickups(result.pickups, [0, 1, 0], 4, 6, 500).pickups
     ).toEqual([]);
+  });
+
+  it("collects gears hit by the sword", () => {
+    const result = collectPickups(
+      [
+        {
+          ...pickup("gear", 3),
+          position: [0, 0.54, 1.3],
+          radius: 0.2,
+        },
+      ],
+      [0, 1, 0],
+      4,
+      6,
+      100,
+      {
+        meleeFrame: {
+          active: true,
+          center: [0, 1, 0],
+          ended: false,
+          facingYaw: 0,
+          swingId: 1,
+          t: 0.5,
+        },
+        meleeParams: DEFAULT_SWING,
+      }
+    );
+
+    expect(result.gearDelta).toBe(3);
+    expect(result.pickups[0].collectedAt).toBe(100);
   });
 
   it("heals only when health is missing", () => {

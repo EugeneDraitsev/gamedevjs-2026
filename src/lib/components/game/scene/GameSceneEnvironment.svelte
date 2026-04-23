@@ -55,11 +55,15 @@
 </script>
 
 <RoomFloor
+  bossFloorHeightTexture={scene.floorReliefMaps ? textures.bossFloorHeight : null}
+  bossFloorNormalTexture={scene.floorReliefMaps ? textures.bossFloorNormal : null}
   bossFloorTexture={textures.bossFloor}
   currentRoomId={scene.currentRoom.id}
   currentRoomTemplate={scene.currentRoomTemplate}
   foundryFloorDecalTexture={textures.foundryFloorDecals}
   foundryFloorTexture={textures.foundryFloor}
+  treasureFloorHeightTexture={scene.floorReliefMaps ? textures.treasureFloorHeight : null}
+  treasureFloorNormalTexture={scene.floorReliefMaps ? textures.treasureFloorNormal : null}
   treasureFloorTexture={textures.treasureFloor}
 />
 
@@ -99,6 +103,7 @@
 <RoomPlatforms animationNow={timing.now} roomPlatforms={scene.roomPlatforms} />
 
 <RoomTemplateEnvironment
+  animationNow={timing.now}
   bossBannerTexture={textures.bossBanner}
   currentFloorPalette={scene.currentFloorPalette}
   environment={scene.roomEnvironment}

@@ -1,8 +1,12 @@
 <script lang="ts">
   import artifactFloorTexture from "$lib/assets/artifact-floor-foundry.png";
+  import artifactFloorHeightTexture from "$lib/assets/artifact-floor-foundry-height.png";
+  import artifactFloorNormalTexture from "$lib/assets/artifact-floor-foundry-normal.png";
   import bossBannerTexture from "$lib/assets/boss-banner-foundry.png";
   import bossDoorTexture from "$lib/assets/boss-door.svg";
   import bossFloorTexture from "$lib/assets/boss-floor-foundry.png";
+  import bossFloorHeightTexture from "$lib/assets/boss-floor-foundry-height.png";
+  import bossFloorNormalTexture from "$lib/assets/boss-floor-foundry-normal.png";
   import foundryFloorTexture from "$lib/assets/foundry-floor-atlas.png";
   import foundryFloorDecalsTexture from "$lib/assets/foundry-floor-decals.png";
   import foundryWallTexture from "$lib/assets/foundry-wall-panel.png";
@@ -13,9 +17,13 @@
 
   const gameTextures = [
     artifactFloorTexture,
+    artifactFloorHeightTexture,
+    artifactFloorNormalTexture,
     bossBannerTexture,
     bossDoorTexture,
     bossFloorTexture,
+    bossFloorHeightTexture,
+    bossFloorNormalTexture,
     foundryFloorTexture,
     foundryFloorDecalsTexture,
     foundryWallTexture,

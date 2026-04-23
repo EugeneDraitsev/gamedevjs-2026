@@ -1,7 +1,13 @@
+import type { SwingParams } from "$lib/combat/melee-swing";
 import type { RoomTemplate } from "$lib/config/room-templates";
 import { collectPickups, createRoomPickups } from "$lib/game/pickups";
 import { getRoomHazards, getRoomPlatforms } from "$lib/game/scene-layout";
-import type { ActivePickup, RoomPlatform, Vec3 } from "$lib/types/game";
+import type {
+  ActivePickup,
+  MeleeFrame,
+  RoomPlatform,
+  Vec3,
+} from "$lib/types/game";
 
 export class PickupStore {
   currentRoomId = $state("");
@@ -66,7 +72,9 @@ export class PickupStore {
     position: Vec3,
     health: number,
     maxHealth: number,
-    obstacles: RoomPlatform[] = []
+    obstacles: RoomPlatform[] = [],
+    meleeFrame?: MeleeFrame,
+    meleeParams?: SwingParams
   ) {
     if (this.items.length === 0) {
       return {
@@ -83,7 +91,7 @@ export class PickupStore {
       health,
       maxHealth,
       performance.now(),
-      { obstacles }
+      { meleeFrame, meleeParams, obstacles }
     );
 
     if (
