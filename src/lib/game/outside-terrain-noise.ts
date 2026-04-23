@@ -159,30 +159,49 @@ export const createOutsideChunkSampler = (params: OutsideChunkParams) => {
     const pond = Math.max(0, 1 - pDist);
     h -= Math.pow(pond, 1.4) * 0.9;
 
-    // Towering mountain ring. The rim ramps up sharply once we pass
-    // the mountainInnerFactor boundary, and the actual peak silhouette
-    // is driven by a separate noise so the ridge looks procedural
-    // rather than a smooth bowl.
+    // Canyon walls rise only on the X sides (east + west). The north
+    // and south ends stay open so the player can traverse the chunk
+    // without getting crushed into a peak at the boundary. The walls
+    // are shaped with multi-octave ridged noise so they read as real
+    // jagged cliffs instead of a smooth bowl.
     const ex = Math.abs(x) / halfW;
-    const ez = Math.abs(z) / halfD;
-    const edge = Math.max(ex, ez);
-    if (edge > params.mountainInnerFactor) {
-      const t = (edge - params.mountainInnerFactor) /
+    if (ex > params.mountainInnerFactor) {
+      const t = (ex - params.mountainInnerFactor) /
         (1 - params.mountainInnerFactor);
-      const angle = Math.atan2(z, x);
-      const silhouette =
+
+      // Along-canyon undulation: tall peaks vs. lower saddles
+      const along =
         0.55 +
-        0.3 * nMountain(angle * 1.3, edge * 2.5) +
-        0.15 * nMountain(angle * 4.2 + 7, edge * 6.1);
-      // Aggressive ramp near the boundary so mountains tower right
-      // behind the invisible wall instead of far off in the distance.
+        0.28 * nMountain(z * 0.05, 0) +
+        0.17 * nMountain(z * 0.12 + 7, 1.3);
+      // Ridged noise adds sharp ridge-and-valley carving into each cliff
+      const ridge1 = 1 - Math.abs(nMountain(z * 0.07, ex * 2.2));
+      const ridge2 = 1 - Math.abs(nMountain(z * 0.2 + 5, ex * 4.4));
+      const ridged = ridge1 * 0.7 + ridge2 * 0.3;
+
       const ramp = Math.pow(t, 0.55);
-      h += ramp * silhouette * params.mountainPeakHeight;
-      // Per-peak jaggedness so individual summits poke out of the rim
-      h += Math.max(0, nMountain(angle * 2.5, edge * 9) - 0.2) *
-        ramp *
-        params.mountainPeakHeight *
-        0.45;
+      const peakShape = along * (0.6 + 0.4 * ridged);
+      h += ramp * peakShape * params.mountainPeakHeight;
+
+      // Boulders and outcrops poking out of the cliff face
+      const boulder = Math.max(
+        0,
+        nMountain(z * 0.45, ex * 10) - 0.25
+      );
+      h += ramp * boulder * params.mountainPeakHeight * 0.4;
+
+      // Occasional saddle gaps so the ridge has passes
+      const gap = Math.max(0, 0.55 - Math.abs(nMountain(z * 0.03, 3.7))) * 0.9;
+      h -= ramp * gap * params.mountainPeakHeight * 0.3;
+    }
+
+    // Distant N/S rise — gentler bluffs at the north and south ends so
+    // the chunk still feels enclosed but stays walkable.
+    const ez = Math.abs(z) / halfD;
+    if (ez > 0.82) {
+      const tz = (ez - 0.82) / 0.18;
+      const bluffNoise = 0.6 + 0.4 * nMountain(x * 0.06 + 19, z * 0.02);
+      h += Math.pow(tz, 1.3) * bluffNoise * params.mountainPeakHeight * 0.35;
     }
 
     // Flatten road corridor so the winding path stays walkable
