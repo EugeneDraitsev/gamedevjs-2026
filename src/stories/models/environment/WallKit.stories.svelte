@@ -1,9 +1,9 @@
 <script module lang="ts">
   import { defineMeta } from "@storybook/addon-svelte-csf";
-  import WallKitShowcase from "../_helpers/WallKitShowcase.svelte";
+  import WallKitShowcase from "../../_helpers/WallKitShowcase.svelte";
 
   const { Story } = defineMeta({
-    title: "Models/Wall Kit",
+    title: "Models/Environment/Wall Kit",
     component: WallKitShowcase,
     parameters: {
       layout: "fullscreen",

@@ -1,9 +1,9 @@
 <script module lang="ts">
   import { defineMeta } from "@storybook/addon-svelte-csf";
-  import DoorShowcase from "../_helpers/DoorShowcase.svelte";
+  import DoorShowcase from "../../_helpers/DoorShowcase.svelte";
 
   const { Story } = defineMeta({
-    title: "Models/Doors",
+    title: "Models/Environment/Doors",
     component: DoorShowcase,
     parameters: {
       layout: "fullscreen",
