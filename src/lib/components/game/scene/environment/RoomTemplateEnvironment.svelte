@@ -7,6 +7,7 @@
   import OutsideDecal from "$lib/components/game/scene/environment/OutsideDecal.svelte";
   import OutsideFoliage from "$lib/components/game/scene/environment/OutsideFoliage.svelte";
   import OutsidePOIs from "$lib/components/game/scene/environment/OutsidePOIs.svelte";
+  import OutsideVegetationColliders from "$lib/components/game/scene/environment/OutsideVegetationColliders.svelte";
   import OutsideMountainCollider from "$lib/components/game/scene/environment/OutsideMountainCollider.svelte";
   import OutsideRoad from "$lib/components/game/scene/environment/OutsideRoad.svelte";
   import OutsideSurface from "$lib/components/game/scene/environment/OutsideSurface.svelte";
@@ -695,8 +696,12 @@
        heightmap and the shader handles surface detail now. -->
   <OutsideProceduralWater />
 
-  <!-- Procedural trees + bushes + rocks — driven by the chunk plan -->
+  <!-- Procedural trees + bushes + rocks — driven by the chunk plan.
+       Visual meshes and colliders are split so the renderer can
+       batch instanced meshes while rapier still gets one collider
+       per solid tree / rock. -->
   <OutsideFoliage />
+  <OutsideVegetationColliders />
 
   <!-- Rocks, camps, POIs etc are now picked procedurally by the
        outside-chunk pipeline and rendered via OutsidePOIs / the rock

@@ -2,13 +2,13 @@
 // fully-baked OutsideChunkPlan with sampling helpers.
 
 import { buildBiome } from "./biome";
-import { buildDecorations } from "./decorations";
 import { buildEnemySpawns } from "./enemies";
 import { buildHeightmap, heightSampler } from "./heightmap";
 import { buildHydrology } from "./hydrology";
 import { buildPois } from "./pois";
 import { hashSeed } from "./rng";
 import { buildRoads } from "./roads";
+import { buildVegetation } from "./vegetation";
 import {
   BIOME_ORDER,
   type BiomeId,
@@ -186,20 +186,22 @@ export const buildOutsideChunkPlan = (
     branchWidthHalf: config.roadWidthHalf * 0.7,
   });
 
-  // 5) Decorations (trees, bushes, rocks) per biome
-  const decor = buildDecorations({
+  // 5) Vegetation (data-driven kind registry) — replaces the old
+  //    decorations stage. Emits per-kind instance buckets so the
+  //    renderer can spin up one InstancedMesh per kind plus colliders
+  //    for the heavy stuff (trees, big rocks).
+  const sampleHeightForVeg = heightSampler(size, height);
+  const pois = poisEarly;
+  const vegetation = buildVegetation({
     size,
+    seedHash,
     height,
     biome,
     playable,
-    seedHash,
-    minTreeSpacing: config.minTreeSpacing,
-    minBushSpacing: config.minBushSpacing,
-    minRockSpacing: config.minRockSpacing,
+    avoid: pois.map((p) => [p.x, 0, p.z] as [number, number, number]),
+    avoidRadius: 3.2,
+    sampleHeight: sampleHeightForVeg,
   });
-
-  // 6) POIs were computed early so roads could branch to them. Reuse.
-  const pois = poisEarly;
 
   // Flow is kept on grids for debug / downstream use
   const grids = {
@@ -262,9 +264,7 @@ export const buildOutsideChunkPlan = (
     spawn,
     pois,
     enemySpawns,
-    trees: decor.trees,
-    bushes: decor.bushes,
-    rocks: decor.rocks,
+    vegetation,
     sampleHeight,
     sampleBiome,
     isUnderwater,

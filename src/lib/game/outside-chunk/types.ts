@@ -78,6 +78,37 @@ export interface EnemySpawn {
   patrolRadius: number;
 }
 
+export type VegetationKindId =
+  | "conifer"
+  | "broadleaf"
+  | "deadwood"
+  | "fern"
+  | "bush-small"
+  | "bush-large"
+  | "rock-sm"
+  | "rock-med"
+  | "rock-lg";
+
+export interface VegetationColliderSpec {
+  shape: "cylinder" | "ball";
+  radius: number;
+  height?: number;
+  yOffset?: number;
+}
+
+export interface VegetationInstance {
+  id: string;
+  kind: VegetationKindId;
+  x: number;
+  y: number;
+  z: number;
+  rotationY: number;
+  scale: number;
+  variant: number;
+  biome: BiomeId;
+  collider?: VegetationColliderSpec;
+}
+
 export interface OutsideChunkPlan {
   seed: string;
   size: ChunkSize;
@@ -87,9 +118,12 @@ export interface OutsideChunkPlan {
   spawn: [number, number, number];
   pois: ChunkFeature[];
   enemySpawns: EnemySpawn[];
-  trees: ChunkDecoration[];
-  bushes: ChunkDecoration[];
-  rocks: ChunkDecoration[];
+  // Vegetation is grouped by kind so the renderer can make one
+  // InstancedMesh per kind and spawn colliders for the heavy stuff.
+  vegetation: {
+    instances: VegetationInstance[];
+    perKind: Record<VegetationKindId, VegetationInstance[]>;
+  };
   // Sampling helpers bound to this plan's heightmap — reading a
   // continuous height anywhere in world space via bilinear lerp.
   sampleHeight(x: number, z: number): number;

@@ -90,6 +90,15 @@ export const createOutsideGroundMaterial = (opts?: {
         // earth texture on the cliffs instead of being washed out.
         vec2 wp = vOutsideWorld.xz;
 
+        // --- Grass decal layers ---
+        // Broad patches of fresh grass (lower frequency)
+        float grassPatch = fbm2(wp * 0.085 + vec2(3.7, 11.0));
+        float grassPatchMask = smoothstep(0.4, 0.62, grassPatch);
+        // Finer grass tuft noise for variation
+        float grassTufts = fbm2(wp * 0.9 + vec2(31.0, 7.0));
+        // Dry / dead patches — anti-correlated with the main grass mask
+        float dryPatch = smoothstep(0.58, 0.74, fbm2(wp * 0.14 + 52.7));
+
         // Moss / overgrowth patches near water and shaded corners
         float mossPattern = fbm2(wp * 0.11 + 3.7);
         float mossDetail = fbm2(wp * 0.55 + 12.1);
@@ -99,14 +108,31 @@ export const createOutsideGroundMaterial = (opts?: {
         float rustNoise = fbm2(wp * 0.16 + vec2(81.3, 9.4));
         float rustMask = smoothstep(0.63, 0.78, rustNoise) * (0.4 + 0.6 * fbm2(wp * 1.6));
 
-        // Hopeful wildflower bloom dots — rare, saturated
+        // Wildflower bloom dots — rare, saturated, modulated by hash
         float bloomN = fbm2(wp * 0.95 + 42.1);
         float bloomSpot = smoothstep(0.78, 0.83, bloomN);
+        // Scatter micro grass clumps via high-freq noise
+        float clumpN = hash21(floor(wp * 2.6));
+        float clump = step(0.82, clumpN) * grassPatchMask;
+
+        vec3 greenBright = vec3(0.36, 0.52, 0.22);
+        vec3 greenDeep = vec3(0.16, 0.28, 0.11);
+        vec3 dryYellow = vec3(0.56, 0.5, 0.23);
+        vec3 grassCol = mix(greenDeep, greenBright, 0.35 + 0.65 * grassTufts);
 
         vec3 col = diffuseColor.rgb;
+        // Main grass paint
+        col = mix(col, col * 0.55 + grassCol * 0.7, grassPatchMask * 0.72);
+        // Small clumps of brighter grass
+        col = mix(col, grassCol * 1.15, clump * 0.5);
+        // Dry patches — inverse with grass, desaturated yellow
+        col = mix(col, col * 0.85 + dryYellow * 0.22, dryPatch * (1.0 - grassPatchMask) * 0.55);
+        // Moss on shaded low ground
         col = mix(col, col * 0.7 + uMossColor * 0.55, mossMask * uMossStrength);
-        col = mix(col, col * 0.8 + uRustColor * 0.4, rustMask * 0.55);
-        col = mix(col, uBloomColor, bloomSpot * 0.5);
+        // Rust stains (rare)
+        col = mix(col, col * 0.8 + uRustColor * 0.4, rustMask * 0.45);
+        // Wildflower bloom
+        col = mix(col, uBloomColor, bloomSpot * 0.45);
 
         // Rock + snow bands on the mountain ring.
         float rockT = smoothstep(uRockLine - 1.2, uRockLine + 2.0, vOutsideWorld.y);
@@ -134,7 +160,7 @@ export const createOutsideGroundMaterial = (opts?: {
         `
       );
   };
-  material.customProgramCacheKey = () => "outside-ground-v7";
+  material.customProgramCacheKey = () => "outside-ground-v8-grass";
 
   return { material, uniforms };
 };
