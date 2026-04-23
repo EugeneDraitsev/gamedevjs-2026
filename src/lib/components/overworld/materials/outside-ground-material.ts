@@ -36,10 +36,10 @@ export const createOutsideGroundMaterial = (opts?: {
     uRustColor: { value: new Color("#6a3518") },
     uBloomColor: { value: new Color("#d5c96b") },
     uMossStrength: { value: 0.85 },
-    uRockColor: { value: new Color("#4a453c") },
-    uSnowColor: { value: new Color("#f0f1f5") },
+    uRockColor: { value: new Color("#4e4c48") },
+    uSnowColor: { value: new Color("#f7f8fa") },
     uSnowLine: { value: opts?.snowLine ?? 14 },
-    uRockLine: { value: opts?.rockLine ?? 6 },
+    uRockLine: { value: opts?.rockLine ?? 2.2 },
   };
 
   material.onBeforeCompile = (shader) => {
@@ -82,9 +82,12 @@ export const createOutsideGroundMaterial = (opts?: {
         `
       )
       .replace(
-        "#include <color_fragment>",
+        "#include <map_fragment>",
         /* glsl */ `
-        #include <color_fragment>
+        #include <map_fragment>
+        // All ground-tint work happens AFTER the PNG map has been
+        // multiplied in, so rock/snow actually overwrite the brown
+        // earth texture on the cliffs instead of being washed out.
         vec2 wp = vOutsideWorld.xz;
 
         // Moss / overgrowth patches near water and shaded corners
@@ -106,13 +109,18 @@ export const createOutsideGroundMaterial = (opts?: {
         col = mix(col, uBloomColor, bloomSpot * 0.5);
 
         // Rock + snow bands on the mountain ring.
-        float rockT = smoothstep(uRockLine - 1.5, uRockLine + 1.5, vOutsideWorld.y);
-        float snowT = smoothstep(uSnowLine - 2.5, uSnowLine + 2.5, vOutsideWorld.y);
-        // Add noise-based variation so the snow line isn't a clean plane
-        float snowEdge = fbm2(wp * 0.25 + 71.3);
-        snowT = clamp(snowT + (snowEdge - 0.5) * 0.35, 0.0, 1.0);
-        col = mix(col, uRockColor, rockT * 0.72);
-        col = mix(col, uSnowColor, snowT * 0.92);
+        float rockT = smoothstep(uRockLine - 1.2, uRockLine + 2.0, vOutsideWorld.y);
+        float snowT = smoothstep(uSnowLine - 3.0, uSnowLine + 4.0, vOutsideWorld.y);
+        // Jagged snow line via noise, but gated by the base smoothstep
+        // so we don't paint snow onto low valleys.
+        float snowEdge = fbm2(wp * 0.22 + 71.3);
+        float snowBase = smoothstep(uSnowLine - 5.0, uSnowLine + 6.0, vOutsideWorld.y);
+        snowT = clamp(snowT + (snowEdge - 0.5) * 0.5 * snowBase, 0.0, 1.0);
+        // Horizontal strata on exposed rock for natural sedimentary look
+        float strata = sin(vOutsideWorld.y * 1.6 + fbm2(wp * 0.7) * 2.0) * 0.5 + 0.5;
+        vec3 rockShade = uRockColor * (0.75 + 0.5 * strata);
+        col = mix(col, rockShade, rockT * 0.92);
+        col = mix(col, uSnowColor, snowT);
 
         diffuseColor.rgb = col;
         `
@@ -126,7 +134,7 @@ export const createOutsideGroundMaterial = (opts?: {
         `
       );
   };
-  material.customProgramCacheKey = () => "outside-ground-v2-snow";
+  material.customProgramCacheKey = () => "outside-ground-v7";
 
   return { material, uniforms };
 };

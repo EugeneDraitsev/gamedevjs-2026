@@ -18,6 +18,7 @@
   import SceneRendererConfig from "$lib/components/game/SceneRendererConfig.svelte";
   import GameSceneActors from "$lib/components/game/scene/GameSceneActors.svelte";
   import GameSceneEnvironment from "$lib/components/game/scene/GameSceneEnvironment.svelte";
+  import { roomTemplateById } from "$lib/config/room-templates";
   import { stepEnemies } from "$lib/game/enemy-stepper";
   import {
     applyMeleeDeflects,
@@ -32,15 +33,14 @@
   } from "$lib/game/room-transitions";
   import {
     beamDurationMs,
+    createOutsidePickups,
     createRoomEnemies,
     damagePopupDurationMs,
     doorOpenDelayMs,
     doorOpenDurationMs,
+    getRoomBounds,
   } from "$lib/game/scene-layout";
-  import {
-    deflectBurstDurationMs,
-    healBurstDurationMs,
-  } from "$lib/game/scene-ui";
+  import { deflectBurstDurationMs } from "$lib/game/scene-ui";
   import { cheats } from "$lib/stores/cheats.svelte";
   import { GameSceneStore } from "$lib/stores/game-scene.svelte";
   import { setGameSceneContext } from "$lib/stores/scene-context";
@@ -63,11 +63,10 @@
   }: GameSceneProps = $props();
 
   const scene = new GameSceneStore();
-  let sceneReady = $state(false);
   const syncSceneInputs = () =>
     scene.syncInputs({
       collectedArtifactRoomIds,
-      controlsLocked: controlsLocked || !sceneReady,
+      controlsLocked,
       dungeon,
       meleeParams,
       meleeTrailSettings,
@@ -86,19 +85,7 @@
   const sceneCamera = $derived(
     scene.settings.cameraOrthographic ? orthographicCamera : perspectiveCamera
   );
-  const preloadTextures = $derived([
-    textures.bossBanner,
-    textures.bossDoor,
-    textures.bossFloor,
-    textures.foundryFloor,
-    textures.foundryFloorDecals,
-    textures.foundryWall,
-    textures.lavaSurface,
-    textures.treasureFloor,
-  ]);
-  const markSceneReady = () => {
-    sceneReady = true;
-  };
+  const outside = $derived(scene.currentRoomTemplate.layout === "outside-yard");
 
   setGameSceneContext(scene);
 
@@ -119,12 +106,24 @@
 
     dungeon.seed;
     untrack(() => {
+      const startRoom = dungeon.rooms[startRoomId];
+      const startBounds = getRoomBounds(
+        roomTemplateById[startRoom.templateId].layout
+      );
+
       timing.resetForFloor();
       combat.resetForFloor();
       pickups.clear();
       room.resetForFloor(startRoomId);
+      if (startRoom.templateId === "outside-start") {
+        pickups.seedRoom(startRoomId, createOutsidePickups(performance.now()));
+      }
       pickups.enterRoom(startRoomId);
       player.resetForFloor();
+
+      if (startRoom.templateId === "outside-start") {
+        room.teleportTo([0, 1.1, startBounds.teleportZ * 0.92]);
+      }
     });
   });
 
@@ -147,6 +146,12 @@
       enemySpawnPending =
         currentRoomTemplate.spawnPattern !== "none" &&
         !room.clearedSet.has(currentRoom.id);
+      if (currentRoomTemplate.layout === "outside-yard") {
+        pickups.seedRoom(
+          currentRoom.id,
+          createOutsidePickups(performance.now())
+        );
+      }
       pickups.enterRoom(currentRoom.id);
       combat.enemies = [];
       combat.beams = [];
@@ -220,17 +225,11 @@
     const pickupResult = pickups.collectAt(
       position,
       player.health,
-      player.maxHealth,
-      scene.roomPlatforms
+      player.maxHealth
     );
 
     if (pickupResult.healthDelta > 0) {
       player.health = pickupResult.nextHealth;
-      combat.popHeal(pickupResult.healthDelta, [
-        position[0],
-        position[1] + 1.05,
-        position[2],
-      ]);
     }
 
     if (pickupResult.gearDelta > 0) {
@@ -261,8 +260,7 @@
       time,
       beamDurationMs,
       damagePopupDurationMs,
-      deflectBurstDurationMs,
-      healBurstDurationMs
+      deflectBurstDurationMs
     );
     textures.advanceLava(delta);
 
@@ -340,14 +338,13 @@
     let previousTime = performance.now();
 
     const frame = (time: number) => {
-      const delta = Math.min(0.05, (time - previousTime) / 1000);
-
-      previousTime = time;
-
       if (scene.controlsLocked) {
+        previousTime = time;
         timing.now = time;
-        textures.advanceLava(delta);
       } else {
+        const delta = Math.min(0.05, (time - previousTime) / 1000);
+
+        previousTime = time;
         tick(time, delta);
       }
 
@@ -365,15 +362,16 @@
 <div class="scene">
   <Canvas shadows={PCFSoftShadowMap} dpr={2}>
     <SceneRendererConfig
-      environmentMap={textures.environmentMap}
+      backgroundColor={outside ? "#d7ded8" : "#050403"}
       exposure={scene.settings.toneMappingExposure}
-      onReady={markSceneReady}
-      {preloadTextures}
-      showEnvironmentMap={scene.settings.showEnvironmentMap}
     />
     <T.Fog
       attach="fog"
-      args={['#080604', scene.settings.fogNear, scene.settings.fogFar]}
+      args={[
+        outside ? '#d7ded8' : '#080604',
+        outside ? 70 : scene.settings.fogNear,
+        outside ? 230 : scene.settings.fogFar,
+      ]}
     />
 
     {#if scene.settings.cameraOrthographic}
@@ -405,14 +403,18 @@
     {/if}
 
     <T.HemisphereLight
-      args={['#c18455', '#050403', scene.settings.hemisphereLightIntensity]}
+      args={[
+        outside ? '#f2f0d5' : '#c18455',
+        outside ? '#77846f' : '#050403',
+        outside ? 1.2 : scene.settings.hemisphereLightIntensity,
+      ]}
     />
     <T.AmbientLight intensity={scene.settings.ambientLightIntensity} />
     <T.DirectionalLight
       bind:ref={sunLight}
       castShadow
-      color="#ffbd76"
-      intensity={scene.settings.sunIntensity}
+      color={outside ? '#fff0ca' : '#ffbd76'}
+      intensity={outside ? 2.55 : scene.settings.sunIntensity}
       position={[
         scene.settings.sunPositionX,
         scene.settings.sunPositionY,
@@ -454,13 +456,6 @@
 
     <GameHud {onOpenSettings} {onOpenWeaponLab} />
   {/if}
-
-  {#if !sceneReady}
-    <div class="scene-loader">
-      <div class="scene-loader-ring"></div>
-      <span>Loading Foundry</span>
-    </div>
-  {/if}
 </div>
 
 <style>
@@ -468,36 +463,5 @@
     position: relative;
     inline-size: 100%;
     block-size: 100%;
-  }
-
-  .scene-loader {
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    display: grid;
-    gap: 0.8rem;
-    place-content: center;
-    justify-items: center;
-    font-size: 0.72rem;
-    font-weight: 800;
-    color: rgba(239, 247, 255, 0.9);
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    background: #050403;
-  }
-
-  .scene-loader-ring {
-    inline-size: 3.2rem;
-    block-size: 3.2rem;
-    border: 0.18rem solid rgba(255, 191, 118, 0.18);
-    border-top-color: #ffbd76;
-    border-radius: 999px;
-    animation: scene-loader-spin 0.8s linear infinite;
-  }
-
-  @keyframes scene-loader-spin {
-    to {
-      transform: rotate(1turn);
-    }
   }
 </style>

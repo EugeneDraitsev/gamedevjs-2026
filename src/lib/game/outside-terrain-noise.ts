@@ -94,9 +94,13 @@ export const DEFAULT_CHUNK: OutsideChunkParams = {
   // and 79.5 on z. Ramp the mountain silhouette up right at that wall
   // so the player sees towering peaks pressing in whenever they bump
   // against the invisible boundary.
-  mountainInnerFactor: 0.55,
-  mountainPeakHeight: 42,
-  snowLineY: 20,
+  // Canyon wall ramps up starting at 45% of half-width (≈x=25) so the
+  // cliffs are already imposing by the time the player hits the
+  // game-logic boundary at x=34. Peaks tower to ~60 units and the
+  // top third of every wall is snow-capped.
+  mountainInnerFactor: 0.45,
+  mountainPeakHeight: 60,
+  snowLineY: 5,
 };
 
 export interface ScatterSample {
@@ -179,7 +183,9 @@ export const createOutsideChunkSampler = (params: OutsideChunkParams) => {
       const ridge2 = 1 - Math.abs(nMountain(z * 0.2 + 5, ex * 4.4));
       const ridged = ridge1 * 0.7 + ridge2 * 0.3;
 
-      const ramp = Math.pow(t, 0.55);
+      // Very steep ramp near the boundary so the cliff walls come up
+      // fast and feel vertical rather than a gentle slope.
+      const ramp = Math.pow(t, 0.38);
       const peakShape = along * (0.6 + 0.4 * ridged);
       h += ramp * peakShape * params.mountainPeakHeight;
 
