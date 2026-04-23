@@ -31,22 +31,24 @@ const vertexShader = /* glsl */ `
     vec4 worldPos = modelMatrix * vec4(position, 1.0);
     vec2 wp = worldPos.xz;
 
+    // gentle ripples — small amplitude, higher frequency so the surface
+    // reads as calm pond water from a top-down camera, not ocean swell
     float h = 0.0;
-    h += wave(wp, normalize(vec2(1.0, 0.35)), 0.55, 0.09, 0.85);
-    h += wave(wp, normalize(vec2(-0.7, 0.9)), 0.85, 0.055, 1.1);
-    h += wave(wp, normalize(vec2(0.2, -0.95)), 1.25, 0.035, 1.5);
-    h += simplex2D(wp * 0.35 + uTime * 0.15) * 0.04;
+    h += wave(wp, normalize(vec2(1.0, 0.35)), 1.6, 0.022, 0.7);
+    h += wave(wp, normalize(vec2(-0.7, 0.9)), 2.4, 0.014, 0.95);
+    h += wave(wp, normalize(vec2(0.2, -0.95)), 3.4, 0.008, 1.3);
+    h += simplex2D(wp * 0.9 + uTime * 0.2) * 0.012;
 
     // compute analytic normal via gradient estimation
-    float eps = 0.5;
+    float eps = 0.25;
     float h2x = 0.0;
-    h2x += wave(wp + vec2(eps, 0.0), normalize(vec2(1.0, 0.35)), 0.55, 0.09, 0.85);
-    h2x += wave(wp + vec2(eps, 0.0), normalize(vec2(-0.7, 0.9)), 0.85, 0.055, 1.1);
-    h2x += wave(wp + vec2(eps, 0.0), normalize(vec2(0.2, -0.95)), 1.25, 0.035, 1.5);
+    h2x += wave(wp + vec2(eps, 0.0), normalize(vec2(1.0, 0.35)), 1.6, 0.022, 0.7);
+    h2x += wave(wp + vec2(eps, 0.0), normalize(vec2(-0.7, 0.9)), 2.4, 0.014, 0.95);
+    h2x += wave(wp + vec2(eps, 0.0), normalize(vec2(0.2, -0.95)), 3.4, 0.008, 1.3);
     float h2z = 0.0;
-    h2z += wave(wp + vec2(0.0, eps), normalize(vec2(1.0, 0.35)), 0.55, 0.09, 0.85);
-    h2z += wave(wp + vec2(0.0, eps), normalize(vec2(-0.7, 0.9)), 0.85, 0.055, 1.1);
-    h2z += wave(wp + vec2(0.0, eps), normalize(vec2(0.2, -0.95)), 1.25, 0.035, 1.5);
+    h2z += wave(wp + vec2(0.0, eps), normalize(vec2(1.0, 0.35)), 1.6, 0.022, 0.7);
+    h2z += wave(wp + vec2(0.0, eps), normalize(vec2(-0.7, 0.9)), 2.4, 0.014, 0.95);
+    h2z += wave(wp + vec2(0.0, eps), normalize(vec2(0.2, -0.95)), 3.4, 0.008, 1.3);
     vec3 n = normalize(vec3(-(h2x - h) / eps, 1.0, -(h2z - h) / eps));
 
     // displace along local +Z (which becomes world +Y after mesh rotation by -PI/2 on X)
@@ -83,20 +85,18 @@ const fragmentShader = /* glsl */ `
   void main() {
     vec2 wp = vWorldPos.xz;
 
-    // Dual-scrolling ripples (caustic-like)
-    vec2 uv1 = wp * 0.22 + vec2(uTime * 0.08, uTime * 0.03);
-    vec2 uv2 = wp * 0.55 + vec2(-uTime * 0.05, uTime * 0.09);
-    float ripple = fbm2(uv1) * 0.6 + fbm2(uv2) * 0.4;
-    float caustic = pow(ripple, 3.2) * 1.2;
+    // Scrolling ripples that look like caustics refracted by the waves
+    vec2 uv1 = wp * 0.9 + vec2(uTime * 0.12, uTime * 0.05);
+    vec2 uv2 = wp * 1.6 + vec2(-uTime * 0.08, uTime * 0.14);
+    float ripple = fbm2(uv1) * 0.55 + fbm2(uv2) * 0.45;
+    float caustic = pow(ripple, 2.2);
 
-    // Algae/plant decals in shallow zones
-    float algaePatch = smoothstep(0.62, 0.82, fbm2(wp * 0.28 + 14.0));
-    float algaeDetail = fbm2(wp * 1.8 + uTime * 0.05);
-    float algae = algaePatch * (0.5 + 0.5 * algaeDetail);
+    // Algae/plant decals — restricted to shallow edges, not mid-pond
+    float algaePatch = smoothstep(0.72, 0.86, fbm2(wp * 0.32 + 14.0));
+    float algae = algaePatch * 0.75;
 
-    // Floating debris (dark specks)
-    float debrisNoise = hash21(floor(wp * 0.8 + uTime * 0.02));
-    float debris = smoothstep(0.975, 0.99, debrisNoise);
+    // No floating debris — kept pond clean
+    float debris = 0.0;
 
     // Shore foam — only near shore edge
     float radialDist = length(wp);
@@ -118,11 +118,11 @@ const fragmentShader = /* glsl */ `
     float specRaw = pow(max(dot(vNormalW, halfV), 0.0), 180.0);
     float spec = specRaw * smoothstep(0.55, 0.9, specRaw);
 
-    vec3 base = mix(uDeepColor, uShallowColor, clamp(caustic * 0.55 + 0.1, 0.0, 1.0));
-    base = mix(base, uAlgaeColor, algae * 0.75);
-    base = mix(base, vec3(0.06, 0.06, 0.08), debris * 0.6);
-    base += vec3(0.18, 0.24, 0.3) * fres * 0.32;
-    base += vec3(1.0, 0.92, 0.7) * spec * 0.35;
+    vec3 base = mix(uDeepColor, uShallowColor, clamp(caustic * 0.35 + 0.25, 0.0, 1.0));
+    base += uShallowColor * caustic * caustic * 0.35;
+    base = mix(base, uAlgaeColor, algae * 0.55);
+    base += vec3(0.24, 0.34, 0.44) * fres * 0.38;
+    base += vec3(1.0, 0.95, 0.78) * spec * 0.5;
     base = mix(base, uFoamColor, clamp(foam, 0.0, 0.9));
 
     // Subtle shimmer highlights (kept subtle)

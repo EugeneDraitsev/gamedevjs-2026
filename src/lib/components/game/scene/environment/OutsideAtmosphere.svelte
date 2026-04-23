@@ -138,8 +138,8 @@
       if (skip) continue;
       dummy.position.set(x, 0, z);
       dummy.rotation.set(0, rng() * Math.PI * 2, 0);
-      const s = 0.9 + rng() * 0.6;
-      dummy.scale.set(s * 0.9, s * (1.3 + rng() * 0.6), s * 0.9);
+      const s = 0.45 + rng() * 0.35;
+      dummy.scale.set(s * 0.9, s * (0.6 + rng() * 0.35), s * 0.9);
       dummy.updateMatrix();
       grassMesh.setMatrixAt(placed, dummy.matrix);
       placed++;

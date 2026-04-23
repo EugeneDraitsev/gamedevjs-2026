@@ -7,7 +7,7 @@
   import OutsideDecal from "$lib/components/game/scene/environment/OutsideDecal.svelte";
   import OutsideSurface from "$lib/components/game/scene/environment/OutsideSurface.svelte";
   import OutsideTerrain from "$lib/components/game/scene/environment/OutsideTerrain.svelte";
-  import OutsideWaterPatch from "$lib/components/game/scene/environment/OutsideWaterPatch.svelte";
+  import OutsideProceduralWater from "$lib/components/game/scene/environment/OutsideProceduralWater.svelte";
   import type { RoomEnvironmentId } from "$lib/config/room-templates";
   import {
     bossGearMounts,
@@ -689,10 +689,19 @@
     />
   {/each}
 
+  <!-- One procedural water body; terrain geometry occludes it wherever the
+       ground is raised, so the shoreline follows the heightmap itself. -->
+  <OutsideProceduralWater />
+
+  <!-- water-decal overlays from codex still render on top for debris /
+       lily-pad accents near the same positions -->
   {#each outsideWater as water}
-    <OutsideWaterPatch
+    <OutsideDecal
       args={water.args}
-      position={[water.position[0], 0.095, water.position[2]]}
+      color={getOutsideDecalColor("water")}
+      opacity={0.25}
+      position={[water.position[0], 0.005, water.position[2]]}
+      texture={outsideWaterDecalTexture}
     />
   {/each}
 
