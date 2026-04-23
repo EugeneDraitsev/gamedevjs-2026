@@ -5,6 +5,9 @@
   import ShootingTarget from "$lib/components/game/ShootingTarget.svelte";
   import OutsideAtmosphere from "$lib/components/game/scene/environment/OutsideAtmosphere.svelte";
   import OutsideDecal from "$lib/components/game/scene/environment/OutsideDecal.svelte";
+  import OutsideFoliage from "$lib/components/game/scene/environment/OutsideFoliage.svelte";
+  import OutsideMountainCollider from "$lib/components/game/scene/environment/OutsideMountainCollider.svelte";
+  import OutsideRoad from "$lib/components/game/scene/environment/OutsideRoad.svelte";
   import OutsideSurface from "$lib/components/game/scene/environment/OutsideSurface.svelte";
   import OutsideTerrain from "$lib/components/game/scene/environment/OutsideTerrain.svelte";
   import OutsideProceduralWater from "$lib/components/game/scene/environment/OutsideProceduralWater.svelte";
@@ -651,33 +654,13 @@
     </T.Mesh>
   </T.Group>
 
-  {#each outsideCanyon as cliff}
-    <T.Mesh
-      castShadow
-      receiveShadow
-      position={cliff.position}
-      rotation={[0, cliff.rotation ?? 0, 0]}
-      scale={cliff.scale}
-    >
-      <T.DodecahedronGeometry args={[1, 0]} />
-      <T.MeshStandardMaterial
-        color={cliff.color}
-        flatShading
-        roughness={0.96}
-      />
-    </T.Mesh>
-  {/each}
+  <!-- Mountain ring is now carved directly into the terrain heightmap;
+       we only need the invisible collider wall so the player can't walk
+       out of the chunk. -->
+  <OutsideMountainCollider />
 
-  {#each outsideRoads as road}
-    <OutsideSurface
-      args={road.args}
-      color="#9d8358"
-      opacity={0.13}
-      position={[road.position[0], 0.035, road.position[2]]}
-      rotation={road.rotation ?? 0}
-      roughness={0.95}
-    />
-  {/each}
+  <!-- Winding procedural road ribbon following the seed-driven centerline -->
+  <OutsideRoad />
 
   {#each outsideClearings as slab}
     <OutsideSurface
@@ -726,65 +709,9 @@
     />
   {/each}
 
-  {#each outsideBushes as bush}
-    <T.Group position={bush.position}>
-      {#each [-0.36, 0, 0.34] as shift}
-        <T.Mesh
-          castShadow
-          receiveShadow
-          position={[shift * bush.radius, bush.radius * 0.38, Math.abs(shift) * 0.18]}
-          scale={[
-            bush.radius * (0.78 + Math.abs(shift) * 0.2),
-            bush.radius,
-            bush.radius * 0.72,
-          ]}
-        >
-          <T.ConeGeometry args={[1, 1.25, 6]} />
-          <T.MeshStandardMaterial color={bush.color} roughness={0.96} />
-        </T.Mesh>
-      {/each}
-    </T.Group>
-  {/each}
-
-  {#each outsideGrassTufts as tuft}
-    <T.Group position={tuft.position} rotation={[0, tuft.rotation, 0]}>
-      {#each [-0.22, 0, 0.22] as shift}
-        <T.Mesh
-          castShadow
-          position={[shift, 0.28, Math.abs(shift) * 0.18]}
-          rotation={[0, 0, shift * 0.9]}
-        >
-          <T.ConeGeometry args={[0.12, 0.62, 5]} />
-          <T.MeshStandardMaterial color={tuft.color} roughness={1} />
-        </T.Mesh>
-      {/each}
-    </T.Group>
-  {/each}
-
-  {#each outsideHills as hill}
-    <T.Group position={hill.position}>
-      <RigidBody type="fixed">
-        <Collider
-          shape="cuboid"
-          args={[hill.radius * 0.58, hill.height * 0.5, hill.radius * 0.58]}
-          friction={0.95}
-        />
-        <T.Mesh
-          castShadow
-          receiveShadow
-          position={[0, hill.height * 0.42, 0]}
-          scale={[1, hill.height / hill.radius, 0.86]}
-        >
-          <T.DodecahedronGeometry args={[hill.radius, 0]} />
-          <T.MeshStandardMaterial
-            color={hill.color}
-            flatShading
-            roughness={0.95}
-          />
-        </T.Mesh>
-      </RigidBody>
-    </T.Group>
-  {/each}
+  <!-- Procedural trees + bushes (seed-driven scatter, avoids road + water
+       + steep mountain slopes) -->
+  <OutsideFoliage treeTarget={70} bushTarget={150} />
 
   {#each outsideCamps as camp}
     <T.Group position={camp.position} rotation={[0, camp.rotation ?? 0, 0]}>
@@ -876,7 +803,7 @@
     </T.Mesh>
   {/each}
 
-  {#each outsideTrees as tree}
+  {#each [] as tree}
     <T.Group position={tree.position}>
       <RigidBody type="fixed">
         <Collider

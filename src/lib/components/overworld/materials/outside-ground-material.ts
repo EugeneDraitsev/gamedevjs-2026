@@ -10,11 +10,17 @@ export interface OutsideGroundUniforms {
   uRustColor: IUniform<Color>;
   uBloomColor: IUniform<Color>;
   uMossStrength: IUniform<number>;
+  uRockColor: IUniform<Color>;
+  uSnowColor: IUniform<Color>;
+  uSnowLine: IUniform<number>;
+  uRockLine: IUniform<number>;
 }
 
 export const createOutsideGroundMaterial = (opts?: {
   map?: Texture | null;
   color?: string;
+  snowLine?: number;
+  rockLine?: number;
 }): { material: MeshStandardMaterial; uniforms: OutsideGroundUniforms } => {
   const material = new MeshStandardMaterial({
     color: new Color(opts?.color ?? "#beb58f"),
@@ -30,6 +36,10 @@ export const createOutsideGroundMaterial = (opts?: {
     uRustColor: { value: new Color("#6a3518") },
     uBloomColor: { value: new Color("#d5c96b") },
     uMossStrength: { value: 0.85 },
+    uRockColor: { value: new Color("#4a453c") },
+    uSnowColor: { value: new Color("#f0f1f5") },
+    uSnowLine: { value: opts?.snowLine ?? 14 },
+    uRockLine: { value: opts?.rockLine ?? 6 },
   };
 
   material.onBeforeCompile = (shader) => {
@@ -64,6 +74,10 @@ export const createOutsideGroundMaterial = (opts?: {
         uniform vec3 uRustColor;
         uniform vec3 uBloomColor;
         uniform float uMossStrength;
+        uniform vec3 uRockColor;
+        uniform vec3 uSnowColor;
+        uniform float uSnowLine;
+        uniform float uRockLine;
         varying vec3 vOutsideWorld;
         `
       )
@@ -91,6 +105,15 @@ export const createOutsideGroundMaterial = (opts?: {
         col = mix(col, col * 0.8 + uRustColor * 0.4, rustMask * 0.55);
         col = mix(col, uBloomColor, bloomSpot * 0.5);
 
+        // Rock + snow bands on the mountain ring.
+        float rockT = smoothstep(uRockLine - 1.5, uRockLine + 1.5, vOutsideWorld.y);
+        float snowT = smoothstep(uSnowLine - 2.5, uSnowLine + 2.5, vOutsideWorld.y);
+        // Add noise-based variation so the snow line isn't a clean plane
+        float snowEdge = fbm2(wp * 0.25 + 71.3);
+        snowT = clamp(snowT + (snowEdge - 0.5) * 0.35, 0.0, 1.0);
+        col = mix(col, uRockColor, rockT * 0.72);
+        col = mix(col, uSnowColor, snowT * 0.92);
+
         diffuseColor.rgb = col;
         `
       )
@@ -99,10 +122,11 @@ export const createOutsideGroundMaterial = (opts?: {
         /* glsl */ `
         float roughnessFactor = roughness;
         roughnessFactor *= 1.0 - rustMask * 0.25;
+        roughnessFactor = mix(roughnessFactor, 0.8, snowT);
         `
       );
   };
-  material.customProgramCacheKey = () => "outside-ground-v1";
+  material.customProgramCacheKey = () => "outside-ground-v2-snow";
 
   return { material, uniforms };
 };
