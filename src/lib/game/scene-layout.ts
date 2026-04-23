@@ -3,14 +3,17 @@ import type {
   DungeonRoom,
   DungeonRoomDirection,
 } from "$lib/config/dungeon-layout";
+import { outsideGroundY } from "$lib/game/outside-chunk-context";
 import {
   enemyTemplateById,
   type RoomSkinId,
   type RoomTemplate,
+  roomTemplateById,
 } from "$lib/config/room-templates";
 import type { FloorTheme, WallTheme } from "$lib/config/scene-settings";
 import type {
   ActiveEnemy,
+  ActivePickup,
   DoorMarker,
   DoorSeal,
   RoomHazard,
@@ -56,6 +59,62 @@ export const playerMaxHealth = 6;
 export const playerRadius = 0.55;
 export const roomTransitionDurationMs = 190;
 
+export interface RoomBounds {
+  floorHalfDepth: number;
+  floorHalfWidth: number;
+  teleportX: number;
+  teleportZ: number;
+  transitionInsetX: number;
+  transitionInsetZ: number;
+  wallHalfDepth: number;
+  wallHalfWidth: number;
+}
+
+export const defaultRoomBounds: RoomBounds = {
+  floorHalfDepth,
+  floorHalfWidth,
+  teleportX: roomTeleportX,
+  teleportZ: roomTeleportZ,
+  transitionInsetX: roomTransitionInsetX,
+  transitionInsetZ: roomTransitionInsetZ,
+  wallHalfDepth,
+  wallHalfWidth,
+};
+
+export const outsideRoomBounds: RoomBounds = {
+  floorHalfDepth: 82,
+  floorHalfWidth: 36,
+  teleportX: 31,
+  teleportZ: 76,
+  transitionInsetX: 32.5,
+  transitionInsetZ: 78,
+  wallHalfDepth: 79.5,
+  wallHalfWidth: 34,
+};
+
+export const getRoomBounds = (layout: RoomTemplate["layout"]): RoomBounds =>
+  layout === "outside-yard" ? outsideRoomBounds : defaultRoomBounds;
+
+export const getRoomEntryTarget = (
+  entryDirection: DungeonRoomDirection,
+  y: number,
+  bounds: RoomBounds
+): Vec3 => {
+  if (entryDirection === "east") {
+    return [bounds.teleportX, y, 0];
+  }
+
+  if (entryDirection === "west") {
+    return [-bounds.teleportX, y, 0];
+  }
+
+  return [
+    0,
+    y,
+    entryDirection === "south" ? bounds.teleportZ : -bounds.teleportZ,
+  ];
+};
+
 export const floorThemes = {
   check: {
     even: "#2b312f",
@@ -84,8 +143,8 @@ export const wallThemes = {
     vertical: "#42321e",
   },
   foundry: {
-    horizontal: "#4b3828",
-    vertical: "#34261c",
+    horizontal: "#3b3025",
+    vertical: "#241d17",
   },
 } satisfies Record<WallTheme, SceneWallPalette>;
 
@@ -109,7 +168,7 @@ export const roomSkins = {
     trimColor: "#6f5532",
     wallLamps: true,
     wallStyle: "mechanic",
-    wallTheme: "aqua",
+    wallTheme: "foundry",
   },
   foundry: {
     doorColor: "#d49a55",
@@ -120,6 +179,16 @@ export const roomSkins = {
     wallLamps: true,
     wallStyle: "mechanic",
     wallTheme: "foundry",
+  },
+  outside: {
+    doorColor: "#a68a55",
+    doorEmissive: "#e0b15e",
+    doorSealColor: "#c0a66b",
+    floorTheme: "steel",
+    trimColor: "#76613a",
+    wallLamps: false,
+    wallStyle: "mechanic",
+    wallTheme: "aqua",
   },
   treasure: {
     doorColor: "#d7a84f",
@@ -163,7 +232,28 @@ export const gearTeeth: SceneGearTooth[] = Array.from(
   }
 );
 
-export const treasureGearMounts: SceneTreasureGearMount[] = [];
+export const treasureGearMounts: SceneTreasureGearMount[] = [
+  {
+    panel: [3.2, 3.2, 0.24],
+    position: [-6.2, 3.1, -7.72],
+    size: 1.28,
+  },
+  {
+    panel: [3.2, 3.2, 0.24],
+    position: [6.2, 3.1, -7.72],
+    size: 1.28,
+  },
+  {
+    panel: [2.6, 2.6, 0.24],
+    position: [-4.5, 2.3, 7.72],
+    size: 0.94,
+  },
+  {
+    panel: [2.6, 2.6, 0.24],
+    position: [4.5, 2.3, 7.72],
+    size: 0.94,
+  },
+];
 
 export const bossGearMounts: SceneBossGearMount[] = [
   { color: "#ffd166", position: [-5.4, 3.3, -7.72], size: 1.56 },
@@ -171,15 +261,19 @@ export const bossGearMounts: SceneBossGearMount[] = [
   { color: "#ff9f68", position: [0, 2.55, -7.68], size: 2.05 },
 ];
 
-export const clampToRoom = (position: Vec3, radius: number): Vec3 => [
+export const clampToRoom = (
+  position: Vec3,
+  radius: number,
+  bounds = defaultRoomBounds
+): Vec3 => [
   Math.max(
-    -wallHalfWidth + wallThickness + radius,
-    Math.min(wallHalfWidth - wallThickness - radius, position[0])
+    -bounds.wallHalfWidth + wallThickness + radius,
+    Math.min(bounds.wallHalfWidth - wallThickness - radius, position[0])
   ),
   position[1],
   Math.max(
-    -wallHalfDepth + wallThickness + radius,
-    Math.min(wallHalfDepth - wallThickness - radius, position[2])
+    -bounds.wallHalfDepth + wallThickness + radius,
+    Math.min(bounds.wallHalfDepth - wallThickness - radius, position[2])
   ),
 ];
 
@@ -647,6 +741,22 @@ export const createEnemyPositions = (
   pattern: RoomTemplate["spawnPattern"],
   count: number
 ): Vec3[] => {
+  if (pattern === "outside") {
+    // Enemies sit on the procedural canyon floor with a small
+    // standing offset instead of floating at a hardcoded Y above the
+    // heightmap.
+    const ground = (x: number, z: number): number =>
+      outsideGroundY(x, z) + enemyFloorY;
+    return [
+      [-17, ground(-17, 36), 36],
+      [-12, ground(-12, 31), 31],
+      [18, ground(18, -13), -13],
+      [13, ground(13, -20), -20],
+      [-15, ground(-15, -57), -57],
+      [-9, ground(-9, -63), -63],
+    ].slice(0, count) as Vec3[];
+  }
+
   if (pattern === "arc") {
     return Array.from({ length: count }, (_, index) => {
       const spread = count === 1 ? 0 : (index / (count - 1) - 0.5) * 6.8;
@@ -656,7 +766,7 @@ export const createEnemyPositions = (
   }
 
   if (pattern === "boss") {
-    return [[0, enemyFloorY, -3]];
+    return [[0, enemyFloorY, -5.6]];
   }
 
   if (pattern === "crossfire") {
@@ -722,7 +832,14 @@ export const createRoomWalls = (
   skin?: SceneRoomSkin
 ): StaticWall[] => {
   const walls: StaticWall[] = [];
+  const layout = roomTemplateById[room.templateId].layout;
+  const bounds = getRoomBounds(layout);
+  const outside = layout === "outside-yard";
   const palette = skin ? wallThemes[skin.wallTheme] : currentWallPalette;
+  const segmentHalfDepth = (bounds.wallHalfDepth - doorwayHalfSpan) * 0.5;
+  const segmentHalfWidth = (bounds.wallHalfWidth - doorwayHalfSpan) * 0.5;
+  const segmentOffsetDepth = doorwayHalfSpan + segmentHalfDepth;
+  const segmentOffsetWidth = doorwayHalfSpan + segmentHalfWidth;
   const wallSkin = skin
     ? {
         lamp: skin.wallLamps,
@@ -738,11 +855,11 @@ export const createRoomWalls = (
     opacity = 1
   ) => {
     walls.push({
-      args: [wallSegmentHalfWidth, wallHalfHeight, wallThickness],
+      args: [segmentHalfWidth, wallHalfHeight, wallThickness],
       color: palette.horizontal,
       facing: z < 0 ? "south" : "north",
       id,
-      opacity,
+      opacity: outside ? 0 : opacity,
       position: [x, wallY, z],
       ...wallSkin,
     });
@@ -750,26 +867,31 @@ export const createRoomWalls = (
 
   const pushVerticalWall = (id: string, x: number, z: number, opacity = 1) => {
     walls.push({
-      args: [wallThickness, wallHalfHeight, wallSegmentHalfDepth],
+      args: [wallThickness, wallHalfHeight, segmentHalfDepth],
       color: palette.vertical,
       facing: x < 0 ? "east" : "west",
       id,
-      opacity,
+      opacity: outside ? 0 : opacity,
       position: [x, wallY, z],
       ...wallSkin,
     });
   };
 
   if (room.exits.north) {
-    pushHorizontalWall("north-west", -wallSegmentOffsetWidth, -wallHalfDepth);
-    pushHorizontalWall("north-east", wallSegmentOffsetWidth, -wallHalfDepth);
+    pushHorizontalWall(
+      "north-west",
+      -segmentOffsetWidth,
+      -bounds.wallHalfDepth
+    );
+    pushHorizontalWall("north-east", segmentOffsetWidth, -bounds.wallHalfDepth);
   } else {
     walls.push({
-      args: [wallHalfWidth, wallHalfHeight, wallThickness],
+      args: [bounds.wallHalfWidth, wallHalfHeight, wallThickness],
       color: palette.horizontal,
       facing: "south",
       id: "north",
-      position: [0, wallY, -wallHalfDepth],
+      opacity: outside ? 0 : undefined,
+      position: [0, wallY, -bounds.wallHalfDepth],
       ...wallSkin,
     });
   }
@@ -777,52 +899,54 @@ export const createRoomWalls = (
   if (room.exits.south) {
     pushHorizontalWall(
       "south-west",
-      -wallSegmentOffsetWidth,
-      wallHalfDepth,
+      -segmentOffsetWidth,
+      bounds.wallHalfDepth,
       0.2
     );
     pushHorizontalWall(
       "south-east",
-      wallSegmentOffsetWidth,
-      wallHalfDepth,
+      segmentOffsetWidth,
+      bounds.wallHalfDepth,
       0.2
     );
   } else {
     walls.push({
-      args: [wallHalfWidth, wallHalfHeight, wallThickness],
+      args: [bounds.wallHalfWidth, wallHalfHeight, wallThickness],
       color: palette.horizontal,
       facing: "north",
       id: "south",
-      opacity: 0.2,
-      position: [0, wallY, wallHalfDepth],
+      opacity: outside ? 0 : 0.2,
+      position: [0, wallY, bounds.wallHalfDepth],
       ...wallSkin,
     });
   }
 
   if (room.exits.west) {
-    pushVerticalWall("west-north", -wallHalfWidth, -wallSegmentOffsetDepth);
-    pushVerticalWall("west-south", -wallHalfWidth, wallSegmentOffsetDepth);
+    pushVerticalWall("west-north", -bounds.wallHalfWidth, -segmentOffsetDepth);
+    pushVerticalWall("west-south", -bounds.wallHalfWidth, segmentOffsetDepth);
   } else {
     walls.push({
-      args: [wallThickness, wallHalfHeight, wallHalfDepth],
+      args: [wallThickness, wallHalfHeight, bounds.wallHalfDepth],
       color: palette.vertical,
       facing: "east",
       id: "west",
-      position: [-wallHalfWidth, wallY, 0],
+      opacity: outside ? 0 : undefined,
+      position: [-bounds.wallHalfWidth, wallY, 0],
       ...wallSkin,
     });
   }
 
   if (room.exits.east) {
-    pushVerticalWall("east-north", wallHalfWidth, -wallSegmentOffsetDepth);
-    pushVerticalWall("east-south", wallHalfWidth, wallSegmentOffsetDepth);
+    pushVerticalWall("east-north", bounds.wallHalfWidth, -segmentOffsetDepth);
+    pushVerticalWall("east-south", bounds.wallHalfWidth, segmentOffsetDepth);
   } else {
     walls.push({
-      args: [wallThickness, wallHalfHeight, wallHalfDepth],
+      args: [wallThickness, wallHalfHeight, bounds.wallHalfDepth],
       color: palette.vertical,
       facing: "west",
       id: "east",
-      position: [wallHalfWidth, wallY, 0],
+      opacity: outside ? 0 : undefined,
+      position: [bounds.wallHalfWidth, wallY, 0],
       ...wallSkin,
     });
   }
@@ -838,17 +962,18 @@ export const createDoorMarkers = (
   (Object.entries(room.exits) as [DungeonRoomDirection, string][])
     .filter(([, target]) => Boolean(target))
     .map(([direction, target]) => {
+      const bounds = getRoomBounds(roomTemplateById[room.templateId].layout);
       const targetRoom = dungeon.rooms[target];
       let position: Vec3;
 
       if (direction === "north") {
-        position = [0, 0.03, -7.6];
+        position = [0, 0.03, -bounds.transitionInsetZ - 0.3];
       } else if (direction === "south") {
-        position = [0, 0.03, 7.6];
+        position = [0, 0.03, bounds.transitionInsetZ + 0.3];
       } else if (direction === "west") {
-        position = [-9.4, 0.03, 0];
+        position = [-bounds.transitionInsetX - 0.3, 0.03, 0];
       } else {
-        position = [9.4, 0.03, 0];
+        position = [bounds.transitionInsetX + 0.3, 0.03, 0];
       }
 
       let color = skin?.doorColor ?? "#8ac6ff";
@@ -877,40 +1002,46 @@ export const createDoorMarkers = (
 export const createDoorSeals = (
   room: DungeonRoom,
   skin?: SceneRoomSkin
-): DoorSeal[] =>
-  (Object.keys(room.exits) as DungeonRoomDirection[]).map((direction) => {
-    let position: Vec3;
+): DoorSeal[] => {
+  const bounds = getRoomBounds(roomTemplateById[room.templateId].layout);
 
-    if (direction === "north") {
-      position = [0, 2.1, -wallHalfDepth];
-    } else if (direction === "south") {
-      position = [0, 2.1, wallHalfDepth];
-    } else if (direction === "west") {
-      position = [-wallHalfWidth, 2.1, 0];
-    } else {
-      position = [wallHalfWidth, 2.1, 0];
+  return (Object.keys(room.exits) as DungeonRoomDirection[]).map(
+    (direction) => {
+      let position: Vec3;
+
+      if (direction === "north") {
+        position = [0, 2.1, -bounds.wallHalfDepth];
+      } else if (direction === "south") {
+        position = [0, 2.1, bounds.wallHalfDepth];
+      } else if (direction === "west") {
+        position = [-bounds.wallHalfWidth, 2.1, 0];
+      } else {
+        position = [bounds.wallHalfWidth, 2.1, 0];
+      }
+
+      return {
+        args:
+          direction === "east" || direction === "west"
+            ? [0.16, 2.2, doorwayHalfSpan]
+            : [doorwayHalfSpan, 2.2, 0.16],
+        color: skin?.doorSealColor ?? "#9dd6ff",
+        emissive: skin?.doorEmissive,
+        id: `${direction}-seal`,
+        position,
+        style: skin?.wallStyle,
+        trimColor: skin?.trimColor,
+      };
     }
-
-    return {
-      args:
-        direction === "east" || direction === "west"
-          ? [0.16, 2.2, doorwayHalfSpan]
-          : [doorwayHalfSpan, 2.2, 0.16],
-      color: skin?.doorSealColor ?? "#9dd6ff",
-      emissive: skin?.doorEmissive,
-      id: `${direction}-seal`,
-      position,
-      style: skin?.wallStyle,
-      trimColor: skin?.trimColor,
-    };
-  });
+  );
+};
 
 export const getTransition = (room: DungeonRoom, position: Vec3) => {
   const [x, y, z] = position;
+  const bounds = getRoomBounds(roomTemplateById[room.templateId].layout);
 
   if (
     room.exits.east &&
-    x >= roomTransitionInsetX &&
+    x >= bounds.transitionInsetX &&
     Math.abs(z) < doorwayHalfSpan
   ) {
     return {
@@ -921,7 +1052,7 @@ export const getTransition = (room: DungeonRoom, position: Vec3) => {
 
   if (
     room.exits.west &&
-    x <= -roomTransitionInsetX &&
+    x <= -bounds.transitionInsetX &&
     Math.abs(z) < doorwayHalfSpan
   ) {
     return {
@@ -932,7 +1063,7 @@ export const getTransition = (room: DungeonRoom, position: Vec3) => {
 
   if (
     room.exits.north &&
-    z <= -roomTransitionInsetZ &&
+    z <= -bounds.transitionInsetZ &&
     Math.abs(x) < doorwayHalfSpan
   ) {
     return {
@@ -943,7 +1074,7 @@ export const getTransition = (room: DungeonRoom, position: Vec3) => {
 
   if (
     room.exits.south &&
-    z >= roomTransitionInsetZ &&
+    z >= bounds.transitionInsetZ &&
     Math.abs(x) < doorwayHalfSpan
   ) {
     return {
@@ -957,6 +1088,59 @@ export const getTransition = (room: DungeonRoom, position: Vec3) => {
 
 export const getRevealedDoors = (room: DungeonRoom) =>
   Object.keys(room.exits) as DungeonRoomDirection[];
+
+export const createOutsidePickups = (
+  now = performance.now()
+): ActivePickup[] => [
+  {
+    createdAt: now,
+    id: "outside-gear-south",
+    kind: "gear",
+    position: [-19, 0.54, 33],
+    radius: 0.38,
+    value: 2,
+  },
+  {
+    createdAt: now,
+    id: "outside-heal-south",
+    kind: "heal",
+    position: [-13, 0.54, 39],
+    radius: 0.46,
+    value: 1,
+  },
+  {
+    createdAt: now,
+    id: "outside-gear-mid",
+    kind: "gear",
+    position: [20, 0.54, -16],
+    radius: 0.38,
+    value: 2,
+  },
+  {
+    createdAt: now,
+    id: "outside-heal-mid",
+    kind: "heal",
+    position: [14, 0.54, -10],
+    radius: 0.46,
+    value: 1,
+  },
+  {
+    createdAt: now,
+    id: "outside-gear-north",
+    kind: "gear",
+    position: [-18, 0.54, -58],
+    radius: 0.38,
+    value: 3,
+  },
+  {
+    createdAt: now,
+    id: "outside-heal-north",
+    kind: "heal",
+    position: [-11, 0.54, -64],
+    radius: 0.46,
+    value: 1,
+  },
+];
 
 export const getEntryDirectionFromTarget = (
   target: Vec3
@@ -984,10 +1168,14 @@ export const createRoomEnemies = (
   }
 
   const enemyTemplate = enemyTemplateById[template.enemyTemplateId];
-  const positions = pushSpawnsFromEntry(
-    createEnemyPositions(template.spawnPattern, template.enemyCount),
-    currentEntryDirection
+  const basePositions = createEnemyPositions(
+    template.spawnPattern,
+    template.enemyCount
   );
+  const positions =
+    template.spawnPattern === "outside"
+      ? basePositions
+      : pushSpawnsFromEntry(basePositions, currentEntryDirection);
 
   return positions.map((position, index) => ({
     behavior: enemyTemplate.behavior,
@@ -1011,6 +1199,13 @@ export const createRoomEnemies = (
     lastShotAt: now - index * 180,
     maxHp: enemyTemplate.hp,
     moveSpeed: enemyTemplate.moveSpeed,
+    patrolCenter: template.spawnPattern === "outside" ? position : undefined,
+    patrolRadius:
+      template.spawnPattern === "outside" ? 2.7 + (index % 3) * 0.9 : undefined,
+    patrolSpeed:
+      template.spawnPattern === "outside"
+        ? 0.000_36 + index * 0.000_035
+        : undefined,
     position,
     preferredRange: enemyTemplate.preferredRange,
     radius: enemyTemplate.radius,

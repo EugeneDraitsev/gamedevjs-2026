@@ -12,6 +12,7 @@
   import OutsideTerrain from "$lib/components/game/scene/environment/OutsideTerrain.svelte";
   import OutsideProceduralWater from "$lib/components/game/scene/environment/OutsideProceduralWater.svelte";
   import type { RoomEnvironmentId } from "$lib/config/room-templates";
+  import { outsideGroundY } from "$lib/game/outside-chunk-context";
   import {
     bossGearMounts,
     gearTeeth,
@@ -420,6 +421,16 @@
   } = $props();
 
   const outside = $derived(environment === "outside-start");
+
+  // Snap a hardcoded Codex prop position onto the procedural heightmap
+  // so nothing floats above or sinks into the new terrain. The original
+  // y acts as an "offset from ground" — e.g. rocks authored at y=0.85
+  // keep their ~0.85 clearance above whatever the ground is now.
+  const onGround = (pos: Vec3, baseOffsetY = 0): Vec3 => [
+    pos[0],
+    outsideGroundY(pos[0], pos[2]) + (pos[1] ?? 0) + baseOffsetY,
+    pos[2],
+  ];
   const getOutsideDecalTexture = (
     kind: (typeof outsideDecals)[number]["kind"]
   ) => {
@@ -667,7 +678,11 @@
       args={slab.args}
       color="#8f8b74"
       opacity={0.2}
-      position={[slab.position[0], 0.045, slab.position[2]]}
+      position={[
+        slab.position[0],
+        outsideGroundY(slab.position[0], slab.position[2]) + 0.045,
+        slab.position[2],
+      ]}
       roughness={0.96}
     />
   {/each}
@@ -693,7 +708,11 @@
       args={grass.args}
       color="#a8aa77"
       opacity={0.22}
-      position={[grass.position[0], 0.045, grass.position[2]]}
+      position={[
+        grass.position[0],
+        outsideGroundY(grass.position[0], grass.position[2]) + 0.045,
+        grass.position[2],
+      ]}
       roughness={1}
     />
   {/each}
@@ -703,7 +722,11 @@
       args={decal.args}
       color={getOutsideDecalColor(decal.kind)}
       opacity={getOutsideDecalOpacity(decal)}
-      position={[decal.position[0], 0.082, decal.position[2]]}
+      position={[
+        decal.position[0],
+        outsideGroundY(decal.position[0], decal.position[2]) + 0.08,
+        decal.position[2],
+      ]}
       rotation={decal.rotation ?? 0}
       texture={getOutsideDecalTexture(decal.kind)}
     />
@@ -714,7 +737,7 @@
   <OutsideFoliage treeTarget={70} bushTarget={150} />
 
   {#each outsideCamps as camp}
-    <T.Group position={camp.position} rotation={[0, camp.rotation ?? 0, 0]}>
+    <T.Group position={onGround(camp.position)} rotation={[0, camp.rotation ?? 0, 0]}>
       <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
         <T.RingGeometry args={[2.1, 2.9, 18]} />
         <T.MeshBasicMaterial color="#8d7651" opacity={0.5} transparent />
@@ -755,7 +778,7 @@
   {/each}
 
   {#each outsidePoiMarkers as poi}
-    <T.Group position={poi.position}>
+    <T.Group position={onGround(poi.position)}>
       <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
         <T.RingGeometry args={[1.25, 1.75, 18]} />
         <T.MeshBasicMaterial color={poi.color} opacity={0.56} transparent />
@@ -768,7 +791,7 @@
   {/each}
 
   {#each outsideRocks as block}
-    <T.Group position={block.position} rotation={[0, block.rotation ?? 0, 0]}>
+    <T.Group position={onGround(block.position)} rotation={[0, block.rotation ?? 0, 0]}>
       <RigidBody type="fixed">
         <Collider shape="cuboid" args={block.args} friction={0.95} />
         <T.Mesh
@@ -791,7 +814,7 @@
   {#each outsideLogs as pipe}
     <T.Mesh
       castShadow
-      position={pipe.position}
+      position={onGround(pipe.position)}
       rotation={pipe.rotation ?? [Math.PI / 2, 0, 0]}
     >
       <T.CylinderGeometry args={[0.42, 0.5, pipe.length, 8]} />

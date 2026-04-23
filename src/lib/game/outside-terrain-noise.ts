@@ -219,14 +219,30 @@ export const createOutsideChunkSampler = (params: OutsideChunkParams) => {
     }
 
     // --- Carve the river along the axis ---
-    // River strength varies along z so the stream widens and narrows
     const riverFlow = 0.55 + 0.45 * nRiver(z * 0.04, 2.1);
-    const riverHalfWidth = 3.2 * riverFlow; // world units
+    const riverHalfWidth = 3.2 * riverFlow;
     if (d < riverHalfWidth) {
       const dn = d / riverHalfWidth;
-      // Deep near axis, shallow at edges. Cubic falloff for soft banks.
       const depth = Math.pow(1 - dn, 1.5) * 1.0;
       h -= depth;
+    }
+
+    // --- Flatten road corridor ---
+    // The road runs along its own spline offset from the river, so we
+    // don't flatten the axis itself — that would drown the road. The
+    // terrain under the road gets pulled toward a gentle walkable
+    // elevation, independent of canyon floor bumps.
+    const roadX = (() => {
+      const axis = canyonAxisX(z);
+      const side = Math.sign(nAxis(z * 0.009 + 7, 3.3)) || 1;
+      return axis + side * 9.2;
+    })();
+    const dRoad = Math.abs(x - roadX);
+    const roadHalfWidth = 2.8;
+    const roadFalloff = Math.max(0, 1 - dRoad / (roadHalfWidth + 1.8));
+    if (roadFalloff > 0) {
+      const flatY = 0.28 + nDetail(x * 0.4, z * 0.3) * 0.04;
+      h = h * (1 - roadFalloff * 0.9) + flatY * roadFalloff * 0.9;
     }
 
     // --- Far-N/S buffer bluffs so chunk ends don't feel cut off ---
@@ -252,15 +268,15 @@ export const createOutsideChunkSampler = (params: OutsideChunkParams) => {
     return Math.hypot(dx, dz);
   };
 
-  // Road runs along the bank of the river (offset from axis) — higher
-  // ground but still flat, simulating a natural path walked along
-  // the canyon floor.
+  // Road runs along the dry bank of the canyon floor, well clear of
+  // the river. The side the road sits on flips occasionally via slow
+  // noise so the path isn't a perfectly straight ribbon, but the
+  // minimum offset keeps it out of the water.
+  const roadOffsetFromAxis = 9.2;
   const roadCenterX = (z: number): number => {
     const axis = canyonAxisX(z);
-    // offset road 4.5 units to one side of the river, side flips with
-    // a slow noise so the path occasionally crosses the stream.
-    const side = Math.sign(nAxis(z * 0.015 + 7, 3.3)) || 1;
-    return axis + side * 4.5;
+    const side = Math.sign(nAxis(z * 0.009 + 7, 3.3)) || 1;
+    return axis + side * roadOffsetFromAxis;
   };
   const distToRoad = (x: number, z: number): number =>
     Math.abs(x - roadCenterX(z));
