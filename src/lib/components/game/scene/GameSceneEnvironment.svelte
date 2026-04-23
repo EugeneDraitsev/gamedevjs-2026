@@ -8,17 +8,49 @@
   import RoomTemplateEnvironment from "$lib/components/game/scene/environment/RoomTemplateEnvironment.svelte";
   import RoomWalls from "$lib/components/game/scene/environment/RoomWalls.svelte";
   import { getGameSceneContext } from "$lib/stores/scene-context";
-  import type { WallFacing } from "$lib/types/game";
+  import type { Vec3, WallFacing } from "$lib/types/game";
 
   const scene = getGameSceneContext();
   const { room, textures, timing } = scene;
   const bossDecoratedWallFacings: WallFacing[] = ["east", "south", "west"];
   const bossGearlessWallFacings: WallFacing[] = ["south"];
+  const lampLightSlots = [0, 1, 2, 3, 4, 5, 6, 7];
+  const hiddenLampLightPosition: Vec3 = [0, -100, 0];
   const decoratedWallFacings = $derived(
     scene.currentRoom.kind === "boss" ? bossDecoratedWallFacings : null
   );
   const gearlessWallFacings = $derived(
     scene.currentRoom.kind === "boss" ? bossGearlessWallFacings : null
+  );
+  const lampLightPositions = $derived(
+    scene.roomWalls
+      .filter(
+        (wall) =>
+          wall.lamp &&
+          wall.style === "mechanic" &&
+          (!wall.opacity || wall.opacity >= 1)
+      )
+      .slice(0, lampLightSlots.length)
+      .map((wall) => {
+        const horizontal = wall.args[0] > wall.args[2];
+        const span = (horizontal ? wall.args[0] : wall.args[2]) * 2;
+        const count = Math.max(1, Math.round(span / 3.2));
+        const offset =
+          (Math.floor(count / 2) - (count - 1) / 2) * (span / count);
+        const sign = wall.facing === "south" || wall.facing === "east" ? 1 : -1;
+
+        return horizontal
+          ? ([
+              wall.position[0] + offset * sign,
+              wall.position[1] - 0.86,
+              wall.position[2] + (wall.args[2] + 0.52) * sign,
+            ] as Vec3)
+          : ([
+              wall.position[0] + (wall.args[0] + 0.52) * sign,
+              wall.position[1] - 0.86,
+              wall.position[2] - offset * sign,
+            ] as Vec3);
+      })
   );
 </script>
 
@@ -40,6 +72,16 @@
   roomWalls={scene.roomWalls}
   showWallKit
 />
+
+{#each lampLightSlots as slot}
+  <T.PointLight
+    color="#ff9d43"
+    decay={1.6}
+    distance={lampLightPositions[slot] ? 5.4 : 0.1}
+    intensity={lampLightPositions[slot] ? 0.7 : 0}
+    position={lampLightPositions[slot] ?? hiddenLampLightPosition}
+  />
+{/each}
 
 <RoomDoors
   bossDoorTexture={textures.bossDoor}

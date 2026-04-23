@@ -17,19 +17,14 @@
 </script>
 
 <T.Group position={[x, y, 0.34]}>
-  <T.PointLight
-    color="#ff9d43"
-    distance={light ? 4.6 : 3.2}
-    intensity={light ? 1.35 : 0.72}
-  />
-
   <T.Mesh castShadow position={[0, 0, -0.03]}>
     <T.BoxGeometry args={[0.44, 0.72, 0.12]} />
     <T.MeshStandardMaterial color="#1b1510" metalness={0.72} roughness={0.36} />
   </T.Mesh>
+
   <T.Mesh>
     <T.CylinderGeometry args={[0.13, 0.13, 0.52, 10]} />
-    <T.MeshBasicMaterial color="#ffb257" />
+    <T.MeshBasicMaterial color={light ? "#ffc46d" : "#ffb257"} />
   </T.Mesh>
 
   {#each bars as bar}

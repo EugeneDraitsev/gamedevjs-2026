@@ -114,7 +114,9 @@
           showDecor && wall.lamp && index === Math.floor(moduleCount / 2)
         )}
         {showDecor}
-        showLamp={showDecor}
+        showLamp={Boolean(
+          showDecor && wall.lamp && index === Math.floor(moduleCount / 2)
+        )}
         trimColor={wall.trimColor ?? "#7b4b22"}
         variant={decorVariant(index)}
         {wallDecalTexture}
