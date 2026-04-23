@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { outsidePlan } from "$lib/game/outside-chunk-context";
+  import { BIOME_COLORS, BIOME_ORDER } from "$lib/game/outside-chunk/types";
   import { getRevealedDoors } from "$lib/game/scene-layout";
   import { getGameSceneContext } from "$lib/stores/scene-context";
 
@@ -11,6 +13,50 @@
   const scene = getGameSceneContext();
 
   let expanded = $state(false);
+  const outside = $derived(scene.currentRoomTemplate.layout === "outside-yard");
+  const mapX = (x: number) =>
+    ((x / scene.roomBounds.wallHalfWidth + 1) / 2) * 100;
+  const mapY = (z: number) =>
+    ((z / scene.roomBounds.wallHalfDepth + 1) / 2) * 100;
+
+  // --- Outside chunk map ---
+  // Render the plan's biome grid to an ImageBitmap-backed canvas,
+  // then overlay roads / rivers / POIs on top in SVG for crisp lines.
+  const plan = outsidePlan();
+  let outsideCanvas: HTMLCanvasElement | null = $state(null);
+  const renderBiomeCanvas = (cv: HTMLCanvasElement) => {
+    const ctx = cv.getContext("2d");
+    if (!ctx) return;
+    const cols = plan.size.cols + 1;
+    const rows = plan.size.rows + 1;
+    cv.width = cols;
+    cv.height = rows;
+    const img = ctx.createImageData(cols, rows);
+    for (let i = 0; i < cols * rows; i++) {
+      const b = plan.grids.biome[i];
+      const hex = BIOME_COLORS[BIOME_ORDER[b]];
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const bl = parseInt(hex.slice(5, 7), 16);
+      img.data[i * 4] = r;
+      img.data[i * 4 + 1] = g;
+      img.data[i * 4 + 2] = bl;
+      img.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  };
+  $effect(() => {
+    if (outsideCanvas) renderBiomeCanvas(outsideCanvas);
+  });
+
+  // Convert world (x, z) → minimap percent [0..100] using chunk bounds
+  const chunkX = (x: number) =>
+    ((x + plan.size.width * 0.5) / plan.size.width) * 100;
+  const chunkY = (z: number) =>
+    ((z + plan.size.depth * 0.5) / plan.size.depth) * 100;
+
+  const toPolyline = (points: Array<[number, number]>) =>
+    points.map(([x, z]) => `${chunkX(x).toFixed(1)},${chunkY(z).toFixed(1)}`).join(" ");
 
   const toggleExpanded = () => {
     expanded = !expanded;
@@ -32,43 +78,94 @@
       }
     }}
   >
-    <div
-      class="minimap-grid"
-      style:grid-template-columns={`repeat(${scene.minimapBounds.columns}, var(--cell-size))`}
-      style:grid-template-rows={`repeat(${scene.minimapBounds.rows}, var(--cell-size))`}
-    >
-      {#each scene.visibleMinimapRooms as room (room.id)}
-        <div
-          class="minimap-room"
-          class:boss={room.kind === "boss"}
-          class:polygon={room.kind === "polygon"}
-          class:current={room.id === scene.currentRoom.id}
-          class:sealed={!scene.isRoomUnlocked(room)}
-          class:treasure={room.kind === "treasure"}
-          style:grid-column={room.grid[0] - scene.minimapBounds.minX + 1}
-          style:grid-row={room.grid[1] - scene.minimapBounds.minY + 1}
+    {#if outside}
+      <div class="outside-map" aria-hidden="true">
+        <canvas bind:this={outsideCanvas} class="outside-biome"></canvas>
+        <svg
+          class="outside-overlay"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
         >
-          {#each getRevealedDoors(room) as direction}
-            <span
-              class={`door ${direction}`}
-              class:locked={!scene.isRoomUnlocked(room)}
-            ></span>
+          {#each plan.rivers as river, i (i)}
+            <polyline
+              class="mm-river"
+              points={toPolyline(river.points)}
+              stroke-width={Math.max(0.7, river.widthHalf * 0.6)}
+            />
           {/each}
-          {#if scene.pickups.countsByRoomId[room.id]?.gear}
-            <span
-              class="pickup-icon gear"
-              aria-label="Gear pickup in room"
-            ></span>
-          {/if}
-          {#if scene.pickups.countsByRoomId[room.id]?.heal}
-            <span
-              class="pickup-icon heal"
-              aria-label="Heal pickup in room"
-            ></span>
-          {/if}
-        </div>
-      {/each}
-    </div>
+          {#each plan.roads as road, i (i)}
+            <polyline
+              class="mm-road"
+              points={toPolyline(road.points)}
+              stroke-width={Math.max(0.5, road.widthHalf * 0.7)}
+            />
+          {/each}
+          {#each plan.pois as poi (poi.id)}
+            <circle
+              class="mm-poi"
+              class:shrine={poi.kind === "shrine"}
+              class:camp={poi.kind === "camp"}
+              class:landmark={poi.kind === "landmark" || poi.kind === "lookout"}
+              cx={chunkX(poi.x)}
+              cy={chunkY(poi.z)}
+              r={1.6}
+            />
+          {/each}
+        </svg>
+        <span
+          class="outside-player"
+          style:left={`${chunkX(scene.player.lastPosition[0])}%`}
+          style:top={`${chunkY(scene.player.lastPosition[2])}%`}
+          style:transform={`translate(-50%, -50%) rotate(${Math.PI - scene.player.facingYaw}rad)`}
+        ></span>
+        {#each scene.combat.enemies as enemy (enemy.id)}
+          <span
+            class="outside-enemy"
+            style:left={`${chunkX(enemy.position[0])}%`}
+            style:top={`${chunkY(enemy.position[2])}%`}
+          ></span>
+        {/each}
+      </div>
+    {:else}
+      <div
+        class="minimap-grid"
+        style:grid-template-columns={`repeat(${scene.minimapBounds.columns}, var(--cell-size))`}
+        style:grid-template-rows={`repeat(${scene.minimapBounds.rows}, var(--cell-size))`}
+      >
+        {#each scene.visibleMinimapRooms as room (room.id)}
+          <div
+            class="minimap-room"
+            class:boss={room.kind === "boss"}
+            class:outside={room.templateId === "outside-start"}
+            class:polygon={room.kind === "polygon"}
+            class:current={room.id === scene.currentRoom.id}
+            class:sealed={!scene.isRoomUnlocked(room)}
+            class:treasure={room.kind === "treasure"}
+            style:grid-column={room.grid[0] - scene.minimapBounds.minX + 1}
+            style:grid-row={room.grid[1] - scene.minimapBounds.minY + 1}
+          >
+            {#each getRevealedDoors(room) as direction}
+              <span
+                class={`door ${direction}`}
+                class:locked={!scene.isRoomUnlocked(room)}
+              ></span>
+            {/each}
+            {#if scene.pickups.countsByRoomId[room.id]?.gear}
+              <span
+                class="pickup-icon gear"
+                aria-label="Gear pickup in room"
+              ></span>
+            {/if}
+            {#if scene.pickups.countsByRoomId[room.id]?.heal}
+              <span
+                class="pickup-icon heal"
+                aria-label="Heal pickup in room"
+              ></span>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <button
@@ -121,6 +218,96 @@
     gap: var(--cell-gap);
   }
 
+  .outside-map {
+    position: relative;
+    inline-size: 6.8rem;
+    block-size: 13.8rem;
+    overflow: hidden;
+    background:
+      linear-gradient(rgba(230, 236, 220, 0.09), rgba(230, 236, 220, 0.03)),
+      rgba(52, 65, 54, 0.5);
+    border: 1px solid rgba(236, 224, 196, 0.22);
+    border-radius: 0.32rem;
+  }
+
+  .minimap.expanded .outside-map {
+    inline-size: 9.1rem;
+    block-size: 18.4rem;
+  }
+
+  .outside-biome {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    image-rendering: pixelated;
+    opacity: 0.85;
+  }
+
+  .outside-overlay {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    fill: none;
+    pointer-events: none;
+  }
+
+  .outside-overlay .mm-river {
+    fill: none;
+    stroke: rgba(118, 184, 200, 0.95);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .outside-overlay .mm-road {
+    fill: none;
+    stroke: rgba(227, 194, 130, 0.95);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1.3 0.9;
+  }
+
+  .outside-overlay .mm-poi {
+    fill: rgba(236, 224, 168, 0.92);
+    stroke: rgba(18, 22, 14, 0.6);
+    stroke-width: 0.4;
+  }
+
+  .outside-overlay .mm-poi.shrine {
+    fill: rgba(159, 214, 255, 0.95);
+  }
+
+  .outside-overlay .mm-poi.camp {
+    fill: rgba(230, 172, 96, 0.95);
+  }
+
+  .outside-overlay .mm-poi.landmark {
+    fill: rgba(217, 179, 255, 0.95);
+  }
+
+  .outside-player,
+  .outside-enemy {
+    position: absolute;
+    display: block;
+  }
+
+  .outside-player {
+    inline-size: 0.44rem;
+    block-size: 0.44rem;
+    background: rgba(255, 255, 255, 0.96);
+    clip-path: polygon(50% 0, 100% 100%, 50% 78%, 0 100%);
+  }
+
+  .outside-enemy {
+    inline-size: 0.32rem;
+    block-size: 0.32rem;
+    background: rgba(211, 92, 74, 0.9);
+    border-radius: 999px;
+    box-shadow: 0 0 0.28rem rgba(211, 92, 74, 0.58);
+    transform: translate(-50%, -50%);
+  }
+
   .minimap-room {
     position: relative;
     box-sizing: border-box;
@@ -151,6 +338,10 @@
 
   .minimap-room.polygon {
     background: rgba(204, 212, 220, 0.4);
+  }
+
+  .minimap-room.outside {
+    background: rgba(112, 145, 111, 0.62);
   }
 
   .minimap-room.sealed {

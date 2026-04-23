@@ -6,6 +6,7 @@
   import OutsideAtmosphere from "$lib/components/game/scene/environment/OutsideAtmosphere.svelte";
   import OutsideDecal from "$lib/components/game/scene/environment/OutsideDecal.svelte";
   import OutsideFoliage from "$lib/components/game/scene/environment/OutsideFoliage.svelte";
+  import OutsidePOIs from "$lib/components/game/scene/environment/OutsidePOIs.svelte";
   import OutsideMountainCollider from "$lib/components/game/scene/environment/OutsideMountainCollider.svelte";
   import OutsideRoad from "$lib/components/game/scene/environment/OutsideRoad.svelte";
   import OutsideSurface from "$lib/components/game/scene/environment/OutsideSurface.svelte";
@@ -736,119 +737,12 @@
        + steep mountain slopes) -->
   <OutsideFoliage treeTarget={70} bushTarget={150} />
 
-  {#each outsideCamps as camp}
-    <T.Group position={onGround(camp.position)} rotation={[0, camp.rotation ?? 0, 0]}>
-      <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-        <T.RingGeometry args={[2.1, 2.9, 18]} />
-        <T.MeshBasicMaterial color="#8d7651" opacity={0.5} transparent />
-      </T.Mesh>
-      <T.Mesh castShadow receiveShadow position={[-1.25, 0.42, -0.15]}>
-        <T.BoxGeometry args={[1.8, 0.84, 1.1]} />
-        <T.MeshStandardMaterial color="#786442" roughness={0.9} />
-      </T.Mesh>
-      <T.Mesh castShadow receiveShadow position={[1.25, 0.32, 0.55]}>
-        <T.BoxGeometry args={[1.1, 0.64, 1.1]} />
-        <T.MeshStandardMaterial color="#6a5d42" roughness={0.86} />
-      </T.Mesh>
-      <T.Mesh
-        castShadow
-        position={[1.25, 0.77, 0.55]}
-        rotation={[Math.PI / 2, 0, 0]}
-      >
-        <T.TorusGeometry args={[0.42, 0.08, 8, 16]} />
-        <T.MeshStandardMaterial
-          color="#b58b46"
-          metalness={0.62}
-          roughness={0.42}
-        />
-      </T.Mesh>
-      <T.Mesh
-        castShadow
-        position={[0.2, 0.42, -1.55]}
-        rotation={[Math.PI / 2, 0, 0]}
-      >
-        <T.CylinderGeometry args={[0.36, 0.42, 1.15, 8]} />
-        <T.MeshStandardMaterial
-          color="#4f5148"
-          metalness={0.38}
-          roughness={0.66}
-        />
-      </T.Mesh>
-    </T.Group>
-  {/each}
-
-  {#each outsidePoiMarkers as poi}
-    <T.Group position={onGround(poi.position)}>
-      <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-        <T.RingGeometry args={[1.25, 1.75, 18]} />
-        <T.MeshBasicMaterial color={poi.color} opacity={0.56} transparent />
-      </T.Mesh>
-      <T.Mesh castShadow receiveShadow position={[0, 0.28, 0]}>
-        <T.CylinderGeometry args={[0.34, 0.5, 0.56, 7]} />
-        <T.MeshStandardMaterial color="#6f725e" roughness={0.9} />
-      </T.Mesh>
-    </T.Group>
-  {/each}
-
-  {#each outsideRocks as block}
-    <T.Group position={onGround(block.position)} rotation={[0, block.rotation ?? 0, 0]}>
-      <RigidBody type="fixed">
-        <Collider shape="cuboid" args={block.args} friction={0.95} />
-        <T.Mesh
-          castShadow
-          receiveShadow
-          rotation={[block.args[0] * 0.12, 0, -block.args[2] * 0.09]}
-          scale={block.args}
-        >
-          <T.IcosahedronGeometry args={[1, 0]} />
-          <T.MeshStandardMaterial
-            color={block.color}
-            flatShading
-            roughness={0.9}
-          />
-        </T.Mesh>
-      </RigidBody>
-    </T.Group>
-  {/each}
-
-  {#each outsideLogs as pipe}
-    <T.Mesh
-      castShadow
-      position={onGround(pipe.position)}
-      rotation={pipe.rotation ?? [Math.PI / 2, 0, 0]}
-    >
-      <T.CylinderGeometry args={[0.42, 0.5, pipe.length, 8]} />
-      <T.MeshStandardMaterial
-        color="#65482b"
-        metalness={0.02}
-        roughness={0.86}
-      />
-    </T.Mesh>
-  {/each}
-
-  {#each [] as tree}
-    <T.Group position={tree.position}>
-      <RigidBody type="fixed">
-        <Collider
-          shape="cuboid"
-          args={[0.55, tree.trunk, 0.55]}
-          friction={0.95}
-        />
-        <T.Mesh castShadow receiveShadow position={[0, tree.trunk * 0.5, 0]}>
-          <T.CylinderGeometry args={[0.34, 0.46, tree.trunk, 7]} />
-          <T.MeshStandardMaterial color="#5b3d24" roughness={0.82} />
-        </T.Mesh>
-        <T.Mesh
-          castShadow
-          receiveShadow
-          position={[0, tree.trunk + tree.crown * 0.58, 0]}
-        >
-          <T.ConeGeometry args={[tree.crown, tree.crown * 2.1, 7]} />
-          <T.MeshStandardMaterial color="#536f48" roughness={0.9} />
-        </T.Mesh>
-      </RigidBody>
-    </T.Group>
-  {/each}
+  <!-- Rocks, camps, POIs etc are now picked procedurally by the
+       outside-chunk pipeline and rendered via OutsidePOIs / the rock
+       instance pass inside OutsideFoliage. The codex hand-authored
+       arrays were still around but conflicted with the plan's
+       landmark selection. -->
+  <OutsidePOIs />
 
   <T.Group position={[0, 0.12, -78.8]}>
     <T.Mesh receiveShadow>

@@ -1,33 +1,23 @@
 <script lang="ts">
   import { T } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
-  import {
-    DEFAULT_CHUNK,
-    type OutsideChunkParams,
-  } from "$lib/game/outside-terrain-noise";
+  import { outsidePlan } from "$lib/game/outside-chunk-context";
 
   interface Props {
-    chunk?: Partial<OutsideChunkParams>;
     segments?: number;
   }
 
-  let { chunk = {}, segments = 24 }: Props = $props();
-  const c = { ...DEFAULT_CHUNK, ...chunk };
-  const halfW = c.width * 0.5;
-  const halfD = c.depth * 0.5;
+  let { segments = 24 }: Props = $props();
 
-  // Canyon walls are only on the X-axis (east/west). North/south stay
-  // open since the game-logic room wall already gates the player along Z.
-  // Each wall is sliced into vertical bricks so the collider roughly
-  // matches the jagged terrain silhouette rather than pretending to be
-  // a perfect plane.
-  // Wall collider sits at ~60% of half-width — matches where the
-  // ridged canyon wall ramps into "can't climb" territory in the
-  // heightmap. Extra safety so the player can't phase out if they
-  // manage to gain speed up the wall.
-  const wallX = halfW * 0.62;
+  // Invisible safety-net walls on the east/west sides of the chunk so
+  // the player can't slip past the canyon cliffs even if they gain
+  // momentum up the trimesh terrain.
+  const plan = outsidePlan();
+  const halfW = plan.size.width * 0.5;
+  const halfD = plan.size.depth * 0.5;
+  const wallX = halfW * 0.6;
   const brickLen = (halfD * 2) / segments;
-  const wallHeight = c.mountainPeakHeight * 0.9;
+  const wallHeight = 38;
 
   const bricks = Array.from({ length: segments }, (_, i) => {
     const t = (i + 0.5) / segments;
@@ -37,7 +27,6 @@
 </script>
 
 {#each bricks as brick (brick.id)}
-  <!-- East wall -->
   <T.Group position={[wallX, wallHeight / 2, brick.z]}>
     <RigidBody type="fixed">
       <Collider
@@ -46,7 +35,6 @@
       />
     </RigidBody>
   </T.Group>
-  <!-- West wall -->
   <T.Group position={[-wallX, wallHeight / 2, brick.z]}>
     <RigidBody type="fixed">
       <Collider
