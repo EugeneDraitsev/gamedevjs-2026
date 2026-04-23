@@ -71,6 +71,7 @@
     bossFloorTexture = null,
     currentRoomId,
     currentRoomTemplate,
+    floorReliefStrength = 1.4,
     foundryFloorDecalTexture = null,
     foundryFloorTexture = null,
     treasureFloorHeightTexture = null,
@@ -82,6 +83,7 @@
     bossFloorTexture?: Texture | null;
     currentRoomId: string;
     currentRoomTemplate: RoomTemplate;
+    floorReliefStrength?: number;
     foundryFloorDecalTexture?: Texture | null;
     foundryFloorTexture?: Texture | null;
     treasureFloorHeightTexture?: Texture | null;
@@ -208,7 +210,7 @@
       bind:ref={treasureFloorMaterial}
       map={treasureFloorTexture}
       bumpMap={treasureFloorHeightTexture}
-      bumpScale={treasureBumpScale}
+      bumpScale={treasureBumpScale * floorReliefStrength}
       normalMap={treasureFloorHeightTexture ? null : treasureFloorNormalTexture}
       normalScale={treasureNormalScale}
       transparent
@@ -231,7 +233,7 @@
       bind:ref={bossFloorMaterial}
       map={bossFloorTexture}
       bumpMap={bossFloorHeightTexture}
-      bumpScale={bossBumpScale}
+      bumpScale={bossBumpScale * floorReliefStrength}
       metalness={0.24}
       normalMap={bossFloorHeightTexture ? null : bossFloorNormalTexture}
       normalScale={bossNormalScale}

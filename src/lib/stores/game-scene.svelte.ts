@@ -36,6 +36,7 @@ interface GameSceneStoreInput {
   controlsLocked: boolean;
   dungeon: DungeonLayout;
   floorReliefMaps: boolean;
+  floorReliefStrength: number;
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;
   settings: SceneSettings;
@@ -55,6 +56,7 @@ export class GameSceneStore {
   controlsLocked = $state(false);
   dungeon = $state.raw<DungeonLayout>(null as never);
   floorReliefMaps = $state(true);
+  floorReliefStrength = $state(1.4);
   meleeParams = $state.raw<SwingParams>(null as never);
   meleeTrailSettings = $state.raw<MeleeTrailSettings>(null as never);
   settings = $state.raw<SceneSettings>(null as never);
@@ -234,6 +236,7 @@ export class GameSceneStore {
     this.controlsLocked = input.controlsLocked;
     this.dungeon = input.dungeon;
     this.floorReliefMaps = input.floorReliefMaps;
+    this.floorReliefStrength = input.floorReliefStrength;
     this.meleeParams = input.meleeParams;
     this.meleeTrailSettings = input.meleeTrailSettings;
     this.settings = input.settings;

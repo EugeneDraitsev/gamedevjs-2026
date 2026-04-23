@@ -31,6 +31,7 @@ export interface GameSceneProps {
   controlsLocked?: boolean;
   dungeon: DungeonLayout;
   floorReliefMaps?: boolean;
+  floorReliefStrength?: number;
   gearCount?: number;
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;

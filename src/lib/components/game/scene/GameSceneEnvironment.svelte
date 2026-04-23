@@ -60,6 +60,7 @@
   bossFloorTexture={textures.bossFloor}
   currentRoomId={scene.currentRoom.id}
   currentRoomTemplate={scene.currentRoomTemplate}
+  floorReliefStrength={scene.floorReliefStrength}
   foundryFloorDecalTexture={textures.foundryFloorDecals}
   foundryFloorTexture={textures.foundryFloor}
   treasureFloorHeightTexture={scene.floorReliefMaps ? textures.treasureFloorHeight : null}
