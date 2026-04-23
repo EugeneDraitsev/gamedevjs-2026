@@ -64,6 +64,18 @@ export interface ChunkDecoration {
   variant: number;
 }
 
+export interface EnemySpawn {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  // How aggressive a guard is vs. a casual wanderer
+  role: "guard" | "wanderer";
+  // If this is a guard attached to a POI, this is the POI's id
+  poiId?: string;
+  patrolRadius: number;
+}
+
 export interface OutsideChunkPlan {
   seed: string;
   size: ChunkSize;
@@ -72,6 +84,7 @@ export interface OutsideChunkPlan {
   roads: PolyPath[];
   spawn: [number, number, number];
   pois: ChunkFeature[];
+  enemySpawns: EnemySpawn[];
   trees: ChunkDecoration[];
   bushes: ChunkDecoration[];
   rocks: ChunkDecoration[];

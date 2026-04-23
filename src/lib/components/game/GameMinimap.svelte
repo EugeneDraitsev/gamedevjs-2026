@@ -220,8 +220,8 @@
 
   .outside-map {
     position: relative;
-    inline-size: 6.8rem;
-    block-size: 13.8rem;
+    inline-size: 10rem;
+    block-size: 10rem;
     overflow: hidden;
     background:
       linear-gradient(rgba(230, 236, 220, 0.09), rgba(230, 236, 220, 0.03)),
@@ -231,8 +231,8 @@
   }
 
   .minimap.expanded .outside-map {
-    inline-size: 9.1rem;
-    block-size: 18.4rem;
+    inline-size: 13rem;
+    block-size: 13rem;
   }
 
   .outside-biome {

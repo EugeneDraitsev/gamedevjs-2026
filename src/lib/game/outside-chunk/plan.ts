@@ -3,6 +3,7 @@
 
 import { buildBiome } from "./biome";
 import { buildDecorations } from "./decorations";
+import { buildEnemySpawns } from "./enemies";
 import { buildHeightmap, heightSampler } from "./heightmap";
 import { buildHydrology } from "./hydrology";
 import { buildPois } from "./pois";
@@ -35,28 +36,40 @@ export interface BuildChunkConfig {
   maxShrines: number;
   maxLandmarks: number;
   spawnPoint: [number, number, number];
+  guardsPerCamp: number;
+  guardsPerShrine: number;
+  guardsPerLandmark: number;
+  wandererCount: number;
+  minWandererDistFromSpawn: number;
 }
 
 export const DEFAULT_CHUNK_CONFIG: BuildChunkConfig = {
   seed: "outside-polygon-001",
-  size: { width: 112, depth: 196, cols: 96, rows: 168 },
+  // Square-ish chunk so roads can branch in all directions; still
+  // slightly taller than wide because the game-logic room wall is.
+  size: { width: 168, depth: 168, cols: 144, rows: 144 },
   waterLevel: 0,
   mountainPeakHeight: 55,
   snowLine: 10,
-  floorHalfWidth: 16,
-  axisMeander: 8,
+  floorHalfWidth: 22,
+  axisMeander: 10,
   roadWidthHalf: 1.9,
-  riverbankRadius: 2.6,
+  riverbankRadius: 2.8,
   cliffSlope: 0.55,
   screeSlope: 0.22,
   minTreeSpacing: 3.2,
   minBushSpacing: 1.3,
   minRockSpacing: 2.6,
-  minPoiSpacing: 18,
-  maxCamps: 3,
-  maxShrines: 2,
-  maxLandmarks: 2,
-  spawnPoint: [0, 1, 70],
+  minPoiSpacing: 22,
+  maxCamps: 4,
+  maxShrines: 3,
+  maxLandmarks: 3,
+  spawnPoint: [0, 1, 60],
+  guardsPerCamp: 4,
+  guardsPerShrine: 3,
+  guardsPerLandmark: 2,
+  wandererCount: 10,
+  minWandererDistFromSpawn: 18,
 };
 
 export const buildOutsideChunkPlan = (
@@ -98,28 +111,59 @@ export const buildOutsideChunkPlan = (
     riverbankRadius: config.riverbankRadius,
   });
 
-  // 4) Road network — waypoint list runs south to north along the
-  //    canyon floor, offset from the axis so roads don't stomp rivers.
+  // 4) Roads — build POIs FIRST so we can route branches to them.
+  //    We need the POI coordinates before pathfinding, but the POI
+  //    stage reads biome; roads mutate biome. Order: pois → roads.
+  const poisEarly = buildPois({
+    size,
+    biome,
+    height,
+    flow: hydro.flow,
+    seedHash,
+    maxCamps: config.maxCamps,
+    maxShrines: config.maxShrines,
+    maxLandmarks: config.maxLandmarks,
+    minPoiSpacing: config.minPoiSpacing,
+  });
+
+  // Main spine — south spawn corridor to north exit corridor, offset
+  // from the river axis on alternating sides.
   const halfD = size.depth * 0.5;
-  const waypointRows = 6;
-  const waypoints: Array<[number, number]> = [];
-  for (let i = 0; i < waypointRows; i++) {
-    const t = i / (waypointRows - 1);
+  const spineRows = 5;
+  const spine: Array<[number, number]> = [];
+  for (let i = 0; i < spineRows; i++) {
+    const t = i / (spineRows - 1);
     const row = Math.round(t * size.rows);
     const z = -halfD + t * size.depth;
-    // stand 4 units off-axis, side flips alternately for interest
     const side = i % 2 === 0 ? 1 : -1;
-    const x = axisX[Math.min(size.rows, row)] + side * 4.0;
-    waypoints.push([x, z]);
+    const x = axisX[Math.min(size.rows, row)] + side * 5.0;
+    spine.push([x, z]);
   }
+
+  // Branch routes — straight from the nearest spine waypoint to each POI.
+  const branches: Array<Array<[number, number]>> = [];
+  for (const poi of poisEarly) {
+    let nearest = spine[0];
+    let nearestD2 = Number.POSITIVE_INFINITY;
+    for (const wp of spine) {
+      const d2 = (wp[0] - poi.x) ** 2 + (wp[1] - poi.z) ** 2;
+      if (d2 < nearestD2) {
+        nearestD2 = d2;
+        nearest = wp;
+      }
+    }
+    branches.push([nearest, [poi.x, poi.z]]);
+  }
+
   const roads = buildRoads({
     size,
     height,
     slope,
     biome,
     water: hydro.water,
-    waypoints,
+    routes: [spine, ...branches],
     widthHalf: config.roadWidthHalf,
+    branchWidthHalf: config.roadWidthHalf * 0.7,
   });
 
   // 5) Decorations (trees, bushes, rocks) per biome
@@ -133,18 +177,8 @@ export const buildOutsideChunkPlan = (
     minRockSpacing: config.minRockSpacing,
   });
 
-  // 6) POIs (camps, shrines, landmarks)
-  const pois = buildPois({
-    size,
-    biome,
-    height,
-    flow: hydro.flow,
-    seedHash,
-    maxCamps: config.maxCamps,
-    maxShrines: config.maxShrines,
-    maxLandmarks: config.maxLandmarks,
-    minPoiSpacing: config.minPoiSpacing,
-  });
+  // 6) POIs were computed early so roads could branch to them. Reuse.
+  const pois = poisEarly;
 
   // Flow is kept on grids for debug / downstream use
   const grids = {
@@ -179,6 +213,22 @@ export const buildOutsideChunkPlan = (
     config.spawnPoint[2],
   ];
 
+  // 7) Enemy spawns — guard rings around POIs + ambient wanderers
+  const enemySpawns = buildEnemySpawns({
+    size,
+    seedHash,
+    pois,
+    height,
+    biome,
+    water: hydro.water,
+    spawn,
+    guardsPerCamp: config.guardsPerCamp,
+    guardsPerShrine: config.guardsPerShrine,
+    guardsPerLandmark: config.guardsPerLandmark,
+    wandererCount: config.wandererCount,
+    minWandererDistFromSpawn: config.minWandererDistFromSpawn,
+  });
+
   return {
     seed: config.seed,
     size,
@@ -187,6 +237,7 @@ export const buildOutsideChunkPlan = (
     roads: roads.paths,
     spawn,
     pois,
+    enemySpawns,
     trees: decor.trees,
     bushes: decor.bushes,
     rocks: decor.rocks,

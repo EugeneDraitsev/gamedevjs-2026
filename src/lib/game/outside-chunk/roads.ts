@@ -14,8 +14,11 @@ export interface RoadsParams {
   slope: Float32Array;
   biome: Uint8Array; // mutated — road cells get tagged
   water: Uint8Array;
-  waypoints: Array<[number, number]>; // world-space (x, z) anchors in order
-  widthHalf: number; // world units
+  // Each route is a list of (x, z) world anchors; A* connects them
+  // in sequence. Multiple routes = a network of branches.
+  routes: Array<Array<[number, number]>>;
+  widthHalf: number;
+  branchWidthHalf?: number; // optional narrower branches
 }
 
 export interface RoadsResult {
@@ -106,6 +109,12 @@ export const buildRoads = (p: RoadsParams): RoadsResult => {
   }
 
   const paths: PolyPath[] = [];
+
+  // Expose the discount map so later routes prefer reusing already
+  // built roads (creates natural branching / shared trunk road).
+  const reuseDiscount = new Float32Array(total);
+  reuseDiscount.fill(1);
+
   const runAStar = (startIdx: number, goalIdx: number): number[] | null => {
     const gScore = new Float32Array(total);
     gScore.fill(Number.POSITIVE_INFINITY);
@@ -150,7 +159,7 @@ export const buildRoads = (p: RoadsParams): RoadsResult => {
         const nr = row + dz;
         if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
         const ni = nr * cols + nc;
-        const step = cost[ni] * mul;
+        const step = cost[ni] * mul * reuseDiscount[ni];
         const tentative = gScore[i] + step;
         if (tentative < gScore[ni]) {
           gScore[ni] = tentative;
@@ -162,16 +171,21 @@ export const buildRoads = (p: RoadsParams): RoadsResult => {
     return null;
   };
 
-  // 2) Pathfind between consecutive waypoints, paint road cells.
-  for (let k = 0; k + 1 < p.waypoints.length; k++) {
-    const [ax, az] = p.waypoints[k];
-    const [bx, bz] = p.waypoints[k + 1];
+  const buildPathBetween = (
+    ax: number,
+    az: number,
+    bx: number,
+    bz: number,
+    widthHalf: number
+  ): Int32Array | null => {
     const s = worldToCell(size, ax, az);
     const g = worldToCell(size, bx, bz);
-    const path = runAStar(cellIndex(size, s.col, s.row), cellIndex(size, g.col, g.row));
-    if (!path) continue;
+    const path = runAStar(
+      cellIndex(size, s.col, s.row),
+      cellIndex(size, g.col, g.row)
+    );
+    if (!path) return null;
 
-    // simplify: keep every Nth point for a smoother polyline
     const stride = Math.max(1, Math.floor(path.length / 80));
     const points: Array<[number, number]> = [];
     for (let i = 0; i < path.length; i += stride) {
@@ -181,17 +195,16 @@ export const buildRoads = (p: RoadsParams): RoadsResult => {
       const { x, z } = cellToWorld(size, col, row);
       points.push([x, z]);
     }
-    // always include the endpoint
     const lastIdx = path[path.length - 1];
     const lastCol = lastIdx % cols;
     const lastRow = (lastIdx - lastCol) / cols;
     const { x: lx, z: lz } = cellToWorld(size, lastCol, lastRow);
     points.push([lx, lz]);
 
-    paths.push({ points, widthHalf: p.widthHalf });
+    paths.push({ points, widthHalf });
 
-    // stamp road cells (widen the footprint a bit)
-    const stampR = Math.ceil((p.widthHalf / size.width) * size.cols) + 1;
+    // stamp road cells + grant a discount so later routes merge
+    const stampR = Math.ceil((widthHalf / size.width) * size.cols) + 1;
     for (const idx of path) {
       const col = idx % cols;
       const row = (idx - col) / cols;
@@ -202,10 +215,25 @@ export const buildRoads = (p: RoadsParams): RoadsResult => {
           if (cc < 0 || cc >= cols || rr < 0 || rr >= rows) continue;
           if (dc * dc + dr * dr > stampR * stampR) continue;
           const ci = rr * cols + cc;
-          // Don't overwrite water biome — roads cross water via implied bridges.
           if (biome[ci] !== biomeIndex("water")) biome[ci] = roadIdx;
+          reuseDiscount[ci] = 0.28;
         }
       }
+    }
+    return Int32Array.from(path);
+  };
+
+  // Pathfind each route (main spine + branches). Later routes see the
+  // discount on earlier-road cells, so branches naturally fuse into
+  // the main spine.
+  for (const route of p.routes) {
+    const width = route === p.routes[0]
+      ? p.widthHalf
+      : (p.branchWidthHalf ?? p.widthHalf * 0.75);
+    for (let k = 0; k + 1 < route.length; k++) {
+      const [ax, az] = route[k];
+      const [bx, bz] = route[k + 1];
+      buildPathBetween(ax, az, bx, bz, width);
     }
   }
 

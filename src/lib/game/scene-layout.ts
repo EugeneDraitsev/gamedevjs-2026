@@ -3,7 +3,7 @@ import type {
   DungeonRoom,
   DungeonRoomDirection,
 } from "$lib/config/dungeon-layout";
-import { outsideGroundY } from "$lib/game/outside-chunk-context";
+import { outsideGroundY, outsidePlan } from "$lib/game/outside-chunk-context";
 import {
   enemyTemplateById,
   type RoomSkinId,
@@ -742,19 +742,12 @@ export const createEnemyPositions = (
   count: number
 ): Vec3[] => {
   if (pattern === "outside") {
-    // Enemies sit on the procedural canyon floor with a small
-    // standing offset instead of floating at a hardcoded Y above the
-    // heightmap.
-    const ground = (x: number, z: number): number =>
-      outsideGroundY(x, z) + enemyFloorY;
-    return [
-      [-17, ground(-17, 36), 36],
-      [-12, ground(-12, 31), 31],
-      [18, ground(18, -13), -13],
-      [13, ground(13, -20), -20],
-      [-15, ground(-15, -57), -57],
-      [-9, ground(-9, -63), -63],
-    ].slice(0, count) as Vec3[];
+    // Pull spawn positions from the outside-chunk plan so guards sit
+    // at their POI rings and wanderers roam the grasslands. `count`
+    // is ignored — the plan decides how many enemies the chunk
+    // supports.
+    const spawns = outsidePlan().enemySpawns;
+    return spawns.map((s) => [s.x, s.y + enemyFloorY, s.z] as Vec3);
   }
 
   if (pattern === "arc") {

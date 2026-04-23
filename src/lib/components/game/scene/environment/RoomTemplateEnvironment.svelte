@@ -688,54 +688,15 @@
     />
   {/each}
 
-  <!-- One procedural water body; terrain geometry occludes it wherever the
-       ground is raised, so the shoreline follows the heightmap itself. -->
+  <!-- One procedural water body; the terrain heightmap occludes it
+       everywhere ground is raised above waterLevel, so the shoreline
+       follows the plan's actual rivers. Old codex water / earth /
+       rock decal overlays removed — they floated above the new
+       heightmap and the shader handles surface detail now. -->
   <OutsideProceduralWater />
 
-  <!-- water-decal overlays from codex still render on top for debris /
-       lily-pad accents near the same positions -->
-  {#each outsideWater as water}
-    <OutsideDecal
-      args={water.args}
-      color={getOutsideDecalColor("water")}
-      opacity={0.25}
-      position={[water.position[0], 0.005, water.position[2]]}
-      texture={outsideWaterDecalTexture}
-    />
-  {/each}
-
-  {#each outsideGrass as grass}
-    <OutsideSurface
-      args={grass.args}
-      color="#a8aa77"
-      opacity={0.22}
-      position={[
-        grass.position[0],
-        outsideGroundY(grass.position[0], grass.position[2]) + 0.045,
-        grass.position[2],
-      ]}
-      roughness={1}
-    />
-  {/each}
-
-  {#each outsideDecals as decal}
-    <OutsideDecal
-      args={decal.args}
-      color={getOutsideDecalColor(decal.kind)}
-      opacity={getOutsideDecalOpacity(decal)}
-      position={[
-        decal.position[0],
-        outsideGroundY(decal.position[0], decal.position[2]) + 0.08,
-        decal.position[2],
-      ]}
-      rotation={decal.rotation ?? 0}
-      texture={getOutsideDecalTexture(decal.kind)}
-    />
-  {/each}
-
-  <!-- Procedural trees + bushes (seed-driven scatter, avoids road + water
-       + steep mountain slopes) -->
-  <OutsideFoliage treeTarget={70} bushTarget={150} />
+  <!-- Procedural trees + bushes + rocks — driven by the chunk plan -->
+  <OutsideFoliage />
 
   <!-- Rocks, camps, POIs etc are now picked procedurally by the
        outside-chunk pipeline and rendered via OutsidePOIs / the rock
