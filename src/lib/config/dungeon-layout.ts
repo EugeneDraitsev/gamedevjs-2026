@@ -180,7 +180,12 @@ export const createDungeonLayout = (
       : floor2NormalTemplateIds;
   const sampleNormalTemplateId = () =>
     normalTemplatePool[Math.floor(random() * normalTemplatePool.length)];
-  const start = createRoom("polygon", [0, 0], "polygon-training");
+  createRoom("polygon", [0, 1], "polygon-training");
+  const start = createRoom(
+    "normal",
+    [0, 0],
+    runFloor === initialDungeonFloor ? "core-prison" : "normal-empty"
+  );
 
   const branches = sampleUnique(getFreeDirections(start.grid), 3, random).map(
     (direction) => {

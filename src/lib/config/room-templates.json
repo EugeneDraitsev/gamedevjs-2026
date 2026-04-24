@@ -11,10 +11,29 @@
     "enemyCount": 6
   },
   {
+    "id": "core-prison",
+    "kind": "normal",
+    "label": "Core Prison",
+    "environment": "core-prison",
+    "layout": "floor",
+    "skin": "foundry",
+    "spawnPattern": "none",
+    "enemyCount": 0
+  },
+  {
     "id": "polygon-training",
     "kind": "polygon",
     "label": "Polygon",
     "environment": "training-range",
+    "layout": "floor",
+    "skin": "foundry",
+    "spawnPattern": "none",
+    "enemyCount": 0
+  },
+  {
+    "id": "normal-empty",
+    "kind": "normal",
+    "label": "Chamber",
     "layout": "floor",
     "skin": "foundry",
     "spawnPattern": "none",

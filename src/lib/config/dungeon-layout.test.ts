@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDungeonLayout } from "$lib/config/dungeon-layout";
+import { roomTemplateById } from "$lib/config/room-templates";
 
 describe("dungeon layout floors", () => {
   it("starts the run on floor -2 inside the dungeon", () => {
@@ -9,9 +10,9 @@ describe("dungeon layout floors", () => {
     );
 
     expect(dungeon.floor).toBe(-2);
-    expect(dungeon.rooms[dungeon.startRoomId].templateId).toBe(
-      "polygon-training"
-    );
+    expect(dungeon.rooms[dungeon.startRoomId].templateId).toBe("core-prison");
+    expect(dungeon.rooms.polygon.templateId).toBe("polygon-training");
+    expect(dungeon.rooms.polygon.exits).toEqual({});
     expect(boss?.templateId).toBe("boss-warden");
     expect(
       Object.values(dungeon.rooms).some(
@@ -25,11 +26,17 @@ describe("dungeon layout floors", () => {
     const boss = Object.values(dungeon.rooms).find(
       (room) => room.kind === "boss"
     );
+    const hasCorePrison = Object.values(dungeon.rooms).some(
+      (room) => room.templateId === "core-prison"
+    );
 
     expect(dungeon.floor).toBe(-1);
-    expect(dungeon.rooms[dungeon.startRoomId].templateId).toBe(
-      "polygon-training"
-    );
+    expect(dungeon.rooms[dungeon.startRoomId].templateId).toBe("normal-empty");
+    expect(roomTemplateById["normal-empty"].spawnPattern).toBe("none");
+    expect(roomTemplateById["normal-empty"].enemyCount).toBe(0);
+    expect(hasCorePrison).toBe(false);
+    expect(dungeon.rooms.polygon.templateId).toBe("polygon-training");
+    expect(dungeon.rooms.polygon.exits).toEqual({});
     expect(boss?.templateId).toBe("boss-bomber");
   });
 

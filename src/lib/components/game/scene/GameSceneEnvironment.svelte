@@ -11,6 +11,20 @@
   import { getGameSceneContext } from "$lib/stores/scene-context";
   import type { Vec3, WallFacing } from "$lib/types/game";
 
+  interface Props {
+    corePrisonSealBrokenAt?: number;
+    corePrisonSealHits?: number;
+    corePrisonSealHitsRequired?: number;
+    corePrisonSealLocked?: boolean;
+  }
+
+  let {
+    corePrisonSealBrokenAt = 0,
+    corePrisonSealHits = 0,
+    corePrisonSealHitsRequired = 2,
+    corePrisonSealLocked = true,
+  }: Props = $props();
+
   const scene = getGameSceneContext();
   const { room, textures, timing } = scene;
   const outside = $derived(scene.currentRoomTemplate.layout === "outside-yard");
@@ -109,9 +123,14 @@
 <RoomTemplateEnvironment
   animationNow={timing.now}
   bossBannerTexture={textures.bossBanner}
+  {corePrisonSealBrokenAt}
+  {corePrisonSealHits}
+  {corePrisonSealHitsRequired}
+  {corePrisonSealLocked}
   currentFloorPalette={scene.currentFloorPalette}
   environment={scene.roomEnvironment}
   floorExitOpenAmount={scene.floorExitOpenAmount}
+  startAnimationAt={timing.floorIntroStartedAt}
   outsideEarthDecalTexture={textures.outsideEarthDecals}
   outsideEarthTexture={textures.outsideEarth}
   outsideRockDecalTexture={textures.outsideRockDecals}

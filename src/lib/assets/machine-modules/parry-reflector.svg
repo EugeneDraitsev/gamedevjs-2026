@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Parry Reflector">
+  <defs>
+    <radialGradient id="core" cx="48%" cy="44%" r="55%">
+      <stop offset="0" stop-color="#f8fdff"/>
+      <stop offset="0.38" stop-color="#79f7ff"/>
+      <stop offset="1" stop-color="#0b2345"/>
+    </radialGradient>
+    <linearGradient id="blade" x1="48" y1="16" x2="82" y2="116">
+      <stop offset="0" stop-color="#f9feff"/>
+      <stop offset="0.42" stop-color="#9ff7ff"/>
+      <stop offset="1" stop-color="#2663ff"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="54" fill="#08131f"/>
+  <circle cx="64" cy="64" r="47" fill="none" stroke="#38bdf8" stroke-width="5"/>
+  <path d="M63 15 78 61 65 114 50 67Z" fill="url(#blade)" stroke="#eaffff" stroke-linejoin="round" stroke-width="3"/>
+  <path d="M27 68c18 17 55 17 74 0" fill="none" stroke="#fbbf24" stroke-linecap="round" stroke-width="8"/>
+  <path d="M25 51c21-22 58-22 79 0" fill="none" stroke="#38bdf8" stroke-linecap="round" stroke-width="5"/>
+  <circle cx="64" cy="64" r="17" fill="url(#core)" stroke="#f8fdff" stroke-width="3"/>
+  <path d="M27 68 18 58M101 68l10-10M25 51l-8 10M104 51l8 10" fill="none" stroke="#f8fdff" stroke-linecap="round" stroke-width="4"/>
+</svg>

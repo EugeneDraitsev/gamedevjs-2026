@@ -32,6 +32,7 @@ const roomLayoutSchema = z.enum([
 
 const roomEnvironmentSchema = z.enum([
   "boss-gears",
+  "core-prison",
   "outside-start",
   "training-range",
   "treasure-gears",

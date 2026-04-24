@@ -27,9 +27,9 @@ describe("machine modules", () => {
     vi.unstubAllGlobals();
   });
 
-  it("defines the eight module catalog without duplicate ids", () => {
-    expect(machineModuleTemplates).toHaveLength(8);
-    expect(new Set(machineModuleIds).size).toBe(8);
+  it("defines the module catalog without duplicate ids", () => {
+    expect(machineModuleTemplates).toHaveLength(9);
+    expect(new Set(machineModuleIds).size).toBe(9);
     expect(machineRewardModuleIds).not.toContain("rivet-press-core");
     expect(machineRewardModuleIds).not.toContain("gyro-servo-frame");
 
@@ -45,6 +45,7 @@ describe("machine modules", () => {
     expect(moduleFitsSlot("arc-splitter-coil", "utility-a")).toBe(false);
     expect(moduleFitsSlot("boiler-plate-frame", "body")).toBe(true);
     expect(moduleFitsSlot("ammo-hopper", "utility-b")).toBe(true);
+    expect(moduleFitsSlot("parry-reflector", "utility-c")).toBe(true);
   });
 
   it("computes combat stats from installed modules", () => {
@@ -62,6 +63,7 @@ describe("machine modules", () => {
       body: "boiler-plate-frame",
       "utility-a": "ammo-hopper",
       "utility-b": "salvage-magnet",
+      "utility-c": null,
     });
 
     expect(arcStats.weaponBuild.pelletCount).toBeGreaterThan(1);
@@ -81,12 +83,14 @@ describe("machine modules", () => {
       body: "boiler-plate-frame",
       "utility-a": "ammo-hopper",
       "utility-b": "salvage-magnet",
+      "utility-c": "ammo-hopper",
     });
 
     expect(normalized.attack).toBe("rivet-press-core");
     expect(normalized.body).toBe("boiler-plate-frame");
     expect(normalized["utility-a"]).toBe("ammo-hopper");
     expect(normalized["utility-b"]).toBe("salvage-magnet");
+    expect(normalized["utility-c"]).toBeNull();
   });
 
   it("saves v2 runs and drops old weapon graph saves", () => {
@@ -106,6 +110,7 @@ describe("machine modules", () => {
       body: "gyro-servo-frame",
       "utility-a": "ammo-hopper",
       "utility-b": null,
+      "utility-c": null,
     };
 
     saveRunSave("v2", {

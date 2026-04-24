@@ -8,6 +8,7 @@
     type MusicCue,
     type MusicTransitionOptions,
   } from "$lib/audio/music";
+  import { gameSfx } from "$lib/audio/sfx";
   import { DEFAULT_SWING, type SwingParams } from "$lib/combat/melee-swing";
   import FloorAdvanceTransition from "$lib/components/app/FloorAdvanceTransition.svelte";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
@@ -397,6 +398,7 @@
   $effect(() => {
     saveSceneSettings(settings);
     gameMusic.syncMix(settings);
+    gameSfx.syncMix(settings);
   });
 
   $effect(() => {
@@ -442,6 +444,7 @@
     touchControls = isTouchDevice();
     gameMusic.preload();
     gameMusic.syncMix(settings);
+    gameSfx.syncMix(settings);
 
     const coarseQuery = window.matchMedia("(pointer: coarse)");
     const onCoarseChange = (event: MediaQueryListEvent) => {

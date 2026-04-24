@@ -47,6 +47,8 @@ export interface SceneSettings {
   musicSoundEnabled: boolean;
   musicVolume: number;
   playerLinearDamping: number;
+  sfxSoundEnabled: boolean;
+  sfxVolume: number;
   shadowBias: number;
   shadowFar: number;
   shadowFrustum: number;
@@ -115,6 +117,8 @@ export const createSceneSettings = (): SceneSettings => ({
   showDebugGeometry: false,
   showEnvironmentMap: false,
   showPhysicsDebug: false,
+  sfxSoundEnabled: true,
+  sfxVolume: 0.8,
   sunIntensity: 4.05,
   sunPositionX: -5.4,
   sunPositionY: 13.2,

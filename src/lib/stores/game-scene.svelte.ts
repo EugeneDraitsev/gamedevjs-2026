@@ -224,7 +224,7 @@ export class GameSceneStore {
     floorIntroTitle:
       this.currentRoomTemplate.layout === "outside-yard"
         ? "Outside"
-        : "Polygon Foundry",
+        : this.currentRoom.label,
     pickedArtifactTemplate: this.pickedArtifactTemplate,
     playerHitFlash: this.playerHitFlash,
     playerReloadRatio: this.playerReloadRatio,

@@ -16,16 +16,23 @@ export type MachineModuleId =
   | "gyro-servo-frame"
   | "ammo-hopper"
   | "overclock-governor"
-  | "salvage-magnet";
+  | "salvage-magnet"
+  | "parry-reflector";
 
-export type MachineModuleKind = "attack" | "body" | "utility";
+export type MachineModuleKind = "attack" | "body" | "sword" | "utility";
 export type MachineModuleRarity = "common" | "uncommon" | "rare";
-export type MachineSlotId = "attack" | "body" | "utility-a" | "utility-b";
+export type MachineSlotId =
+  | "attack"
+  | "body"
+  | "utility-a"
+  | "utility-b"
+  | "utility-c";
 
 export const machineModuleKindAccents = {
   attack: "#ef4444",
   body: "#22c55e",
-  utility: "#38bdf8",
+  sword: "#38bdf8",
+  utility: "#e5e7eb",
 } satisfies Record<MachineModuleKind, string>;
 
 export const machineModuleRarityAccents = {
@@ -59,6 +66,7 @@ export interface MachineStats {
   damage: number;
   fireRate: number;
   installedModuleIds: MachineModuleId[];
+  reflectedShotsSeekEnemies: boolean;
   magazineSize: number;
   maxHealth: number;
   pickupRadiusBonus: number;
@@ -79,6 +87,7 @@ interface MachineStatDraft {
   magazineBonus: number;
   maxHealthBonus: number;
   pickupRadiusBonus: number;
+  reflectedShotsSeekEnemies: boolean;
   reloadMultiplier: number;
   scrapYieldBonus: number;
   weaponNodes: CompiledWeaponNode[];
@@ -94,10 +103,11 @@ export const machineSlots: Array<{
   kind: MachineModuleKind;
   label: string;
 }> = [
-  { id: "attack", kind: "attack", label: "Attack Core" },
-  { id: "body", kind: "body", label: "Body Frame" },
-  { id: "utility-a", kind: "utility", label: "Utility A" },
-  { id: "utility-b", kind: "utility", label: "Utility B" },
+  { id: "attack", kind: "attack", label: "Eye Module" },
+  { id: "body", kind: "body", label: "Body Module" },
+  { id: "utility-a", kind: "utility", label: "Utility Module" },
+  { id: "utility-b", kind: "utility", label: "Utility Module" },
+  { id: "utility-c", kind: "sword", label: "Sword Module" },
 ];
 
 export const machineModuleTemplates: MachineModuleTemplate[] = [
@@ -205,6 +215,19 @@ export const machineModuleTemplates: MachineModuleTemplate[] = [
     shortLabel: "Magnet",
     statLines: ["+pickup reach", "+scrap"],
   },
+  {
+    accent: "#38bdf8",
+    description:
+      "A blade relay that catches hostile charge and throws it back downrange.",
+    effect: "Deflected enemy shots turn into homing counter-shots.",
+    id: "parry-reflector",
+    kind: "sword",
+    label: "Parry Reflector",
+    rarity: "rare",
+    scrapValue: 6,
+    shortLabel: "Parry",
+    statLines: ["shot reflect", "homing counter"],
+  },
 ];
 
 export const machineModuleIds = machineModuleTemplates.map(
@@ -229,6 +252,7 @@ export const createDefaultMachineLoadout = (): MachineLoadout => ({
   body: "gyro-servo-frame",
   "utility-a": null,
   "utility-b": null,
+  "utility-c": null,
 });
 
 export const createDefaultModuleInventory = (): MachineModuleId[] => [];
@@ -266,6 +290,7 @@ export const normalizeMachineLoadout = (
     body: null,
     "utility-a": null,
     "utility-b": null,
+    "utility-c": null,
   };
   const used = new Set<MachineModuleId>();
 
@@ -302,6 +327,7 @@ const createStatDraft = (): MachineStatDraft => ({
   magazineBonus: 0,
   maxHealthBonus: 0,
   pickupRadiusBonus: 0,
+  reflectedShotsSeekEnemies: false,
   reloadMultiplier: 1,
   scrapYieldBonus: 0,
   weaponNodes: [],
@@ -361,6 +387,9 @@ const applyModuleToDraft = (
     case "salvage-magnet":
       draft.pickupRadiusBonus += 0.38;
       draft.scrapYieldBonus += 1;
+      break;
+    case "parry-reflector":
+      draft.reflectedShotsSeekEnemies = true;
       break;
     default:
       break;
@@ -469,6 +498,7 @@ export const computeMachineStats = (loadout: MachineLoadout): MachineStats => {
     magazineSize,
     maxHealth,
     pickupRadiusBonus: draft.pickupRadiusBonus,
+    reflectedShotsSeekEnemies: draft.reflectedShotsSeekEnemies,
     reloadDurationMs,
     scrapYieldBonus: draft.scrapYieldBonus,
     shootCooldownMs,

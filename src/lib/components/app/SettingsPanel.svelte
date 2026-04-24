@@ -108,6 +108,28 @@
     >
   </label>
 
+  <label class="toggle">
+    <input type="checkbox" bind:checked={settings.sfxSoundEnabled}>
+    <span>SFX Sound</span>
+  </label>
+
+  <label class="slider">
+    <span class="slider-label">
+      <span>SFX Volume</span>
+      <span class="slider-value">
+        {Math.round(settings.sfxVolume * 100)}%
+      </span>
+    </span>
+    <input
+      type="range"
+      min="0"
+      max="1"
+      step="0.05"
+      bind:value={settings.sfxVolume}
+      disabled={!(settings.masterSoundEnabled && settings.sfxSoundEnabled)}
+    >
+  </label>
+
   {#if onDebugEnabledChange}
     <label class="toggle">
       <input

@@ -10,6 +10,7 @@
     type PerspectiveCamera,
   } from "three";
   import type { OrbitControls as OrbitControlsInstance } from "three/examples/jsm/controls/OrbitControls.js";
+  import { gameSfx } from "$lib/audio/sfx";
   import GameHud from "$lib/components/game/GameHud.svelte";
   import GameMinimap from "$lib/components/game/GameMinimap.svelte";
   import GameSceneOverlays from "$lib/components/game/GameSceneOverlays.svelte";
@@ -99,10 +100,18 @@
   let sunLight = $state<DirectionalLight>();
   let enemySpawnPending = $state(false);
   let endDemoTriggered = $state(false);
+  let corePrisonSealHits = $state(0);
+  let corePrisonLastSealSwingId = 0;
+  let corePrisonSealBrokenAt = $state(0);
+  const corePrisonSealHitsRequired = 3;
   const sceneCamera = $derived(
     scene.settings.cameraOrthographic ? orthographicCamera : perspectiveCamera
   );
   const outside = $derived(scene.currentRoomTemplate.layout === "outside-yard");
+  const corePrisonSealLocked = $derived(
+    scene.currentRoomTemplate.environment === "core-prison" &&
+      corePrisonSealHits < corePrisonSealHitsRequired
+  );
   const preloadTextures = $derived([
     textures.bossBanner,
     textures.bossDoor,
@@ -131,6 +140,7 @@
 
   $effect(() => {
     syncSceneInputs();
+    gameSfx.syncMix(settings);
   });
 
   $effect(() => {
@@ -163,6 +173,9 @@
       pickups.clear();
       room.resetForFloor(startRoomId);
       endDemoTriggered = false;
+      corePrisonSealHits = 0;
+      corePrisonLastSealSwingId = 0;
+      corePrisonSealBrokenAt = 0;
       if (startRoom.templateId === "outside-start") {
         pickups.seedRoom(startRoomId, createOutsidePickups(performance.now()));
       }
@@ -345,8 +358,41 @@
     }
   };
 
+  const handleCorePrisonSealHit = (frame: MeleeFrame) => {
+    if (
+      !(corePrisonSealLocked && frame.active) ||
+      frame.ended ||
+      frame.swingId === corePrisonLastSealSwingId ||
+      Math.hypot(frame.center[0], frame.center[2]) > 2.35
+    ) {
+      return;
+    }
+
+    const now = performance.now();
+    const nextHits = Math.min(
+      corePrisonSealHitsRequired,
+      corePrisonSealHits + 1
+    );
+
+    corePrisonLastSealSwingId = frame.swingId;
+    corePrisonSealHits = nextHits;
+    combat.deflectBursts.push({
+      color: nextHits >= corePrisonSealHitsRequired ? "#ffd166" : "#8ff7ff",
+      createdAt: now,
+      id: crypto.randomUUID(),
+      position: [0, 1, 1.66],
+      radius: nextHits >= corePrisonSealHitsRequired ? 2.2 : 1,
+    });
+
+    if (nextHits >= corePrisonSealHitsRequired) {
+      corePrisonSealBrokenAt = now;
+      gameSfx.playCorePrisonDomeBreak();
+    }
+  };
+
   const handleMelee = (frame: MeleeFrame) => {
     handleMeleeFrame(combat, frame);
+    handleCorePrisonSealHit(frame);
   };
 
   const tick = (time: number, delta: number) => {
@@ -535,7 +581,12 @@
         <Debug />
       {/if}
 
-      <GameSceneEnvironment />
+      <GameSceneEnvironment
+        {corePrisonSealBrokenAt}
+        {corePrisonSealHits}
+        {corePrisonSealHitsRequired}
+        {corePrisonSealLocked}
+      />
 
       <GameSceneActors />
 

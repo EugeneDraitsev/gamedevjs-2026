@@ -13,6 +13,7 @@
   import OutsideSurface from "$lib/components/game/scene/environment/OutsideSurface.svelte";
   import OutsideTerrain from "$lib/components/game/scene/environment/OutsideTerrain.svelte";
   import OutsideVegetationColliders from "$lib/components/game/scene/environment/OutsideVegetationColliders.svelte";
+  import StartingMachineSetpiece from "$lib/components/game/scene/environment/StartingMachineSetpiece.svelte";
   import FoundryGearSet from "$lib/components/game/scene/environment/walls/FoundryGearSet.svelte";
   import type { RoomEnvironmentId } from "$lib/config/room-templates";
   import { outsideGroundY } from "$lib/game/outside-chunk-context";
@@ -400,6 +401,10 @@
   let {
     animationNow = 0,
     bossBannerTexture = null,
+    corePrisonSealBrokenAt = 0,
+    corePrisonSealHits = 0,
+    corePrisonSealHitsRequired = 2,
+    corePrisonSealLocked = true,
     currentFloorPalette,
     environment = null,
     floorExitOpenAmount = 0,
@@ -409,9 +414,14 @@
     outsideRocksTexture = null,
     outsideWaterDecalTexture = null,
     outsideWaterTexture = null,
+    startAnimationAt = 0,
   }: {
     animationNow?: number;
     bossBannerTexture?: Texture | null;
+    corePrisonSealBrokenAt?: number;
+    corePrisonSealHits?: number;
+    corePrisonSealHitsRequired?: number;
+    corePrisonSealLocked?: boolean;
     currentFloorPalette: SceneFloorPalette;
     environment?: RoomEnvironmentId | null;
     floorExitOpenAmount?: number;
@@ -421,11 +431,22 @@
     outsideRocksTexture?: Texture | null;
     outsideWaterDecalTexture?: Texture | null;
     outsideWaterTexture?: Texture | null;
+    startAnimationAt?: number;
   } = $props();
 
   const outside = $derived(environment === "outside-start");
   const exitReveal = $derived(Math.max(0, Math.min(1, floorExitOpenAmount)));
   const bannerLift = $derived(exitReveal * exitReveal);
+  const startAnimationAge = $derived(
+    startAnimationAt > 0
+      ? Math.max(0, (animationNow - startAnimationAt) / 1000)
+      : 999
+  );
+  const corePrisonSealBreakAge = $derived(
+    corePrisonSealBrokenAt > 0
+      ? Math.max(0, (animationNow - corePrisonSealBrokenAt) / 1000)
+      : 999
+  );
 
   // Snap a hardcoded Codex prop position onto the procedural heightmap
   // so nothing floats above or sinks into the new terrain. The original
@@ -737,6 +758,16 @@
       </T.Mesh>
     </T.Group>
   {/each}
+{/if}
+
+{#if environment === "core-prison"}
+  <StartingMachineSetpiece
+    animationAge={startAnimationAge}
+    breakAge={corePrisonSealBreakAge}
+    locked={corePrisonSealLocked}
+    sealHits={corePrisonSealHits}
+    sealHitsRequired={corePrisonSealHitsRequired}
+  />
 {/if}
 
 {#if environment === "training-range"}
