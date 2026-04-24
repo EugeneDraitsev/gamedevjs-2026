@@ -16,14 +16,19 @@
   const halfW = plan.size.width * 0.5;
   const halfD = plan.size.depth * 0.5;
   const wallX = halfW * 0.6;
-  const brickLen = (halfD * 2) / segments;
   const wallHeight = 38;
 
-  const bricks = Array.from({ length: segments }, (_, i) => {
-    const t = (i + 0.5) / segments;
-    const z = -halfD + t * halfD * 2;
-    return { id: `brick-${i}`, z };
-  });
+  const createBricks = () => {
+    const brickLen = (halfD * 2) / segments;
+    const bricks = Array.from({ length: segments }, (_, i) => {
+      const t = (i + 0.5) / segments;
+      const z = -halfD + t * halfD * 2;
+      return { id: `brick-${i}`, z };
+    });
+    return { brickLen, bricks };
+  };
+
+  const { brickLen, bricks } = createBricks();
 </script>
 
 {#each bricks as brick (brick.id)}

@@ -73,10 +73,15 @@
     };
   };
 
-  const grassMesh = new InstancedMesh(bladeGeo, grassMat, grassCount);
-  grassMesh.count = 0;
-  grassMesh.receiveShadow = true;
-  grassMesh.frustumCulled = false;
+  const createGrassMesh = () => {
+    const mesh = new InstancedMesh(bladeGeo, grassMat, grassCount);
+    mesh.count = 0;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    return mesh;
+  };
+
+  const grassMesh = createGrassMesh();
 
   const setupGrass = () => {
     const rng = createRng(13_571);

@@ -93,11 +93,14 @@
   };
   const colliderGeometry = buildColliderGeometry();
 
-  const { material, uniforms } = createOutsideGroundMaterial({
-    map: texture,
-    color: "#beb58f",
-    snowLine: 10,
-  });
+  const createGround = () =>
+    createOutsideGroundMaterial({
+      map: texture,
+      color: "#beb58f",
+      snowLine: 10,
+    });
+
+  const { material, uniforms } = createGround();
 
   $effect(() => {
     material.map = texture ?? null;

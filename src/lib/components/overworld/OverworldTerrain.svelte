@@ -18,11 +18,19 @@
     collider = false,
   }: Props = $props();
 
-  const { material, uniforms } = createGroundMaterial();
-  uniforms.uPlayableRadius.value = playableRadius;
+  const createTerrainMaterial = () => {
+    const result = createGroundMaterial();
+    result.uniforms.uPlayableRadius.value = playableRadius;
+    return result;
+  };
+
+  const { material, uniforms } = createTerrainMaterial();
 
   // Dense tessellation so vertex displacement creates actual topology
-  const terrainGeometry = new PlaneGeometry(radius * 2, radius * 2, 180, 180);
+  const createTerrainGeometry = () =>
+    new PlaneGeometry(radius * 2, radius * 2, 180, 180);
+
+  const terrainGeometry = createTerrainGeometry();
 
   useTask((delta) => {
     uniforms.uTime.value += delta;

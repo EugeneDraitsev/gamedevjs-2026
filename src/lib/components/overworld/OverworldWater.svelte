@@ -14,15 +14,18 @@
   let { seaInnerRadius, seaOuterRadius, rivers, shorelineRadius }: Props =
     $props();
 
-  const sea = createWaterMaterial({
-    deepColor: "#061b2a",
-    shallowColor: "#2a6a7a",
-    foamColor: "#e8f2ec",
-    algaeColor: "#2b5138",
-    shoreRadius: shorelineRadius,
-    foamEdge: 4.5,
-    useShoreMask: true,
-  });
+  const createSeaMaterial = () =>
+    createWaterMaterial({
+      deepColor: "#061b2a",
+      shallowColor: "#2a6a7a",
+      foamColor: "#e8f2ec",
+      algaeColor: "#2b5138",
+      shoreRadius: shorelineRadius,
+      foamEdge: 4.5,
+      useShoreMask: true,
+    });
+
+  const sea = createSeaMaterial();
 
   const riverMat = createWaterMaterial({
     deepColor: "#0c324a",
@@ -33,11 +36,15 @@
   });
 
   // High-tessellation ring so wave vertex shader produces rolling water
-  const seaGeometry = new RingGeometry(seaInnerRadius, seaOuterRadius, 96, 16);
+  const createSeaGeometry = () =>
+    new RingGeometry(seaInnerRadius, seaOuterRadius, 96, 16);
 
-  const riverGeometries = rivers.map(
-    (r) => new PlaneGeometry(r.width, r.length, 24, 48)
-  );
+  const seaGeometry = createSeaGeometry();
+
+  const createRiverGeometries = () =>
+    rivers.map((r) => new PlaneGeometry(r.width, r.length, 24, 48));
+
+  const riverGeometries = createRiverGeometries();
 
   useTask((delta) => {
     sea.uniforms.uTime.value += delta;

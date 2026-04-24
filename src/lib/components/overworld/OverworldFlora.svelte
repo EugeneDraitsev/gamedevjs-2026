@@ -68,10 +68,15 @@
   const bladeGeo = createBladeGeometry();
   const { material: grassMat, uniforms: grassUniforms } = createGrassMaterial();
 
-  const grassMesh = new InstancedMesh(bladeGeo, grassMat, count);
-  grassMesh.count = 0;
-  grassMesh.receiveShadow = true;
-  grassMesh.frustumCulled = false;
+  const createGrassMesh = () => {
+    const mesh = new InstancedMesh(bladeGeo, grassMat, count);
+    mesh.count = 0;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    return mesh;
+  };
+
+  const grassMesh = createGrassMesh();
 
   // seeded RNG
   const createRng = (s: number) => {
@@ -188,12 +193,12 @@
       .replace(
         "#include <begin_vertex>",
         `#include <begin_vertex>
-             vec4 iw = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-             float seed = fract(sin(dot(iw.xz, vec2(12.9898, 78.233))) * 43758.5453);
-             float heightT = clamp(position.y + 0.5, 0.0, 1.0);
-             float sway = sin(uTime * 0.9 + seed * 6.28) * 0.09;
-             transformed.x += sway * heightT;
-             transformed.z += cos(uTime * 0.7 + seed * 6.28) * 0.06 * heightT;`
+                 vec4 iw = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+                 float seed = fract(sin(dot(iw.xz, vec2(12.9898, 78.233))) * 43758.5453);
+                 float heightT = clamp(position.y + 0.5, 0.0, 1.0);
+                 float sway = sin(uTime * 0.9 + seed * 6.28) * 0.09;
+                 transformed.x += sway * heightT;
+                 transformed.z += cos(uTime * 0.7 + seed * 6.28) * 0.06 * heightT;`
       );
   };
   bushMat.customProgramCacheKey = () => "overworld-bush-v2";
