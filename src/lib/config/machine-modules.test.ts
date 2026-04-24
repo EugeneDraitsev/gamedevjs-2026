@@ -45,7 +45,9 @@ describe("machine modules", () => {
     expect(moduleFitsSlot("arc-splitter-coil", "utility-a")).toBe(false);
     expect(moduleFitsSlot("boiler-plate-frame", "body")).toBe(true);
     expect(moduleFitsSlot("ammo-hopper", "utility-b")).toBe(true);
+    expect(moduleFitsSlot("ammo-hopper", "utility-c")).toBe(false);
     expect(moduleFitsSlot("parry-reflector", "utility-c")).toBe(true);
+    expect(moduleFitsSlot("parry-reflector", "utility-a")).toBe(false);
   });
 
   it("computes combat stats from installed modules", () => {
@@ -65,6 +67,10 @@ describe("machine modules", () => {
       "utility-b": "salvage-magnet",
       "utility-c": null,
     });
+    const parryStats = computeMachineStats({
+      ...createDefaultMachineLoadout(),
+      "utility-c": "parry-reflector",
+    });
 
     expect(arcStats.weaponBuild.pelletCount).toBeGreaterThan(1);
     expect(arcStats.fireRate).toBeGreaterThan(defaults.fireRate);
@@ -75,6 +81,8 @@ describe("machine modules", () => {
     expect(heavyStats.magazineSize).toBeGreaterThan(defaults.magazineSize);
     expect(heavyStats.pickupRadiusBonus).toBeGreaterThan(0);
     expect(heavyStats.scrapYieldBonus).toBe(1);
+    expect(defaults.reflectedShotsSeekEnemies).toBe(false);
+    expect(parryStats.reflectedShotsSeekEnemies).toBe(true);
   });
 
   it("normalizes invalid or duplicate saved loadouts", () => {

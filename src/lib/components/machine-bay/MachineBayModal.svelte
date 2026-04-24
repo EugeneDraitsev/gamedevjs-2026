@@ -36,39 +36,26 @@
 
   const slotPresentation = {
     attack: {
-      detail: "front lens",
       label: "Eye Module",
-      marker: "eye lens",
       path: "M18 17 L46 42",
     },
     body: {
-      detail: "outer casing",
       label: "Body Module",
-      marker: "armor shell",
       path: "M82 17 L62 33",
     },
     "utility-a": {
-      detail: "service heart",
       label: "Utility Module",
-      marker: "left internals",
       path: "M18 74 L37 58",
     },
     "utility-b": {
-      detail: "coil socket",
       label: "Utility Module",
-      marker: "upper internals",
       path: "M82 50 L67 38",
     },
     "utility-c": {
-      detail: "blade coupling",
       label: "Sword Module",
-      marker: "blade mount",
       path: "M50 86 L66 61",
     },
-  } satisfies Record<
-    MachineSlotId,
-    { detail: string; label: string; marker: string; path: string }
-  >;
+  } satisfies Record<MachineSlotId, { label: string; path: string }>;
 
   let {
     gearCount,
@@ -271,11 +258,6 @@
                   style:--accent={socket.accent}
                   style:--rarity={socket.rarityAccent}
                 >
-                  <div class="socket-label">
-                    <span>{socket.presentation.label}</span>
-                    <small>{socket.presentation.marker}</small>
-                  </div>
-
                   {#if socket.template}
                     <div class="module-head">
                       <div class="module-glyph" aria-hidden="true">
@@ -290,7 +272,6 @@
                           <span class="rarity-label">
                             {socket.template.rarity}
                           </span>
-                          <span>{socket.presentation.detail}</span>
                         </small>
                       </div>
                     </div>
@@ -313,6 +294,9 @@
                       </button>
                     </div>
                   {:else}
+                    <div class="socket-label">
+                      <span>{socket.presentation.label}</span>
+                    </div>
                     <div class="empty-copy">
                       <strong>Empty socket</strong>
                       <span>
@@ -364,7 +348,6 @@
                           <span class="rarity-label">
                             {item.template.rarity}
                           </span>
-                          <span>{item.template.kind}</span>
                         </small>
                       </div>
                     </div>

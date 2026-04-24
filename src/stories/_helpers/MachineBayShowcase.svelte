@@ -27,7 +27,7 @@
       body: "gyro-servo-frame",
       "utility-a": "ammo-hopper",
       "utility-b": "overclock-governor",
-      "utility-c": "salvage-magnet",
+      "utility-c": "parry-reflector",
     };
   };
 
@@ -48,6 +48,7 @@
       "ammo-hopper",
       "overclock-governor",
       "salvage-magnet",
+      "parry-reflector",
       "arc-splitter-coil",
       "pressure-lance-nozzle",
       "boiler-plate-frame",

@@ -18,6 +18,7 @@
     Vector2,
     Vector3,
   } from "three";
+  import { gameSfx } from "$lib/audio/sfx";
   import {
     isPointInSwing,
     isSwingActive,
@@ -521,6 +522,7 @@
     activeCamera: NonNullable<typeof camera.current>
   ) => {
     swingId += 1;
+    gameSfx.playSwordSwing(swingId);
     swingStartedAt = performance.now();
     swingFacingYaw = resolveFacingYaw(body, activeCamera);
     const translation = body.translation();

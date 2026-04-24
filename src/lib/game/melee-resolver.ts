@@ -10,8 +10,10 @@ import type {
   ActiveBomb,
   ActiveEnemy,
   ActiveEnemyShot,
+  ActiveProjectile,
   DeflectBurst,
   MeleeFrame,
+  Vec3,
 } from "$lib/types/game";
 
 const buildHitboxConfig = (
@@ -61,12 +63,90 @@ interface ApplyMeleeArgs {
   meleeParams: SwingParams;
 }
 
+interface ApplyMeleeDeflectArgs extends ApplyMeleeArgs {
+  reflectedShotsSeekEnemies?: boolean;
+  weaponBuild: WeaponBuild;
+}
+
+const findNearestEnemy = (position: Vec3, enemies: ActiveEnemy[]) => {
+  let nearestEnemy: ActiveEnemy | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+
+  for (const enemy of enemies) {
+    const distance = Math.hypot(
+      enemy.position[0] - position[0],
+      enemy.position[2] - position[2]
+    );
+
+    if (distance >= nearestDistance) {
+      continue;
+    }
+
+    nearestEnemy = enemy;
+    nearestDistance = distance;
+  }
+
+  return nearestEnemy;
+};
+
+const createReflectedProjectile = (
+  shot: ActiveEnemyShot,
+  enemies: ActiveEnemy[],
+  weaponBuild: WeaponBuild
+): ActiveProjectile => {
+  const target = findNearestEnemy(shot.position, enemies);
+  const direction: Vec3 = target
+    ? [
+        target.position[0] - shot.position[0],
+        0,
+        target.position[2] - shot.position[2],
+      ]
+    : [-shot.velocity[0], 0, -shot.velocity[2]];
+  const directionLength = Math.hypot(direction[0], direction[2]) || 1;
+  const incomingSpeed = Math.hypot(shot.velocity[0], shot.velocity[2]);
+  const speed = Math.max(incomingSpeed * 1.55, weaponBuild.speed * 1.1, 18);
+  const damage = Math.max(weaponBuild.damage, weaponBuild.meleeDamage);
+
+  return {
+    build: {
+      ...weaponBuild,
+      attackMode: "projectile",
+      burstDamage: damage,
+      colors: {
+        ...weaponBuild.colors,
+        core: "#fff7ed",
+        glow: shot.color,
+        shell: shot.color,
+      },
+      curve: 0,
+      damage,
+      drag: Math.min(weaponBuild.drag, 0.02),
+      gravity: 0,
+      homingTurn: target ? Math.max(weaponBuild.homingTurn, 5.5) : 0,
+      pelletCount: 1,
+      radius: Math.max(shot.radius * 0.88, Math.min(weaponBuild.radius, 0.24)),
+      speed,
+      spread: 0,
+      ttlMs: Math.min(Math.max(weaponBuild.ttlMs, 900), 1400),
+    },
+    id: crypto.randomUUID(),
+    position: [...shot.position],
+    velocity: [
+      (direction[0] / directionLength) * speed,
+      0,
+      (direction[2] / directionLength) * speed,
+    ],
+  };
+};
+
 export const applyMeleeDeflects = ({
   combat,
   frame,
   hitboxPadding,
   meleeParams,
-}: ApplyMeleeArgs) => {
+  reflectedShotsSeekEnemies = false,
+  weaponBuild,
+}: ApplyMeleeDeflectArgs) => {
   if (!(frame.active && combat.enemyShots.length > 0)) {
     return;
   }
@@ -75,6 +155,7 @@ export const applyMeleeDeflects = ({
   const now = performance.now();
   const survivors: ActiveEnemyShot[] = [];
   const newBursts: DeflectBurst[] = [];
+  const reflectedProjectiles: ActiveProjectile[] = [];
 
   for (const shot of combat.enemyShots) {
     if (
@@ -93,6 +174,11 @@ export const applyMeleeDeflects = ({
         position: shot.position,
         radius: shot.radius,
       });
+      if (reflectedShotsSeekEnemies) {
+        reflectedProjectiles.push(
+          createReflectedProjectile(shot, combat.enemies, weaponBuild)
+        );
+      }
     } else {
       survivors.push(shot);
     }
@@ -101,6 +187,7 @@ export const applyMeleeDeflects = ({
   if (newBursts.length > 0) {
     combat.enemyShots = survivors;
     combat.deflectBursts.push(...newBursts);
+    combat.addProjectiles(reflectedProjectiles);
   }
 };
 

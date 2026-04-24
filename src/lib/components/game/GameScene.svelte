@@ -387,6 +387,8 @@
     if (nextHits >= corePrisonSealHitsRequired) {
       corePrisonSealBrokenAt = now;
       gameSfx.playCorePrisonDomeBreak();
+    } else {
+      gameSfx.playCorePrisonDomeCrack(nextHits);
     }
   };
 
@@ -426,6 +428,8 @@
         frame: combat.currentMeleeFrame,
         hitboxPadding: settings.meleeHitboxPadding,
         meleeParams: scene.meleeParams,
+        reflectedShotsSeekEnemies: scene.machineStats.reflectedShotsSeekEnemies,
+        weaponBuild: scene.weaponBuild,
       });
     }
 

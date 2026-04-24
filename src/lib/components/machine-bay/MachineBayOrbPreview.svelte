@@ -90,7 +90,7 @@
 
   const getBodyGhostOpacity = () => {
     if (isActive("body")) {
-      return 0.14;
+      return 0.12;
     }
 
     if (isMuted("body")) {
@@ -104,28 +104,28 @@
 
   const getSwordGlowOpacity = () => {
     if (isActive("utility-c")) {
-      return 0.42;
-    }
-
-    if (isMuted("utility-c")) {
-      return 0.02;
-    }
-
-    return 0.18;
-  };
-
-  const swordGlowOpacity = $derived(getSwordGlowOpacity());
-
-  const getSwordLightIntensity = () => {
-    if (isActive("utility-c")) {
-      return 3.2;
+      return 0.22;
     }
 
     if (isMuted("utility-c")) {
       return 0;
     }
 
-    return 1.12;
+    return 0;
+  };
+
+  const swordGlowOpacity = $derived(getSwordGlowOpacity());
+
+  const getSwordLightIntensity = () => {
+    if (isActive("utility-c")) {
+      return 1.35;
+    }
+
+    if (isMuted("utility-c")) {
+      return 0;
+    }
+
+    return 0;
   };
 
   const swordLightIntensity = $derived(getSwordLightIntensity());
@@ -208,7 +208,7 @@
         <T.Mesh renderOrder={30} scale={[1.08, 1.08, 1.08]}>
           <T.SphereGeometry args={[1, 32, 16]} />
           <T.MeshBasicMaterial
-            color={isActive("body") ? "#f4bd70" : "#f4fbff"}
+            color="#f4fbff"
             depthFunc={GreaterDepth}
             opacity={bodyGhostOpacity}
             transparent
@@ -220,12 +220,12 @@
         <T.Mesh castShadow receiveShadow>
           <T.SphereGeometry args={[1, 72, 36]} />
           <T.MeshStandardMaterial
-            color={isActive("body") ? "#b87930" : "#8f6424"}
-            emissive={isActive("body") ? "#4b2308" : "#120900"}
-            emissiveIntensity={isActive("body") ? 0.48 : 0.25}
+            color="#8f6424"
+            emissive="#120900"
+            emissiveIntensity={0.25}
             metalness={0.95}
             opacity={opacityFor("body")}
-            roughness={isActive("body") ? 0.34 : 0.42}
+            roughness={0.42}
             transparent={isMuted("body")}
             wireframe={wireframeFor("body")}
           />
@@ -234,9 +234,9 @@
         <T.Mesh rotation={[Math.PI / 2, 0, 0]}>
           <T.TorusGeometry args={[1.01, 0.018, 10, 96]} />
           <T.MeshStandardMaterial
-            color={isActive("body") ? "#e8ae55" : "#d39a38"}
-            emissive={isActive("body") ? "#7a3a0a" : "#000000"}
-            emissiveIntensity={isActive("body") ? 0.34 : 0}
+            color="#d39a38"
+            emissive="#000000"
+            emissiveIntensity={0}
             metalness={1}
             opacity={opacityFor("body")}
             roughness={0.35}
@@ -248,7 +248,7 @@
         <T.Mesh rotation={[0, Math.PI / 2, 0]}>
           <T.TorusGeometry args={[1.012, 0.012, 10, 96]} />
           <T.MeshStandardMaterial
-            color={isActive("body") ? "#d29442" : "#3a2412"}
+            color="#3a2412"
             metalness={0.8}
             opacity={opacityFor("body")}
             roughness={0.55}
@@ -260,7 +260,7 @@
         <T.Mesh rotation={[Math.PI / 2, Math.PI / 2, 0]}>
           <T.TorusGeometry args={[1.014, 0.012, 10, 96]} />
           <T.MeshStandardMaterial
-            color={isActive("body") ? "#d29442" : "#3a2412"}
+            color="#3a2412"
             metalness={0.8}
             opacity={opacityFor("body")}
             roughness={0.55}
@@ -337,7 +337,7 @@
           >
             <T.BoxGeometry args={[1, 1, 1]} />
             <T.MeshStandardMaterial
-              color={isActive("body") ? "#efc884" : "#16100b"}
+              color="#16100b"
               opacity={opacityFor("body")}
               roughness={0.8}
               transparent={isMuted("body")}
@@ -350,9 +350,9 @@
           <T.Mesh position={rivet} castShadow>
             <T.SphereGeometry args={[0.045, 14, 10]} />
             <T.MeshStandardMaterial
-              color={isActive("body") ? "#d8a64c" : "#c28b31"}
-              emissive={isActive("body") ? "#6b3108" : "#000000"}
-              emissiveIntensity={isActive("body") ? 0.26 : 0}
+              color="#c28b31"
+              emissive="#000000"
+              emissiveIntensity={0}
               metalness={1}
               opacity={opacityFor("body")}
               roughness={0.32}
@@ -367,11 +367,11 @@
             <T.Mesh>
               <T.TorusGeometry args={[0.16, 0.022, 12, 32]} />
               <T.MeshStandardMaterial
-                color={isActive(slotId as MachineSlotId) ? "#ffffff" : "#70e7ff"}
+                color={isActive(slotId as MachineSlotId) ? "#ffffff" : "#e5e7eb"}
                 emissive={isActive(slotId as MachineSlotId)
-                  ? "#67f7ff"
+                  ? "#f8fafc"
                   : "#000000"}
-                emissiveIntensity={isActive(slotId as MachineSlotId) ? 1.8 : 0}
+                emissiveIntensity={isActive(slotId as MachineSlotId) ? 0.9 : 0}
                 metalness={0.65}
                 opacity={opacityFor(slotId as MachineSlotId)}
                 roughness={0.28}
@@ -385,7 +385,7 @@
                 blending={isActive(slotId as MachineSlotId)
                   ? AdditiveBlending
                   : undefined}
-                color={isActive(slotId as MachineSlotId) ? "#ffffff" : "#17343c"}
+                color={isActive(slotId as MachineSlotId) ? "#ffffff" : "#27313a"}
                 opacity={utilityFillOpacityFor(slotId as MachineSlotId)}
                 toneMapped={false}
                 transparent
@@ -441,11 +441,13 @@
 
         <T.Mesh position={[0, 1.27, 0]}>
           <T.CylinderGeometry args={[0.024, 0.064, 1.24, 20]} />
-          <T.MeshBasicMaterial
-            blending={isActive("utility-c") ? AdditiveBlending : undefined}
-            color={isActive("utility-c") ? "#ffffff" : "#eaffff"}
+          <T.MeshStandardMaterial
+            color="#cdeff4"
+            emissive="#0f3a44"
+            emissiveIntensity={isActive("utility-c") ? 0.14 : 0.03}
+            metalness={0.28}
             opacity={opacityFor("utility-c")}
-            toneMapped={false}
+            roughness={0.22}
             transparent={isMuted("utility-c")}
             wireframe={wireframeFor("utility-c")}
           />
@@ -466,10 +468,13 @@
 
         <T.Mesh position={[0, 1.99, 0]}>
           <T.ConeGeometry args={[0.058, 0.2, 20]} />
-          <T.MeshBasicMaterial
-            color={isActive("utility-c") ? "#ffffff" : "#eaffff"}
+          <T.MeshStandardMaterial
+            color="#d9f5f8"
+            emissive="#0b2b34"
+            emissiveIntensity={isActive("utility-c") ? 0.12 : 0.02}
+            metalness={0.22}
             opacity={opacityFor("utility-c")}
-            toneMapped={false}
+            roughness={0.24}
             transparent={isMuted("utility-c")}
             wireframe={wireframeFor("utility-c")}
           />
@@ -484,25 +489,18 @@
         />
       </T.Group>
 
-      {#if isActive("body")}
+      {#if isActive("utility-a")}
         <T.PointLight
-          color="#fbbf24"
+          color="#f8fafc"
           distance={3.2}
-          intensity={0.72}
-          position={[-0.58, 0.1, 1.25]}
-        />
-      {:else if isActive("utility-a")}
-        <T.PointLight
-          color="#70e7ff"
-          distance={3.2}
-          intensity={3.2}
+          intensity={1.7}
           position={[-1.03, -0.22, 1.1]}
         />
       {:else if isActive("utility-b")}
         <T.PointLight
-          color="#70e7ff"
+          color="#f8fafc"
           distance={3.2}
-          intensity={3.2}
+          intensity={1.7}
           position={[-0.2, 0.32, 1.1]}
         />
       {/if}

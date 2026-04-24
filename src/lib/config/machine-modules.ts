@@ -66,10 +66,10 @@ export interface MachineStats {
   damage: number;
   fireRate: number;
   installedModuleIds: MachineModuleId[];
-  reflectedShotsSeekEnemies: boolean;
   magazineSize: number;
   maxHealth: number;
   pickupRadiusBonus: number;
+  reflectedShotsSeekEnemies: boolean;
   reloadDurationMs: number;
   scrapYieldBonus: number;
   shootCooldownMs: number;
