@@ -94,7 +94,6 @@
   let shootRequested = false;
   let shootingHeld = false;
   let meleeRequested = false;
-  let shotSfxId = 0;
   let mouseScreenX = 0;
   let mouseScreenY = 0;
   let lastMobileJumpPulse = 0;
@@ -351,7 +350,6 @@
     return () => {
       cancelAnimationFrame(teleportFrame);
       cleanup();
-      gameSfx.setPlayerRolling(0);
     };
   });
 
@@ -765,9 +763,6 @@
       return;
     }
 
-    shotSfxId += 1;
-    gameSfx.playPlayerLaserShot(shotSfxId, scene.weaponBuild.attackMode);
-
     onShoot?.({
       position: [
         shootSpawnPosition.x,
@@ -961,21 +956,6 @@
     pollMobileInput(body, activeCamera);
     updateBodyMovement(body, delta);
     keepBodyInRoom(body);
-
-    const velocity = body.linvel();
-    const rollingSpeed = Math.hypot(velocity.x, velocity.z);
-    const rollingScale = Math.max(
-      1,
-      settings.moveSpeed * scene.moveSpeedFactor
-    );
-
-    gameSfx.setPlayerRolling(
-      settings.cameraMode === "orbit" ||
-        scene.sceneControlsLocked ||
-        !isGroundedState
-        ? 0
-        : rollingSpeed / rollingScale
-    );
 
     const translation = body.translation();
 

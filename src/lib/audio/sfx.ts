@@ -27,18 +27,9 @@ interface OneShotGraph {
   start: number;
 }
 
-interface RollingLoop {
-  filter: BiquadFilterNode;
-  gain: GainNode;
-  oscillator: OscillatorNode;
-  source: AudioBufferSourceNode;
-}
-
 class GameSfxManager {
   #mix: SfxMixSettings = defaultSfxMix;
   #output: GainNode | null = null;
-  #rollingLoop: RollingLoop | null = null;
-  #lastRollingTickAt = 0;
 
   syncMix(settings: SfxMixSettings) {
     this.#mix = {
@@ -133,25 +124,6 @@ class GameSfxManager {
     this.#playSparkleSpray(context, root, start + 0.08);
   }
 
-  playPlayerLaserShot(shotId: number, attackMode: "beam" | "projectile") {
-    const shot = this.#beginOneShot(
-      attackMode === "beam" ? 0.76 : 0.84,
-      attackMode === "beam" ? 680 : 470,
-      0.003
-    );
-
-    if (!shot) {
-      return;
-    }
-
-    const { context, root, start } = shot;
-    const variant = Math.abs(shotId) % 4;
-
-    this.#playBlasterZap(context, root, start, variant, attackMode);
-    this.#playBlasterSnap(context, root, start + 0.002, variant, attackMode);
-    this.#playBlasterBody(context, root, start, variant, attackMode);
-  }
-
   playPlayerDamage() {
     const shot = this.#beginOneShot(0.88, 720, 0.002);
 
@@ -198,57 +170,6 @@ class GameSfxManager {
 
     this.#playSwordWhoosh(context, root, start, variant);
     this.#playSwordEdgeTone(context, root, start + 0.012, variant);
-  }
-
-  setPlayerRolling(amount: number) {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const normalizedAmount = clamp01(amount);
-
-    if (normalizedAmount <= 0.012 && !this.#rollingLoop) {
-      return;
-    }
-
-    const context = this.#getContext();
-    const output = this.#getOutput();
-
-    if (!(context && output)) {
-      return;
-    }
-
-    if (context.state === "suspended") {
-      context.resume().catch(() => undefined);
-    }
-
-    this.#rollingLoop ??= this.#createRollingLoop(context, output);
-
-    const { filter, gain, oscillator, source } = this.#rollingLoop;
-    const now = context.currentTime;
-    const active =
-      normalizedAmount > 0.045 &&
-      this.#mix.masterSoundEnabled &&
-      this.#mix.sfxSoundEnabled &&
-      this.#mix.masterVolume > 0 &&
-      this.#mix.sfxVolume > 0;
-    const targetGain = active ? 0.055 + normalizedAmount * 0.18 : 0;
-
-    gain.gain.setTargetAtTime(targetGain, now, active ? 0.055 : 0.16);
-    oscillator.frequency.setTargetAtTime(58 + normalizedAmount * 64, now, 0.08);
-    source.playbackRate.setTargetAtTime(
-      0.65 + normalizedAmount * 1.75,
-      now,
-      0.08
-    );
-    filter.frequency.setTargetAtTime(125 + normalizedAmount * 620, now, 0.09);
-    filter.Q.setTargetAtTime(1.25 + normalizedAmount * 1.35, now, 0.1);
-
-    if (active) {
-      this.#playRollingContactTick(context, output, now, normalizedAmount);
-    } else {
-      this.#lastRollingTickAt = now;
-    }
   }
 
   #beginOneShot(
@@ -355,118 +276,6 @@ class GameSfxManager {
     }
 
     return buffer;
-  }
-
-  #createLoopNoiseBuffer(context: AudioContext, durationSeconds: number) {
-    const length = Math.max(
-      1,
-      Math.floor(context.sampleRate * durationSeconds)
-    );
-    const buffer = context.createBuffer(1, length, context.sampleRate);
-    const data = buffer.getChannelData(0);
-    let sample = 0;
-
-    for (let index = 0; index < length; index += 1) {
-      sample = sample * 0.86 + (Math.random() * 2 - 1) * 0.14;
-      data[index] = sample * 0.7;
-    }
-
-    return buffer;
-  }
-
-  #createRollingLoop(context: AudioContext, output: GainNode): RollingLoop {
-    const source = context.createBufferSource();
-    const filter = context.createBiquadFilter();
-    const noiseGain = context.createGain();
-    const oscillator = context.createOscillator();
-    const oscillatorGain = context.createGain();
-    const gain = context.createGain();
-
-    source.buffer = this.#createLoopNoiseBuffer(context, 0.56);
-    source.loop = true;
-    source.playbackRate.setValueAtTime(0.65, context.currentTime);
-    filter.type = "bandpass";
-    filter.frequency.setValueAtTime(160, context.currentTime);
-    filter.Q.setValueAtTime(1.35, context.currentTime);
-    noiseGain.gain.setValueAtTime(0.74, context.currentTime);
-
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(58, context.currentTime);
-    oscillatorGain.gain.setValueAtTime(0.082, context.currentTime);
-    gain.gain.setValueAtTime(0, context.currentTime);
-
-    source.connect(filter);
-    filter.connect(noiseGain);
-    noiseGain.connect(gain);
-    oscillator.connect(oscillatorGain);
-    oscillatorGain.connect(gain);
-    gain.connect(output);
-    source.start();
-    oscillator.start();
-
-    return { filter, gain, oscillator, source };
-  }
-
-  #playRollingContactTick(
-    context: AudioContext,
-    output: GainNode,
-    now: number,
-    amount: number
-  ) {
-    const interval = 0.17 - amount * 0.095 + randomBetween(-0.014, 0.01);
-
-    if (now < this.#lastRollingTickAt + interval) {
-      return;
-    }
-
-    this.#lastRollingTickAt = now;
-
-    const start = now + 0.002;
-    const oscillator = context.createOscillator();
-    const source = context.createBufferSource();
-    const toneFilter = context.createBiquadFilter();
-    const noiseFilter = context.createBiquadFilter();
-    const gain = context.createGain();
-    const duration = 0.055 + amount * 0.028;
-
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(
-      randomBetween(78, 118) + amount * 58,
-      start
-    );
-    oscillator.frequency.exponentialRampToValueAtTime(
-      randomBetween(44, 62),
-      start + duration
-    );
-    toneFilter.type = "lowpass";
-    toneFilter.frequency.setValueAtTime(360 + amount * 420, start);
-
-    source.buffer = this.#createNoiseBuffer(context, duration + 0.02);
-    source.playbackRate.setValueAtTime(0.74 + amount * 0.5, start);
-    noiseFilter.type = "bandpass";
-    noiseFilter.frequency.setValueAtTime(190 + amount * 380, start);
-    noiseFilter.Q.setValueAtTime(2.6, start);
-
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(
-      0.026 + amount * 0.045,
-      start + 0.004
-    );
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-
-    oscillator.connect(toneFilter);
-    toneFilter.connect(gain);
-    source.connect(noiseFilter);
-    noiseFilter.connect(gain);
-    gain.connect(output);
-    oscillator.start(start);
-    oscillator.stop(start + duration + 0.012);
-    source.start(start);
-    source.stop(start + duration + 0.012);
-
-    window.setTimeout(() => {
-      gain.disconnect();
-    }, 140);
   }
 
   #playDullImpact(
@@ -584,155 +393,6 @@ class GameSfxManager {
     gain.connect(root);
     source.start(start);
     source.stop(start + 0.44);
-  }
-
-  #playBlasterBody(
-    context: AudioContext,
-    root: GainNode,
-    start: number,
-    variant: number,
-    attackMode: "beam" | "projectile"
-  ) {
-    const source = context.createBufferSource();
-    const highpass = context.createBiquadFilter();
-    const bandpass = context.createBiquadFilter();
-    const gain = context.createGain();
-    const duration = attackMode === "beam" ? 0.24 : 0.16;
-
-    source.buffer = this.#createNoiseBuffer(context, duration + 0.04);
-    source.playbackRate.setValueAtTime(1.8 + variant * 0.12, start);
-    highpass.type = "highpass";
-    highpass.frequency.setValueAtTime(1400 + variant * 120, start);
-    bandpass.type = "bandpass";
-    bandpass.frequency.setValueAtTime(3400 + variant * 420, start);
-    bandpass.frequency.exponentialRampToValueAtTime(
-      1200 + variant * 160,
-      start + duration
-    );
-    bandpass.Q.setValueAtTime(4.4, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(
-      attackMode === "beam" ? 0.105 : 0.14,
-      start + 0.006
-    );
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-
-    source.connect(highpass);
-    highpass.connect(bandpass);
-    bandpass.connect(gain);
-    gain.connect(root);
-    source.start(start);
-    source.stop(start + duration + 0.03);
-  }
-
-  #playBlasterZap(
-    context: AudioContext,
-    root: GainNode,
-    start: number,
-    variant: number,
-    attackMode: "beam" | "projectile"
-  ) {
-    const oscillator = context.createOscillator();
-    const detunedOscillator = context.createOscillator();
-    const gain = context.createGain();
-    const filter = context.createBiquadFilter();
-    const panner = context.createStereoPanner();
-    const startFrequency =
-      attackMode === "beam" ? 1480 + variant * 80 : 1720 + variant * 110;
-    const peakFrequency =
-      attackMode === "beam" ? 3600 + variant * 190 : 4300 + variant * 230;
-    const endFrequency =
-      attackMode === "beam" ? 360 + variant * 26 : 295 + variant * 34;
-    const duration = attackMode === "beam" ? 0.34 : 0.24;
-
-    oscillator.type = "sawtooth";
-    detunedOscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(startFrequency, start);
-    oscillator.frequency.exponentialRampToValueAtTime(
-      peakFrequency,
-      start + 0.022
-    );
-    oscillator.frequency.exponentialRampToValueAtTime(
-      endFrequency,
-      start + duration
-    );
-    detunedOscillator.frequency.setValueAtTime(startFrequency * 1.48, start);
-    detunedOscillator.frequency.exponentialRampToValueAtTime(
-      peakFrequency * 1.36,
-      start + 0.018
-    );
-    detunedOscillator.frequency.exponentialRampToValueAtTime(
-      endFrequency * 1.18,
-      start + duration * 0.92
-    );
-    filter.type = "bandpass";
-    filter.frequency.setValueAtTime(1900 + variant * 180, start);
-    filter.frequency.exponentialRampToValueAtTime(5800, start + 0.038);
-    filter.frequency.exponentialRampToValueAtTime(720, start + duration);
-    filter.Q.setValueAtTime(7.8, start);
-    panner.pan.setValueAtTime((variant - 1.5) * 0.08, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(
-      attackMode === "beam" ? 0.24 : 0.34,
-      start + 0.006
-    );
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-
-    oscillator.connect(filter);
-    detunedOscillator.connect(filter);
-    filter.connect(gain);
-    gain.connect(panner);
-    panner.connect(root);
-    oscillator.start(start);
-    detunedOscillator.start(start);
-    oscillator.stop(start + duration + 0.02);
-    detunedOscillator.stop(start + duration + 0.02);
-  }
-
-  #playBlasterSnap(
-    context: AudioContext,
-    root: GainNode,
-    start: number,
-    variant: number,
-    attackMode: "beam" | "projectile"
-  ) {
-    const source = context.createBufferSource();
-    const noiseFilter = context.createBiquadFilter();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    const filter = context.createBiquadFilter();
-    const duration = attackMode === "beam" ? 0.06 : 0.045;
-    const frequency =
-      attackMode === "beam" ? 5200 + variant * 320 : 6800 + variant * 440;
-
-    source.buffer = this.#createNoiseBuffer(context, duration + 0.02);
-    source.playbackRate.setValueAtTime(2.1 + variant * 0.16, start);
-    noiseFilter.type = "highpass";
-    noiseFilter.frequency.setValueAtTime(3400, start);
-    oscillator.type = "sawtooth";
-    oscillator.frequency.setValueAtTime(frequency, start);
-    oscillator.frequency.exponentialRampToValueAtTime(
-      frequency * 0.64,
-      start + duration
-    );
-    filter.type = "highpass";
-    filter.frequency.setValueAtTime(2100, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(
-      attackMode === "beam" ? 0.09 : 0.13,
-      start + 0.003
-    );
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-
-    source.connect(noiseFilter);
-    noiseFilter.connect(gain);
-    oscillator.connect(filter);
-    filter.connect(gain);
-    gain.connect(root);
-    source.start(start);
-    source.stop(start + duration + 0.01);
-    oscillator.start(start);
-    oscillator.stop(start + duration + 0.01);
   }
 
   #playDoorChainTicks(context: AudioContext, root: GainNode, start: number) {
