@@ -351,6 +351,7 @@
     return () => {
       cancelAnimationFrame(teleportFrame);
       cleanup();
+      gameSfx.setPlayerRolling(0);
     };
   });
 
@@ -960,6 +961,21 @@
     pollMobileInput(body, activeCamera);
     updateBodyMovement(body, delta);
     keepBodyInRoom(body);
+
+    const velocity = body.linvel();
+    const rollingSpeed = Math.hypot(velocity.x, velocity.z);
+    const rollingScale = Math.max(
+      1,
+      settings.moveSpeed * scene.moveSpeedFactor
+    );
+
+    gameSfx.setPlayerRolling(
+      settings.cameraMode === "orbit" ||
+        scene.sceneControlsLocked ||
+        !isGroundedState
+        ? 0
+        : rollingSpeed / rollingScale
+    );
 
     const translation = body.translation();
 

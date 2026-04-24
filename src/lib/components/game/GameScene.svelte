@@ -460,6 +460,7 @@
       roomPlatforms: scene.roomPlatforms,
       timing,
     });
+    const playerTookDamage = result.nextHealth < player.health;
 
     if (result.doorStartedOpening) {
       gameSfx.playDoorOpen();
@@ -477,6 +478,10 @@
     if (cheats.infiniteHealth) {
       player.health = player.maxHealth;
       return;
+    }
+
+    if (playerTookDamage) {
+      gameSfx.playPlayerDamage();
     }
 
     if (result.nextHealth <= 0) {
