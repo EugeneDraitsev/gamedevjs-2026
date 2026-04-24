@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import { gameMusic } from "$lib/audio/music";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import {
     createSceneSettings,
@@ -43,6 +45,16 @@
 
   $effect(() => {
     saveSceneSettings(settings);
+    gameMusic.syncMix(settings);
+  });
+
+  onMount(() => {
+    gameMusic.preload();
+    gameMusic.playCue("menu", {
+      fadeInMs: 2000,
+      fadeOutMs: 1500,
+      startDelayMs: 260,
+    });
   });
 </script>
 

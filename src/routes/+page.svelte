@@ -2,8 +2,10 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import { gameMusic } from "$lib/audio/music";
   import MainMenu from "$lib/components/app/MainMenu.svelte";
-  import { initialDungeonFloor } from "$lib/config/run-floor";
+  import { initialDungeonFloor, outsideFloor } from "$lib/config/run-floor";
+  import { loadSceneSettings } from "$lib/config/scene-settings";
   import { loadRunSave } from "$lib/game/run-save";
 
   const seed = "polygon-001";
@@ -12,9 +14,13 @@
 
   onMount(() => {
     const savedRun = loadRunSave(seed);
+    const settings = loadSceneSettings();
 
     canResume = Boolean(savedRun);
     floorIndex = savedRun?.floorIndex ?? initialDungeonFloor;
+    gameMusic.syncMix(settings);
+    gameMusic.preload();
+    gameMusic.playCue("menu", { fadeInMs: 1800, fadeOutMs: 1200 });
   });
 
   const withDebugParam = (path: string) => {
@@ -26,6 +32,22 @@
 
     return nextUrl;
   };
+
+  const openGameRoute = async (path: URL | string, floor: number) => {
+    await gameMusic.unlock();
+    gameMusic.playCue("level", {
+      fadeInMs: 2300,
+      fadeOutMs: 1800,
+      restart: floor < outsideFloor,
+      startDelayMs: 380,
+    });
+    await goto(path);
+  };
+
+  const openRoute = async (path: URL | string) => {
+    await gameMusic.unlock();
+    await goto(path);
+  };
 </script>
 
 <svelte:head> <title>Warden's Trial</title> </svelte:head>
@@ -33,8 +55,9 @@
 <MainMenu
   {canResume}
   {floorIndex}
-  onContinue={() => goto(withDebugParam(`/game/${seed}?continue=1`))}
-  onOpenSettings={() => goto(withDebugParam("/settings"))}
-  onPlay={() => goto(withDebugParam(`/game/${seed}`))}
+  onContinue={() =>
+    openGameRoute(withDebugParam(`/game/${seed}?continue=1`), floorIndex)}
+  onOpenSettings={() => openRoute(withDebugParam("/settings"))}
+  onPlay={() => openGameRoute(withDebugParam(`/game/${seed}`), initialDungeonFloor)}
   {seed}
 />

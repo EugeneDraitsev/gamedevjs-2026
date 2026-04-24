@@ -3,6 +3,11 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import {
+    gameMusic,
+    type MusicCue,
+    type MusicTransitionOptions,
+  } from "$lib/audio/music";
   import { DEFAULT_SWING, type SwingParams } from "$lib/combat/melee-swing";
   import FloorAdvanceTransition from "$lib/components/app/FloorAdvanceTransition.svelte";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
@@ -85,6 +90,7 @@
   let moduleInventory = $state<MachineModuleId[]>(
     createDefaultModuleInventory()
   );
+  let musicFloorIndex: number | null = null;
 
   const dungeon = $derived(
     createDungeonLayout(`${seed}-f${floorIndex}`, floorIndex)
@@ -210,6 +216,37 @@
     settingsOpen = true;
   };
 
+  const getMusicTransitionDefaults = (
+    cue: MusicCue,
+    options: MusicTransitionOptions
+  ): MusicTransitionOptions => {
+    if (cue === "boss") {
+      return { fadeInMs: 2600, fadeOutMs: 1900, startDelayMs: 420 };
+    }
+
+    if (cue === "level") {
+      return {
+        fadeInMs: options.restart ? 2200 : 1900,
+        fadeOutMs: options.restart ? 1700 : 1500,
+        startDelayMs: options.restart ? 420 : 260,
+      };
+    }
+
+    return { fadeOutMs: 1800 };
+  };
+
+  const handleMusicCue = (
+    cue: MusicCue,
+    options: MusicTransitionOptions = {}
+  ) => {
+    const defaults = getMusicTransitionDefaults(cue, options);
+
+    gameMusic.playCue(cue, {
+      ...defaults,
+      ...options,
+    });
+  };
+
   const openMachineBay = () => {
     if (settingsOpen || demoCompleteOpen) {
       return;
@@ -234,6 +271,11 @@
 
   const openMainMenu = async () => {
     demoCompleteOpen = false;
+    gameMusic.playCue("menu", {
+      fadeInMs: 2400,
+      fadeOutMs: 1800,
+      startDelayMs: 360,
+    });
     await goto(withDebugParam("/"));
   };
 
@@ -354,6 +396,18 @@
 
   $effect(() => {
     saveSceneSettings(settings);
+    gameMusic.syncMix(settings);
+  });
+
+  $effect(() => {
+    if (!runReady) {
+      return;
+    }
+
+    const restart = musicFloorIndex !== null && musicFloorIndex !== floorIndex;
+
+    musicFloorIndex = floorIndex;
+    handleMusicCue("level", { restart });
   });
 
   $effect(() => {
@@ -386,6 +440,8 @@
 
     runReady = true;
     touchControls = isTouchDevice();
+    gameMusic.preload();
+    gameMusic.syncMix(settings);
 
     const coarseQuery = window.matchMedia("(pointer: coarse)");
     const onCoarseChange = (event: MediaQueryListEvent) => {
@@ -472,6 +528,7 @@
         onCollectArtifact={collectArtifact}
         onEndDemo={openDemoComplete}
         onGearCountChange={(value) => (gearCount = value)}
+        onMusicCue={handleMusicCue}
         onOpenSettings={openSettings}
         onOpenWeaponLab={openMachineBay}
         {settings}

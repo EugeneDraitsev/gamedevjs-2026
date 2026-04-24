@@ -67,6 +67,7 @@
     onCollectArtifact,
     onEndDemo,
     onGearCountChange,
+    onMusicCue,
     onOpenSettings,
     onOpenWeaponLab,
     settings,
@@ -172,6 +173,17 @@
         room.teleportTo([0, 1.1, startBounds.teleportZ * 0.92]);
       }
     });
+  });
+
+  $effect(() => {
+    const currentRoom = scene.currentRoom;
+
+    if (currentRoom.kind === "boss") {
+      onMusicCue?.(room.clearedSet.has(currentRoom.id) ? "silence" : "boss");
+      return;
+    }
+
+    onMusicCue?.("level");
   });
 
   $effect(() => {
@@ -397,6 +409,7 @@
 
     if (result.roomCleared && scene.currentRoom.kind === "boss") {
       timing.beginBossDeath(time);
+      onMusicCue?.("silence", { fadeOutMs: 2400 });
     }
 
     if (cheats.infiniteHealth) {

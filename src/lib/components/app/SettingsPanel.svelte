@@ -64,6 +64,50 @@
     >
   </label>
 
+  <label class="toggle">
+    <input type="checkbox" bind:checked={settings.masterSoundEnabled}>
+    <span>Master Sound</span>
+  </label>
+
+  <label class="slider">
+    <span class="slider-label">
+      <span>Master Volume</span>
+      <span class="slider-value">
+        {Math.round(settings.masterVolume * 100)}%
+      </span>
+    </span>
+    <input
+      type="range"
+      min="0"
+      max="1"
+      step="0.05"
+      bind:value={settings.masterVolume}
+      disabled={!settings.masterSoundEnabled}
+    >
+  </label>
+
+  <label class="toggle">
+    <input type="checkbox" bind:checked={settings.musicSoundEnabled}>
+    <span>Music Sound</span>
+  </label>
+
+  <label class="slider">
+    <span class="slider-label">
+      <span>Music Volume</span>
+      <span class="slider-value">
+        {Math.round(settings.musicVolume * 100)}%
+      </span>
+    </span>
+    <input
+      type="range"
+      min="0"
+      max="1"
+      step="0.05"
+      bind:value={settings.musicVolume}
+      disabled={!(settings.masterSoundEnabled && settings.musicSoundEnabled)}
+    >
+  </label>
+
   {#if onDebugEnabledChange}
     <label class="toggle">
       <input
@@ -181,6 +225,11 @@
     accent-color: #d5b06f;
     cursor: pointer;
     background: transparent;
+  }
+
+  .slider input[type="range"]:disabled {
+    cursor: default;
+    opacity: 0.42;
   }
 
   .actions {

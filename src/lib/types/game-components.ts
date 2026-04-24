@@ -1,5 +1,6 @@
 import type { BufferGeometry, ShaderMaterial, Texture } from "three";
 import type { OrbitControls as OrbitControlsInstance } from "three/examples/jsm/controls/OrbitControls.js";
+import type { MusicCue, MusicTransitionOptions } from "$lib/audio/music";
 import type { SwingParams } from "$lib/combat/melee-swing";
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
 import type {
@@ -41,6 +42,7 @@ export interface GameSceneProps {
   onCollectArtifact?: (roomId: string, type: MachineModuleId) => void;
   onEndDemo?: () => void;
   onGearCountChange?: (gearCount: number) => void;
+  onMusicCue?: (cue: MusicCue, options?: MusicTransitionOptions) => void;
   onOpenSettings?: () => void;
   onOpenWeaponLab?: () => void;
   settings: SceneSettings;

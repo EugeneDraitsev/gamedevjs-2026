@@ -20,6 +20,8 @@ export interface SceneSettings {
   hemisphereLightIntensity: number;
   jumpSpeed: number;
   lookHeight: number;
+  masterSoundEnabled: boolean;
+  masterVolume: number;
   meleeArcSpan: number;
   meleeBand1Alpha: number;
   meleeBand1Center: number;
@@ -42,6 +44,8 @@ export interface SceneSettings {
   minimapOpacity: number;
   moveResponsiveness: number;
   moveSpeed: number;
+  musicSoundEnabled: boolean;
+  musicVolume: number;
   playerLinearDamping: number;
   shadowBias: number;
   shadowFar: number;
@@ -96,6 +100,10 @@ export const createSceneSettings = (): SceneSettings => ({
   meleeSwordOpacity: 0.5,
   meleeTailLength: 0.59,
   minimapOpacity: 0.82,
+  masterSoundEnabled: true,
+  masterVolume: 0.86,
+  musicSoundEnabled: true,
+  musicVolume: 0.72,
   moveResponsiveness: 12,
   moveSpeed: 7,
   playerLinearDamping: 1.6,
