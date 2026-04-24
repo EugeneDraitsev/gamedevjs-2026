@@ -68,18 +68,18 @@
         .replace(
           "#include <color_fragment>",
           /* glsl */ `
-              #include <color_fragment>
-              vec3 rustA = vec3(0.42, 0.22, 0.12);
-              vec3 rustB = vec3(0.25, 0.13, 0.07);
-              vec3 mossC = vec3(0.22, 0.36, 0.14);
-              float stripe = abs(sin(vLocalPos.y * 6.0 + vLocalPos.x * 1.5));
-              float rustMask = mix(0.4, 1.0, stripe) * uRust;
-              float moss = smoothstep(-0.4, -1.0, vLocalPos.y) * 0.8;
-              vec3 col = mix(diffuseColor.rgb, rustA, rustMask * 0.85);
-              col = mix(col, rustB, rustMask * 0.35);
-              col = mix(col, mossC, moss * 0.7);
-              diffuseColor.rgb = col;
-              `
+            #include <color_fragment>
+            vec3 rustA = vec3(0.42, 0.22, 0.12);
+            vec3 rustB = vec3(0.25, 0.13, 0.07);
+            vec3 mossC = vec3(0.22, 0.36, 0.14);
+            float stripe = abs(sin(vLocalPos.y * 6.0 + vLocalPos.x * 1.5));
+            float rustMask = mix(0.4, 1.0, stripe) * uRust;
+            float moss = smoothstep(-0.4, -1.0, vLocalPos.y) * 0.8;
+            vec3 col = mix(diffuseColor.rgb, rustA, rustMask * 0.85);
+            col = mix(col, rustB, rustMask * 0.35);
+            col = mix(col, mossC, moss * 0.7);
+            diffuseColor.rgb = col;
+            `
         )
         .replace(
           "#include <roughnessmap_fragment>",
