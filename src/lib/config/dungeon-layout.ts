@@ -154,48 +154,54 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
     floor === 1 ? floor1NormalTemplateIds : floor2NormalTemplateIds;
   const sampleNormalTemplateId = () =>
     normalTemplatePool[Math.floor(random() * normalTemplatePool.length)];
+  const outside = createRoom("normal", [0, 1], "outside-start");
   const start = createRoom("polygon", [0, 0], "polygon-training");
-  const branches = sampleUnique(directions, 3, random).map((direction) => {
-    const firstRoom = createRoom(
-      "normal",
-      [start.grid[0] + direction.dx, start.grid[1] + direction.dy],
-      sampleNormalTemplateId()
-    );
 
-    connectRooms(start, firstRoom, direction.key);
+  connectRooms(outside, start, "north");
 
-    const rooms = [start, firstRoom];
-
-    for (
-      let step = 0;
-      step < (floor === 1 ? 1 : 3) + Math.floor(random() * 2);
-      step += 1
-    ) {
-      const previous = rooms.at(-1) ?? firstRoom;
-      const options = getFreeDirections(previous.grid);
-
-      if (options.length === 0) {
-        break;
-      }
-
-      const nextDirection =
-        options.find((candidate) => candidate.key === direction.key) ??
-        options[Math.floor(random() * options.length)];
-      const nextRoom = createRoom(
+  const branches = sampleUnique(getFreeDirections(start.grid), 3, random).map(
+    (direction) => {
+      const firstRoom = createRoom(
         "normal",
-        [
-          previous.grid[0] + nextDirection.dx,
-          previous.grid[1] + nextDirection.dy,
-        ],
+        [start.grid[0] + direction.dx, start.grid[1] + direction.dy],
         sampleNormalTemplateId()
       );
 
-      connectRooms(previous, nextRoom, nextDirection.key);
-      rooms.push(nextRoom);
-    }
+      connectRooms(start, firstRoom, direction.key);
 
-    return { direction: direction.key, rooms };
-  });
+      const rooms = [start, firstRoom];
+
+      for (
+        let step = 0;
+        step < (floor === 1 ? 1 : 3) + Math.floor(random() * 2);
+        step += 1
+      ) {
+        const previous = rooms.at(-1) ?? firstRoom;
+        const options = getFreeDirections(previous.grid);
+
+        if (options.length === 0) {
+          break;
+        }
+
+        const nextDirection =
+          options.find((candidate) => candidate.key === direction.key) ??
+          options[Math.floor(random() * options.length)];
+        const nextRoom = createRoom(
+          "normal",
+          [
+            previous.grid[0] + nextDirection.dx,
+            previous.grid[1] + nextDirection.dy,
+          ],
+          sampleNormalTemplateId()
+        );
+
+        connectRooms(previous, nextRoom, nextDirection.key);
+        rooms.push(nextRoom);
+      }
+
+      return { direction: direction.key, rooms };
+    }
+  );
   const mainBranch = [...branches].sort(
     (left, right) => right.rooms.length - left.rooms.length
   )[0];
@@ -250,6 +256,6 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
     initialModules: [...commonModules],
     rooms,
     seed,
-    startRoomId: start.id,
+    startRoomId: outside.id,
   };
 };

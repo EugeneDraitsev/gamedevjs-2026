@@ -3,6 +3,7 @@
     BoxGeometry,
     ConeGeometry,
     CylinderGeometry,
+    GreaterDepth,
     MeshBasicMaterial,
     MeshStandardMaterial,
     RingGeometry,
@@ -88,6 +89,20 @@
 </script>
 
 <T.Group position={enemy.position}>
+  <T.Mesh
+    geometry={enemyBodyGeometry}
+    renderOrder={29}
+    scale={[enemy.radius * 1.12, enemy.radius * 1.12, enemy.radius * 1.12]}
+  >
+    <T.MeshBasicMaterial
+      color="#ff5353"
+      depthFunc={GreaterDepth}
+      opacity={0.22}
+      transparent
+      depthWrite={false}
+    />
+  </T.Mesh>
+
   {#if enemy.radius > 1}
     <T.Mesh
       geometry={enemyRingGeometry}

@@ -21,35 +21,6 @@
     avoid = [],
   }: Props = $props();
 
-  // --- Distant silhouettes for background depth ---
-  const farSilhouettes = Array.from({ length: 22 }, (_, i) => {
-    const angle = (i / 22) * Math.PI * 2 + Math.sin(i * 7.1) * 0.08;
-    const radius = 180 + Math.sin(i * 11.1) * 28;
-    const height = 24 + ((i * 37) % 18);
-    const base = 28 + ((i * 13) % 10);
-    return {
-      id: `far-sil-${i}`,
-      x: Math.cos(angle) * radius,
-      z: Math.sin(angle) * radius,
-      height,
-      base,
-    };
-  });
-
-  const closerRuinRow = Array.from({ length: 14 }, (_, i) => {
-    const angle = (i / 14) * Math.PI * 2 + Math.sin(i * 3.7) * 0.12;
-    const radius = 130 + Math.sin(i * 5.1) * 10;
-    const h = 10 + ((i * 19) % 8);
-    const w = 6 + ((i * 7) % 5);
-    return {
-      id: `close-sil-${i}`,
-      x: Math.cos(angle) * radius,
-      z: Math.sin(angle) * radius,
-      h,
-      w,
-    };
-  });
-
   // --- Procedural grass blade geometry ---
   const createBladeGeometry = () => {
     const geo = new BufferGeometry();
@@ -121,9 +92,7 @@
       // patchy density - favor some areas
       const density =
         0.55 +
-        0.45 *
-          Math.sin(x * 0.11 + z * 0.16) *
-          Math.cos(x * 0.19 - z * 0.11);
+        0.45 * Math.sin(x * 0.11 + z * 0.16) * Math.cos(x * 0.19 - z * 0.11);
       if (rng() > density) continue;
       // avoid roads, structures, water
       let skip = false;
@@ -153,25 +122,6 @@
     grassUniforms.uTime.value += delta;
   });
 </script>
-
-<!-- Distant silhouette peaks — sits inside fog, painting the horizon.
-     We skip a full sky dome because the game camera is near-top-down and
-     the dome introduced clipping artifacts; the fog + silhouettes already
-     give the scene its background depth. -->
-{#each farSilhouettes as sil (sil.id)}
-  <T.Mesh position={[sil.x, sil.height / 2 - 4, sil.z]} renderOrder={-5}>
-    <T.ConeGeometry args={[sil.base, sil.height, 7]} />
-    <T.MeshBasicMaterial color="#1d2232" fog={true} />
-  </T.Mesh>
-{/each}
-
-<!-- Closer broken-city silhouettes -->
-{#each closerRuinRow as sil (sil.id)}
-  <T.Mesh position={[sil.x, sil.h / 2 - 2, sil.z]} renderOrder={-4}>
-    <T.BoxGeometry args={[sil.w, sil.h, 4]} />
-    <T.MeshBasicMaterial color="#141826" fog={true} />
-  </T.Mesh>
-{/each}
 
 <!-- Instanced swaying grass -->
 <T is={grassMesh} />

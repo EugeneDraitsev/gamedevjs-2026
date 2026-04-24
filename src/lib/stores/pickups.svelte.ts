@@ -1,7 +1,7 @@
 import type { RoomTemplate } from "$lib/config/room-templates";
 import { collectPickups, createRoomPickups } from "$lib/game/pickups";
 import { getRoomHazards, getRoomPlatforms } from "$lib/game/scene-layout";
-import type { ActivePickup, RoomPlatform, Vec3 } from "$lib/types/game";
+import type { ActivePickup, Vec3 } from "$lib/types/game";
 
 export class PickupStore {
   currentRoomId = $state("");
@@ -40,6 +40,12 @@ export class PickupStore {
     }
   }
 
+  seedRoom(roomId: string, items: ActivePickup[]) {
+    if (!(roomId in this.itemsByRoomId)) {
+      this.itemsByRoomId = { ...this.itemsByRoomId, [roomId]: items };
+    }
+  }
+
   dropRoom(roomId: string, template: RoomTemplate, now: number) {
     const roomItems = this.itemsByRoomId[roomId] ?? [];
     const drops = createRoomPickups(
@@ -62,12 +68,7 @@ export class PickupStore {
     }
   }
 
-  collectAt(
-    position: Vec3,
-    health: number,
-    maxHealth: number,
-    obstacles: RoomPlatform[] = []
-  ) {
+  collectAt(position: Vec3, health: number, maxHealth: number) {
     if (this.items.length === 0) {
       return {
         gearDelta: 0,
@@ -77,19 +78,9 @@ export class PickupStore {
       };
     }
 
-    const result = collectPickups(
-      this.items,
-      position,
-      health,
-      maxHealth,
-      performance.now(),
-      { obstacles }
-    );
+    const result = collectPickups(this.items, position, health, maxHealth);
 
-    if (
-      result.pickups.length !== this.items.length ||
-      result.pickups.some((pickup, index) => pickup !== this.items[index])
-    ) {
+    if (result.pickups.length !== this.items.length) {
       this.itemsByRoomId = {
         ...this.itemsByRoomId,
         [this.currentRoomId]: result.pickups,

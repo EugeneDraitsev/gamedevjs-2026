@@ -6,6 +6,7 @@
 // as road (paints the biome grid).
 
 import { cellToWorld } from "./heightmap";
+import { makeNoise2D } from "./rng";
 import { biomeIndex, type ChunkSize, type PolyPath } from "./types";
 
 export interface RoadsParams {
@@ -20,6 +21,7 @@ export interface RoadsParams {
   routes: Array<Array<[number, number]>>;
   widthHalf: number;
   branchWidthHalf?: number; // optional narrower branches
+  seedHash?: number;
 }
 
 export interface RoadsResult {
@@ -46,6 +48,24 @@ const worldToCell = (size: ChunkSize, x: number, z: number) => {
     )
   );
   return { col, row };
+};
+
+const smoothPath = (points: Array<[number, number]>) => {
+  let out = points;
+  for (let pass = 0; pass < 2; pass++) {
+    const next: Array<[number, number]> = [out[0]];
+    for (let i = 0; i + 1 < out.length; i++) {
+      const [ax, az] = out[i];
+      const [bx, bz] = out[i + 1];
+      next.push(
+        [ax * 0.75 + bx * 0.25, az * 0.75 + bz * 0.25],
+        [ax * 0.25 + bx * 0.75, az * 0.25 + bz * 0.75]
+      );
+    }
+    next.push(out[out.length - 1]);
+    out = next;
+  }
+  return out;
 };
 
 // Min-heap for A* open set
@@ -96,6 +116,7 @@ export const buildRoads = (p: RoadsParams): RoadsResult => {
   const rows = size.rows + 1;
   const total = cols * rows;
   const roadIdx = biomeIndex("road");
+  const roadNoise = makeNoise2D((p.seedHash ?? 1) + 0x4f1bbcdc);
 
   // 1) Cost grid — inside playable zone only. Mountain cells get
   //    an astronomical cost so A* never climbs them.
@@ -106,8 +127,11 @@ export const buildRoads = (p: RoadsParams): RoadsResult => {
       continue;
     }
     const s = slope[i];
-    let c = 1 + s * 4.2;
-    if (water[i]) c += 20;
+    const col = i % cols;
+    const row = (i - col) / cols;
+    const { x, z } = cellToWorld(size, col, row);
+    let c = 1 + s * 4.2 + (roadNoise(x * 0.045, z * 0.045) + 1) * 2.2;
+    if (water[i]) c += 80;
     const b = biome[i];
     if (b === biomeIndex("cliff") || b === biomeIndex("snow")) c += 25;
     if (b === biomeIndex("scree")) c += 6;
@@ -207,7 +231,7 @@ export const buildRoads = (p: RoadsParams): RoadsResult => {
     const { x: lx, z: lz } = cellToWorld(size, lastCol, lastRow);
     points.push([lx, lz]);
 
-    paths.push({ points, widthHalf });
+    paths.push({ points: smoothPath(points), widthHalf });
 
     // stamp road cells + grant a discount so later routes merge
     const stampR = Math.ceil((widthHalf / size.width) * size.cols) + 1;

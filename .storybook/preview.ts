@@ -15,7 +15,7 @@ const preview: Preview = {
       storySort: {
         order: [
           "Playgrounds",
-          ["Player", "Combat"],
+          ["Player", "Combat", "Water"],
           "Rooms",
           ["Preview"],
           "Models",

@@ -7,7 +7,7 @@
 // a gameplay obstacle rather than as ocean pools at the mountain foot.
 
 import { cellToWorld } from "./heightmap";
-import { makeNoise2D } from "./rng";
+import { createRng, makeNoise2D } from "./rng";
 import type { ChunkSize, PolyPath } from "./types";
 
 export interface HydrologyParams {
@@ -15,9 +15,12 @@ export interface HydrologyParams {
   height: Float32Array; // mutated (carved)
   playable: Uint8Array; // only carve inside
   seedHash: number;
+  playableHalfWidth: number;
+  playableHalfDepth: number;
   waterLevel: number;
   riverHalfWidth: number; // world units
   riverDepth: number; // how deep to carve below waterLevel
+  protectedPoints?: Array<[number, number, number]>; // x, z, clear radius
 }
 
 export interface HydrologyResult {
@@ -57,24 +60,88 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
   const flow = new Float32Array(total);
 
   const meanderNoise = makeNoise2D(p.seedHash ^ 0x1eadbeef);
+  const rng = createRng(p.seedHash + 0x6a09e667);
   const halfW = size.width * 0.5;
   const halfD = size.depth * 0.5;
+  const playW = p.playableHalfWidth;
+  const playD = p.playableHalfDepth;
 
-  // Pick two rivers: one runs N→S on the east side, another W→E on the
-  // south side. Endpoints are chosen well inside the playable zone so
-  // rivers always cross the arena rather than hugging the mountain edge.
-  const rivers: { a: [number, number]; b: [number, number]; meanderAmp: number }[] = [
-    {
-      a: [halfW * 0.45, -halfD * 0.6],
-      b: [halfW * 0.25, halfD * 0.65],
-      meanderAmp: 6,
-    },
-    {
-      a: [-halfW * 0.55, halfD * 0.2],
-      b: [halfW * 0.1, halfD * 0.55],
-      meanderAmp: 5,
-    },
-  ];
+  const pointOnSide = (side: number): [number, number] => {
+    const x = (rng() * 2 - 1) * playW * 0.9;
+    const z = (rng() * 2 - 1) * playD * 0.9;
+    if (side === 0) return [x, -playD * 0.96];
+    if (side === 1) return [playW * 0.96, z];
+    if (side === 2) return [x, playD * 0.96];
+    return [-playW * 0.96, z];
+  };
+  const distToSegment = (
+    px: number,
+    pz: number,
+    a: [number, number],
+    b: [number, number]
+  ) => {
+    const dx = b[0] - a[0];
+    const dz = b[1] - a[1];
+    const t = Math.max(
+      0,
+      Math.min(1, ((px - a[0]) * dx + (pz - a[1]) * dz) / (dx * dx + dz * dz || 1))
+    );
+    return Math.hypot(px - (a[0] + dx * t), pz - (a[1] + dz * t));
+  };
+  const isSafe = (a: [number, number], b: [number, number]) =>
+    !(p.protectedPoints ?? []).some(([x, z, r]) => distToSegment(x, z, a, b) < r);
+
+  const rivers: {
+    a: [number, number];
+    b: [number, number];
+    meanderAmp: number;
+    noiseOffset: number;
+    widthHalf: number;
+  }[] = [];
+  let mainSide = Math.floor(rng() * 4);
+  let mainA = pointOnSide(mainSide);
+  let mainB = pointOnSide((mainSide + 2) % 4);
+  for (let attempt = 0; attempt < 16 && !isSafe(mainA, mainB); attempt++) {
+    mainSide = Math.floor(rng() * 4);
+    mainA = pointOnSide(mainSide);
+    mainB = pointOnSide((mainSide + 2) % 4);
+  }
+  const main = {
+    a: mainA,
+    b: mainB,
+    meanderAmp: 8 + rng() * 9,
+    noiseOffset: rng() * 100,
+    widthHalf: p.riverHalfWidth * (1.05 + rng() * 0.22),
+  };
+  rivers.push(main);
+
+  for (let i = 0; i < 1 + Math.floor(rng() * 2); i++) {
+    let side = (mainSide + 1 + i * 2) % 4;
+    let a = pointOnSide(side);
+    let b: [number, number] = [0, 0];
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const joinT = 0.34 + rng() * 0.42;
+      b = pointOnRiver(
+        joinT,
+        main.a[0],
+        main.a[1],
+        main.b[0],
+        main.b[1],
+        (x, y) => meanderNoise(x + main.noiseOffset, y),
+        main.meanderAmp
+      );
+      if (isSafe(a, b)) break;
+      side = Math.floor(rng() * 4);
+      a = pointOnSide(side);
+    }
+    rivers.push({
+      a,
+      b,
+      meanderAmp: 5 + rng() * 7,
+      noiseOffset: rng() * 100,
+      widthHalf: p.riverHalfWidth * (0.62 + rng() * 0.22),
+    });
+  }
 
   const riverPaths: PolyPath[] = [];
   const samplesPerRiver = 56;
@@ -84,15 +151,30 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
     for (let i = 0; i <= samplesPerRiver; i++) {
       const t = i / samplesPerRiver;
       pts.push(
-        pointOnRiver(t, spec.a[0], spec.a[1], spec.b[0], spec.b[1], meanderNoise, spec.meanderAmp)
+        pointOnRiver(
+          t,
+          spec.a[0],
+          spec.a[1],
+          spec.b[0],
+          spec.b[1],
+          (x, y) => meanderNoise(x + spec.noiseOffset, y),
+          spec.meanderAmp
+        )
       );
     }
-    riverPaths.push({ points: pts, widthHalf: p.riverHalfWidth });
+    riverPaths.push({ points: pts, widthHalf: spec.widthHalf });
   }
 
   // Carve each river: dip terrain below waterLevel within riverHalfWidth.
-  const carveRadius = p.riverHalfWidth + 0.5;
-  const carve = (wx: number, wz: number) => {
+  const carve = (wx: number, wz: number, widthHalf: number) => {
+    if (
+      (p.protectedPoints ?? []).some(
+        ([x, z, r]) => Math.hypot(x - wx, z - wz) < r
+      )
+    ) {
+      return;
+    }
+    const carveRadius = widthHalf + 0.8;
     const colCenter = ((wx + halfW) / size.width) * size.cols;
     const rowCenter = ((wz + halfD) / size.depth) * size.rows;
     const r = Math.ceil((carveRadius / size.width) * size.cols) + 1;
@@ -108,7 +190,7 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
         if (d > carveRadius) continue;
         const t = 1 - d / carveRadius;
         const depth = Math.pow(t, 1.3) * p.riverDepth;
-        const target = p.waterLevel - depth * 0.45; // river bed sits below waterLevel
+        const target = p.waterLevel - depth * 0.72; // river bed sits below waterLevel
         if (height[idx] > target) height[idx] = target;
       }
     }
@@ -124,7 +206,7 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
         const t = s / steps;
         const x = ax + (bx - ax) * t;
         const z = az + (bz - az) * t;
-        carve(x, z);
+        carve(x, z, river.widthHalf);
       }
     }
   }

@@ -254,6 +254,16 @@
     { position: [17, 0.14, -16], rotation: -0.55 },
     { position: [-14, 0.14, -59], rotation: 0.5 },
   ];
+  const outsideWrecks: { color: string; position: Vec3; rotation: number }[] = [
+    { color: "#6b3e27", position: [-9, 0, 49], rotation: -0.28 },
+    { color: "#405045", position: [12, 0, -35], rotation: 0.38 },
+    { color: "#6a5a3c", position: [-18, 0, -12], rotation: 0.72 },
+  ];
+  const outsideBarriers: { position: Vec3; rotation: number }[] = [
+    { position: [5.5, 0, 35], rotation: -0.22 },
+    { position: [-6.5, 0, 4], rotation: 0.18 },
+    { position: [7, 0, -55], rotation: -0.14 },
+  ];
   const outsideDecals: {
     args: Vec3;
     kind: "earth" | "rock" | "water";
@@ -619,6 +629,11 @@
         z: c.position[2],
         r: 2.4,
       })),
+      ...outsideWrecks.map((w) => ({
+        x: w.position[0],
+        z: w.position[2],
+        r: 2.5,
+      })),
       ...outsidePoiMarkers.map((p) => ({
         x: p.position[0],
         z: p.position[2],
@@ -675,6 +690,85 @@
   <!-- Winding procedural road ribbon following the seed-driven centerline -->
   <OutsideRoad />
 
+  {#each outsideWrecks as wreck}
+    <T.Group
+      position={onGround(wreck.position, 0.08)}
+      rotation={[0, wreck.rotation, 0]}
+    >
+      <T.Group position={[0, 0.52, 0]}>
+        <RigidBody type="fixed">
+          <Collider shape="cuboid" args={[1.42, 0.52, 0.72]} friction={0.92} />
+        </RigidBody>
+      </T.Group>
+      <T.Mesh castShadow receiveShadow position={[0, 0.25, 0]}>
+        <T.BoxGeometry args={[2.7, 0.5, 1.25]} />
+        <T.MeshStandardMaterial
+          color={wreck.color}
+          metalness={0.18}
+          roughness={0.93}
+        />
+      </T.Mesh>
+      <T.Mesh castShadow receiveShadow position={[0.18, 0.68, -0.05]}>
+        <T.BoxGeometry args={[1.1, 0.55, 1.02]} />
+        <T.MeshStandardMaterial
+          color="#27332d"
+          metalness={0.1}
+          roughness={0.96}
+        />
+      </T.Mesh>
+      <T.Mesh position={[0.2, 0.72, -0.58]} rotation={[0.12, 0, 0]}>
+        <T.BoxGeometry args={[0.9, 0.04, 0.52]} />
+        <T.MeshBasicMaterial color="#8fb1a1" opacity={0.23} transparent />
+      </T.Mesh>
+      {#each [-1, 1] as x}
+        {#each [-1, 1] as z}
+          <T.Mesh
+            castShadow
+            position={[x * 0.95, 0.1, z * 0.64]}
+            rotation={[Math.PI / 2, 0, 0]}
+          >
+            <T.CylinderGeometry args={[0.22, 0.22, 0.18, 10]} />
+            <T.MeshStandardMaterial color="#151512" roughness={0.9} />
+          </T.Mesh>
+        {/each}
+      {/each}
+    </T.Group>
+  {/each}
+
+  {#each outsideBarriers as barrier}
+    <T.Group
+      position={onGround(barrier.position, 0.12)}
+      rotation={[0, barrier.rotation, 0]}
+    >
+      <T.Group position={[0, 0.16, 0]}>
+        <RigidBody type="fixed">
+          <Collider shape="cuboid" args={[1.4, 0.16, 0.12]} friction={0.9} />
+        </RigidBody>
+      </T.Group>
+      {#each [-1, 1] as x}
+        <T.Group position={[x * 1.08, 0.52, 0]}>
+          <RigidBody type="fixed">
+            <Collider shape="cuboid" args={[0.08, 0.4, 0.08]} friction={0.9} />
+          </RigidBody>
+        </T.Group>
+      {/each}
+      <T.Mesh castShadow receiveShadow position={[0, 0.16, 0]}>
+        <T.BoxGeometry args={[2.8, 0.32, 0.24]} />
+        <T.MeshStandardMaterial color="#77705e" roughness={0.95} />
+      </T.Mesh>
+      {#each [-1, 1] as x}
+        <T.Mesh castShadow receiveShadow position={[x * 1.08, 0.52, 0]}>
+          <T.BoxGeometry args={[0.16, 0.8, 0.16]} />
+          <T.MeshStandardMaterial
+            color="#4d4437"
+            metalness={0.3}
+            roughness={0.82}
+          />
+        </T.Mesh>
+      {/each}
+    </T.Group>
+  {/each}
+
   {#each outsideClearings as slab}
     <OutsideSurface
       args={slab.args}
@@ -711,6 +805,9 @@
   <OutsidePOIs />
 
   <T.Group position={[0, 0.12, -78.8]}>
+    <RigidBody type="fixed">
+      <Collider shape="cuboid" args={[3.9, 0.06, 1.55]} friction={0.96} />
+    </RigidBody>
     <T.Mesh receiveShadow>
       <T.BoxGeometry args={[7.8, 0.12, 3.1]} />
       <T.MeshStandardMaterial color="#3e4039" roughness={0.9} />

@@ -24,6 +24,7 @@
   } from "$lib/config/weapon-graph";
   import { isEditableTarget } from "$lib/game/dom";
   import { isTouchDevice } from "$lib/game/mobile";
+  import { setOutsideChunkSeed } from "$lib/game/outside-chunk-context";
   import { clearRunSave, loadRunSave, saveRunSave } from "$lib/game/run-save";
   import { mobileInput } from "$lib/stores/mobile-input.svelte";
   import type { MeleeTrailSettings } from "$lib/types/game";
@@ -141,6 +142,10 @@
     }
 
     return nextUrl;
+  };
+  const sceneKey = () => {
+    setOutsideChunkSeed(`outside-${dungeon.seed}`);
+    return `${dungeon.seed}:${sceneResetKey}`;
   };
 
   const openMainMenu = async () => {
@@ -299,7 +304,7 @@
 
 <main class="stage">
   {#if runReady}
-    {#key sceneResetKey}
+    {#key sceneKey()}
       <GameScene
         collectedArtifactRoomIds={collectedArtifactRooms}
         {controlsLocked}

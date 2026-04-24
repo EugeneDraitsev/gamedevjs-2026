@@ -1,8 +1,11 @@
 <script lang="ts">
   import { T } from "@threlte/core";
+  import { onMount } from "svelte";
+  import { GreaterDepth } from "three";
   import BombActor from "$lib/components/game/scene/BombActor.svelte";
   import EnemyActor from "$lib/components/game/scene/EnemyActor.svelte";
   import PickupActor from "$lib/components/game/scene/PickupActor.svelte";
+  import WaterWake from "$lib/components/game/scene/WaterWake.svelte";
   import { enemyTemplateById } from "$lib/config/room-templates";
   import { getGameSceneContext } from "$lib/stores/scene-context";
   import type {
@@ -13,9 +16,16 @@
   } from "$lib/types/game";
 
   const scene = getGameSceneContext();
-  const { combat, pickups, player, timing } = scene;
-  const enemyWarmups: ActiveEnemy[] = Object.values(enemyTemplateById).map(
-    (template, index) => ({
+  const { combat, pickups, timing } = scene;
+  const enemyWarmups: ActiveEnemy[] = [
+    "scrap-runner",
+    "coil-sentry",
+    "iron-warden",
+    "mine-herald",
+  ].map((templateId, index) => {
+    const template = enemyTemplateById[templateId];
+
+    return {
       behavior: template.behavior,
       bombArmMs: template.bombArmMs,
       bombColor: template.bombColor,
@@ -30,7 +40,7 @@
       bombTtlMs: template.bombTtlMs,
       color: template.color,
       hp: template.hp,
-      id: `enemy-warmup-${template.id}`,
+      id: `enemy-warmup-${templateId}`,
       knockbackVelocity: [0, 0, 0],
       lastBombAt: 0,
       lastHitAt: 0,
@@ -47,8 +57,8 @@
       templateId: template.id,
       touchDamage: template.touchDamage,
       touchIntervalMs: template.touchIntervalMs,
-    })
-  );
+    };
+  });
   const bombWarmups: ActiveBomb[] = [
     {
       armAt: 1200,
@@ -97,14 +107,24 @@
     },
   ];
 
-  const playerHealPosition = $derived([
-    player.lastPosition[0],
-    player.lastPosition[1],
-    player.lastPosition[2],
-  ] as [number, number, number]);
+  let actorWarmupVisible = $state(true);
+
+  onMount(() => {
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        actorWarmupVisible = false;
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  });
 </script>
 
-<T.Group position={[0, 0.42, 0]} scale={[0.001, 0.001, 0.001]}>
+<T.Group visible={actorWarmupVisible} position={[0, -80, 0]}>
   {#each enemyWarmups as enemy (enemy.id)}
     <EnemyActor animationNow={0} {enemy} />
   {/each}
@@ -119,6 +139,17 @@
 
   {#each enemyShotWarmups as shot (shot.id)}
     <T.Group position={shot.position}>
+      <T.Mesh renderOrder={28} scale={[1.35, 1.35, 1.35]}>
+        <T.SphereGeometry args={[shot.radius, 16, 16]} />
+        <T.MeshBasicMaterial
+          color="#ff8068"
+          depthFunc={GreaterDepth}
+          depthWrite={false}
+          opacity={0.36}
+          transparent
+        />
+      </T.Mesh>
+
       <T.Mesh castShadow>
         <T.SphereGeometry args={[shot.radius, 16, 16]} />
         <T.MeshStandardMaterial
@@ -131,33 +162,19 @@
       </T.Mesh>
     </T.Group>
   {/each}
-
-  <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
-    <T.TorusGeometry args={[0.44, 0.018, 8, 42]} />
-    <T.MeshBasicMaterial
-      color="#7dffd7"
-      depthWrite={false}
-      opacity={0.01}
-      toneMapped={false}
-      transparent
-    />
-  </T.Mesh>
-
-  <T.Mesh>
-    <T.SphereGeometry args={[1, 10, 10]} />
-    <T.MeshBasicMaterial
-      color="#9defff"
-      depthWrite={false}
-      opacity={0.01}
-      toneMapped={false}
-      transparent
-    />
-  </T.Mesh>
 </T.Group>
 
 {#each combat.enemies as enemy (enemy.id)}
   <EnemyActor animationNow={timing.now} {enemy} />
 {/each}
+
+{#if scene.currentRoomTemplate.layout === "outside-yard"}
+  <WaterWake position={scene.player.lastPosition} radius={0.62} />
+
+  {#each combat.enemies as enemy (enemy.id)}
+    <WaterWake opacity={0.2} position={enemy.position} radius={enemy.radius} />
+  {/each}
+{/if}
 
 {#each combat.bombs as bomb (bomb.id)}
   <BombActor animationNow={timing.now} {bomb} />
@@ -169,6 +186,17 @@
 
 {#each combat.enemyShots as shot (shot.id)}
   <T.Group position={shot.position}>
+    <T.Mesh renderOrder={28} scale={[1.35, 1.35, 1.35]}>
+      <T.SphereGeometry args={[shot.radius, 16, 16]} />
+      <T.MeshBasicMaterial
+        color="#ff8068"
+        depthFunc={GreaterDepth}
+        depthWrite={false}
+        opacity={0.36}
+        transparent
+      />
+    </T.Mesh>
+
     <T.Mesh castShadow>
       <T.SphereGeometry args={[shot.radius, 16, 16]} />
       <T.MeshStandardMaterial
@@ -208,44 +236,29 @@
   </T.Group>
 {/each}
 
-{#each scene.healBurstsRendered as burst (burst.id)}
-  <T.Group position={playerHealPosition}>
-    <T.Mesh
-      position={[0, 0.92 + burst.age * 0.52, 0]}
-      rotation={[-Math.PI / 2, 0, burst.age * 4.8]}
-      scale={[1 + burst.age * 0.55, 1 + burst.age * 0.55, 1]}
-    >
-      <T.TorusGeometry args={[0.44, 0.018, 8, 42]} />
-      <T.MeshBasicMaterial
-        color="#7dffd7"
-        depthWrite={false}
-        opacity={burst.fade * 0.46}
-        toneMapped={false}
-        transparent
-      />
-    </T.Mesh>
-    {#each burst.particles as particle, index (index)}
-      <T.Mesh
-        position={particle.position}
-        scale={[particle.scale, particle.scale, particle.scale]}
-      >
-        <T.SphereGeometry args={[1, 10, 10]} />
-        <T.MeshBasicMaterial
-          color={particle.color}
-          depthWrite={false}
-          opacity={particle.opacity}
-          toneMapped={false}
-          transparent
-        />
-      </T.Mesh>
-    {/each}
-  </T.Group>
-{/each}
-
 {#each combat.beams as beam (beam.id)}
   <T.Group position={beam.position} rotation={[0, beam.rotationY, 0]}>
     {#if beam.curve > 0.25}
       {#each Array.from({ length: 6 }, (__unused, index) => index) as index}
+        <T.Mesh
+          position={[
+            Math.sin(((index + 0.5) / 6) * Math.PI * (1.7 + beam.curve * 0.08)) *
+              beam.curve *
+              0.32,
+            0,
+            ((index + 0.5) / 6) * beam.length,
+          ]}
+        >
+          <T.BoxGeometry args={[beam.width, 0.08, beam.length / 6]} />
+          <T.MeshBasicMaterial
+            color="#dffcff"
+            depthFunc={GreaterDepth}
+            depthWrite={false}
+            opacity={0.28}
+            transparent
+          />
+        </T.Mesh>
+
         <T.Mesh
           position={[
             Math.sin(((index + 0.5) / 6) * Math.PI * (1.7 + beam.curve * 0.08)) *
@@ -270,6 +283,17 @@
     {:else}
       <T.Mesh position={[0, 0, beam.length * 0.5]}>
         <T.BoxGeometry args={[beam.width, 0.08, beam.length]} />
+        <T.MeshBasicMaterial
+          color="#dffcff"
+          depthFunc={GreaterDepth}
+          depthWrite={false}
+          opacity={0.28}
+          transparent
+        />
+      </T.Mesh>
+
+      <T.Mesh position={[0, 0, beam.length * 0.5]}>
+        <T.BoxGeometry args={[beam.width, 0.08, beam.length]} />
         <T.MeshStandardMaterial
           color={beam.color}
           emissive={beam.color}
@@ -281,6 +305,17 @@
         />
       </T.Mesh>
     {/if}
+
+    <T.Mesh position={[0, 0, beam.length]}>
+      <T.SphereGeometry args={[beam.width * 0.45, 12, 12]} />
+      <T.MeshBasicMaterial
+        color="#dffcff"
+        depthFunc={GreaterDepth}
+        depthWrite={false}
+        opacity={0.3}
+        transparent
+      />
+    </T.Mesh>
 
     <T.Mesh position={[0, 0, beam.length]}>
       <T.SphereGeometry args={[beam.width * 0.28, 12, 12]} />

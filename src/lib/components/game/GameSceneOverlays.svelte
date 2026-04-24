@@ -45,8 +45,9 @@
 
   {#key `${overlays.dungeonFloor}:${overlays.floorIntroStartedAt ?? 0}`}
     <FloorIntroOverlay
-      dungeonFloor={overlays.dungeonFloor}
       floorIntroProgress={overlays.floorIntroProgress}
+      floorIntroSubtitle={overlays.floorIntroSubtitle}
+      floorIntroTitle={overlays.floorIntroTitle}
     />
   {/key}
 

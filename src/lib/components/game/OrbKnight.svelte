@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T, useTask } from "@threlte/core";
-  import type { Group } from "three";
+  import { GreaterDepth, type Group } from "three";
 
   interface Props {
     autoRotate?: boolean;
@@ -44,6 +44,17 @@
   scale={[scale, scale, scale]}
 >
   <!-- Main brass orb body -->
+  <T.Mesh renderOrder={30} scale={[1.08, 1.08, 1.08]}>
+    <T.SphereGeometry args={[1, 32, 16]} />
+    <T.MeshBasicMaterial
+      color="#f4fbff"
+      depthFunc={GreaterDepth}
+      opacity={0.2}
+      transparent
+      depthWrite={false}
+    />
+  </T.Mesh>
+
   <T.Mesh castShadow receiveShadow>
     <T.SphereGeometry args={[1, 72, 36]} />
     <T.MeshStandardMaterial

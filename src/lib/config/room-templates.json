@@ -1,5 +1,16 @@
 [
   {
+    "id": "outside-start",
+    "kind": "normal",
+    "label": "Outside",
+    "environment": "outside-start",
+    "layout": "outside-yard",
+    "skin": "outside",
+    "spawnPattern": "outside",
+    "enemyTemplateId": "coil-sentry",
+    "enemyCount": 6
+  },
+  {
     "id": "polygon-training",
     "kind": "polygon",
     "label": "Polygon",

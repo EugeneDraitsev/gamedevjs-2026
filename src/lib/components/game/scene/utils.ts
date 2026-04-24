@@ -2,8 +2,10 @@ import type { WeaponBuild } from "$lib/config/weapon-graph";
 import { getDamageAtDistance } from "$lib/config/weapon-graph";
 import {
   clampToRoom,
+  defaultRoomBounds,
   enemyShotRadius,
   enemyShotTtlMs,
+  type RoomBounds,
 } from "$lib/game/scene-layout";
 import type {
   ActiveBomb,
@@ -47,9 +49,10 @@ export const resolveEnemyWallImpact = (
   position: Vec3,
   knockbackVelocity: Vec3,
   hp: number,
-  now: number
+  now: number,
+  bounds: RoomBounds = defaultRoomBounds
 ) => {
-  const clampedPosition = clampToRoom(position, enemy.radius);
+  const clampedPosition = clampToRoom(position, enemy.radius, bounds);
   const hitWallX = Math.abs(clampedPosition[0] - position[0]) > 0.001;
   const hitWallZ = Math.abs(clampedPosition[2] - position[2]) > 0.001;
   const wallImpactSpeed = Math.max(

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from "@threlte/core";
-  import { AdditiveBlending } from "three";
+  import { AdditiveBlending, GreaterDepth } from "three";
   import { meleeHeightOffset } from "$lib/components/game/player/melee-trail";
   import type { PlayerMeleeVisualsProps } from "$lib/types/game-components";
 
@@ -79,6 +79,17 @@
   </T.Mesh>
 
   <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
+    <T.CylinderGeometry args={[0.08, 0.12, swingBladeLength + 0.1, 20]} />
+    <T.MeshBasicMaterial
+      color="#eaffff"
+      depthFunc={GreaterDepth}
+      depthWrite={false}
+      opacity={0.38 * swordVisibleOpacity}
+      transparent
+    />
+  </T.Mesh>
+
+  <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
     <T.CylinderGeometry args={[0.09, 0.13, swingBladeLength + 0.03, 24]} />
     <T.MeshBasicMaterial
       blending={AdditiveBlending}
@@ -121,6 +132,26 @@
   renderOrder={3}
   frustumCulled={false}
 />
+
+<T.Mesh
+  geometry={trailGeometry}
+  position={[
+    swingCenter[0],
+    swingCenter[1] + meleeHeightOffset + 0.05,
+    swingCenter[2],
+  ]}
+  rotation={[0, swingFacingYaw, 0]}
+  renderOrder={28}
+  frustumCulled={false}
+>
+  <T.MeshBasicMaterial
+    color="#eaffff"
+    depthFunc={GreaterDepth}
+    depthWrite={false}
+    opacity={0.24 * swingLingerFade}
+    transparent
+  />
+</T.Mesh>
 
 <T.PointLight
   color={meleeTrailSettings.edgeColor}

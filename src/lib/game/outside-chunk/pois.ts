@@ -25,6 +25,7 @@ export interface PoiParams {
   maxShrines: number;
   maxLandmarks: number;
   minPoiSpacing: number;
+  protectedPoints?: Array<[number, number, number]>;
 }
 
 export const buildPois = (p: PoiParams): ChunkFeature[] => {
@@ -36,9 +37,20 @@ export const buildPois = (p: PoiParams): ChunkFeature[] => {
   const forest = biomeIndex("forest");
   const cliff = biomeIndex("cliff");
   const rng = createRng(seedHash ^ 0x74737474);
+  const jitter = (i: number, salt: number) => {
+    const h = Math.sin((i + seedHash + salt) * 12.9898) * 43_758.5453;
+    return h - Math.floor(h);
+  };
 
   const placed: ChunkFeature[] = [];
   const accept = (x: number, z: number) => {
+    if (
+      (p.protectedPoints ?? []).some(
+        ([px, pz, r]) => (px - x) ** 2 + (pz - z) ** 2 < r ** 2
+      )
+    ) {
+      return false;
+    }
     for (const f of placed) {
       if ((f.x - x) ** 2 + (f.z - z) ** 2 < p.minPoiSpacing ** 2) return false;
     }
@@ -57,8 +69,7 @@ export const buildPois = (p: PoiParams): ChunkFeature[] => {
       // a river bank and confuse the shrine logic below.
       clearingScore[i] = 1;
       // Jitter score with a stable hash so deterministic but spread out
-      const hash = Math.sin(i * 12.9898) * 43758.5453;
-      clearingScore[i] += (hash - Math.floor(hash)) * 0.5;
+      clearingScore[i] += jitter(i, 0x1234) * 0.5;
     }
   }
 
@@ -108,8 +119,7 @@ export const buildPois = (p: PoiParams): ChunkFeature[] => {
       }
     }
     if (nearWater) {
-      const hash = Math.sin(i * 53.1337) * 129.7531;
-      confluenceCandidates.push({ i, f: hash - Math.floor(hash) });
+      confluenceCandidates.push({ i, f: jitter(i, 0x5678) });
     }
   }
   confluenceCandidates.sort((a, b) => b.f - a.f);
@@ -140,8 +150,7 @@ export const buildPois = (p: PoiParams): ChunkFeature[] => {
     if (p.playable && !p.playable[i]) continue;
     if (biome[i] === biomeIndex("water")) continue;
     if (biome[i] === grass || biome[i] === forest || biome[i] === cliff) {
-      const hash = Math.sin(i * 91.7717) * 89.4513;
-      lookoutCandidates.push({ i, h: (hash - Math.floor(hash)) * height[i] });
+      lookoutCandidates.push({ i, h: jitter(i, 0x9abc) * height[i] });
     }
   }
   lookoutCandidates.sort((a, b) => b.h - a.h);

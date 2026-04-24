@@ -6,7 +6,7 @@ import { buildEnemySpawns } from "./enemies";
 import { buildHeightmap, heightSampler } from "./heightmap";
 import { buildHydrology } from "./hydrology";
 import { buildPois } from "./pois";
-import { hashSeed } from "./rng";
+import { createRng, hashSeed } from "./rng";
 import { buildRoads } from "./roads";
 import { buildVegetation } from "./vegetation";
 import {
@@ -78,7 +78,7 @@ export const DEFAULT_CHUNK_CONFIG: BuildChunkConfig = {
   maxCamps: 4,
   maxShrines: 3,
   maxLandmarks: 3,
-  spawnPoint: [0, 1, 60],
+  spawnPoint: [0, 1, 70],
   guardsPerCamp: 4,
   guardsPerShrine: 3,
   guardsPerLandmark: 2,
@@ -91,6 +91,10 @@ export const buildOutsideChunkPlan = (
 ): OutsideChunkPlan => {
   const seedHash = hashSeed(config.seed);
   const { size } = config;
+  const protectedPoints: [number, number, number][] = [
+    [config.spawnPoint[0], config.spawnPoint[2], 12],
+    [0, -config.playableHalfDepth * 0.985, 9],
+  ];
 
   // 1) Heightmap — flat playable rectangle + decorative mountain ring.
   const { height, slope, playable } = buildHeightmap({
@@ -111,9 +115,12 @@ export const buildOutsideChunkPlan = (
     height,
     playable,
     seedHash,
+    playableHalfWidth: config.playableHalfWidth,
+    playableHalfDepth: config.playableHalfDepth,
     waterLevel: config.waterLevel,
     riverHalfWidth: config.riverHalfWidth,
     riverDepth: config.riverDepth,
+    protectedPoints,
   });
 
   // 3) Biome classification (reads height, slope, water)
@@ -143,19 +150,35 @@ export const buildOutsideChunkPlan = (
     maxShrines: config.maxShrines,
     maxLandmarks: config.maxLandmarks,
     minPoiSpacing: config.minPoiSpacing,
+    protectedPoints,
   });
 
-  // Main spine — south spawn corridor to north exit corridor along
-  // the centre of the playable zone with a slight wiggle driven by
-  // the chunk seed.
-  const halfD = config.playableHalfDepth * 0.95;
-  const spineRows = 5;
+  // Main spine — south spawn corridor to north exit corridor. The
+  // shape is seed-driven so each run feels distinct: vary waypoint
+  // count, wiggle frequency, amplitude, phase, and harmonics so
+  // spines can be nearly straight, gently curving, or strongly
+  // meandering depending on the seed.
+  const gateZ = -config.playableHalfDepth * 0.985;
+  const spawnZ = config.spawnPoint[2];
+  const spineRng = createRng(seedHash + 0x5adb0715);
+  const spineRows = 5 + Math.floor(spineRng() * 5); // 5..9
+  const wiggleAmp = 3 + spineRng() * 10; // 3..13
+  const wigglePhase = spineRng() * Math.PI * 2;
+  const wiggleFreq = 0.7 + spineRng() * 1.6; // 0.7..2.3
+  const harmonicAmp = spineRng() * 3.2; // 0..3.2
+  const harmonicFreq = 2.1 + spineRng() * 1.9; // 2.1..4.0
+  const maxAbsX = config.playableHalfWidth - 6;
   const spine: Array<[number, number]> = [];
   for (let i = 0; i < spineRows; i++) {
     const t = i / (spineRows - 1);
-    const z = -halfD + t * halfD * 2;
-    // gentle wiggle — keep well inside playable rect
-    const wiggle = Math.sin((t + seedHash / 1e9) * Math.PI * 1.3) * 6;
+    const z = gateZ + t * (spawnZ - gateZ);
+    const primary = Math.sin(wigglePhase + t * Math.PI * wiggleFreq) * wiggleAmp;
+    const harmonic =
+      Math.sin(wigglePhase * 0.7 + t * Math.PI * harmonicFreq) * harmonicAmp;
+    const wiggle =
+      i === 0 || i === spineRows - 1
+        ? 0
+        : Math.max(-maxAbsX, Math.min(maxAbsX, primary + harmonic));
     spine.push([wiggle, z]);
   }
 
@@ -184,6 +207,7 @@ export const buildOutsideChunkPlan = (
     routes: [spine, ...branches],
     widthHalf: config.roadWidthHalf,
     branchWidthHalf: config.roadWidthHalf * 0.7,
+    seedHash,
   });
 
   // 5) Vegetation (data-driven kind registry) — replaces the old

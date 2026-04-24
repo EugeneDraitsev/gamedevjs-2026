@@ -6,6 +6,8 @@ import {
 import type { WeaponNodeType } from "$lib/config/weapon-graph";
 import {
   getEntryDirectionFromTarget,
+  getRoomBounds,
+  getRoomEntryTarget,
   getTransition,
   roomTeleportZ,
 } from "$lib/game/scene-layout";
@@ -62,6 +64,15 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
   }
 
   const nextRoom = dungeon.rooms[transition.roomId];
+  const entryDirection =
+    nextRoom.kind === "boss"
+      ? "south"
+      : getEntryDirectionFromTarget(transition.target);
+  const target = getRoomEntryTarget(
+    entryDirection,
+    transition.target[1],
+    getRoomBounds(roomTemplateById[nextRoom.templateId].layout)
+  );
   room.lastTransitionAt = now;
   room.transitionPending = true;
   timing.beginRoomTransition(now);
@@ -74,15 +85,10 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
     const appliedAt = performance.now();
 
     room.transitionPending = false;
-    room.entryDirection =
-      nextRoom.kind === "boss"
-        ? "south"
-        : getEntryDirectionFromTarget(transition.target);
+    room.entryDirection = entryDirection;
     room.currentId = transition.roomId;
     room.teleportTo(
-      nextRoom.kind === "boss"
-        ? [0, transition.target[1], roomTeleportZ]
-        : transition.target
+      nextRoom.kind === "boss" ? [0, target[1], roomTeleportZ] : target
     );
     combat.clearForRoomChange();
     timing.enemyWakeUntil = appliedAt + 650;
@@ -140,5 +146,14 @@ export const resetPlayerAfterDeath = ({
   room.transitionPending = false;
   room.doorOpenAmount = 1;
   player.resetForRespawn();
-  room.teleportTo([0, 1.1, 0]);
+  const startRoom = dungeon.rooms[dungeon.startRoomId];
+  const startBounds = getRoomBounds(
+    roomTemplateById[startRoom.templateId].layout
+  );
+
+  room.teleportTo([
+    0,
+    1.1,
+    startRoom.templateId === "outside-start" ? startBounds.teleportZ * 0.92 : 0,
+  ]);
 };

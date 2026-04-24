@@ -7,13 +7,12 @@ import {
 } from "$lib/components/game/scene/utils";
 import type { RoomTemplate } from "$lib/config/room-templates";
 import {
-  clampToRoom,
-  floorHalfDepth,
-  floorHalfWidth,
   getConveyorVelocity,
+  getRoomBounds,
   hazardTickMs,
   playerRadius,
 } from "$lib/game/scene-layout";
+import { outsidePlan } from "$lib/game/outside-chunk-context";
 import type { CombatStore } from "$lib/stores/combat.svelte";
 import type { PickupStore } from "$lib/stores/pickups.svelte";
 import type { PlayerStore } from "$lib/stores/player.svelte";
@@ -32,6 +31,7 @@ interface StepContext {
   combat: CombatStore;
   currentRoomId: string;
   currentRoomTemplate: RoomTemplate;
+  obstacles: SolidObstacle[];
   isCurrentRoomCombat: boolean;
   pickups: PickupStore;
   player: PlayerStore;
@@ -40,6 +40,117 @@ interface StepContext {
   roomPlatforms: RoomPlatform[];
   timing: TimingStore;
 }
+
+interface SolidObstacle {
+  radius: number;
+  x: number;
+  z: number;
+}
+
+let obstacleSeed = "";
+let outsideObstacles: SolidObstacle[] = [];
+
+const getSolidObstacles = (layout: RoomTemplate["layout"]): SolidObstacle[] => {
+  if (layout !== "outside-yard") {
+    return [];
+  }
+
+  const plan = outsidePlan();
+  if (plan.seed !== obstacleSeed) {
+    obstacleSeed = plan.seed;
+    outsideObstacles = plan.vegetation.instances
+      .filter((inst) => inst.collider)
+      .map((inst) => ({
+        radius: inst.collider!.radius * inst.scale,
+        x: inst.x,
+        z: inst.z,
+      }));
+  }
+
+  return outsideObstacles;
+};
+
+const getWaterSpeedFactor = (
+  layout: RoomTemplate["layout"],
+  x: number,
+  z: number,
+  radius: number
+) =>
+  layout === "outside-yard" &&
+  Math.min(
+    outsidePlan().sampleHeight(x, z),
+    outsidePlan().sampleHeight(x + radius, z),
+    outsidePlan().sampleHeight(x - radius, z),
+    outsidePlan().sampleHeight(x, z + radius),
+    outsidePlan().sampleHeight(x, z - radius)
+  ) < -0.04
+    ? 0.5
+    : 1;
+
+const resolveObstacleImpact = (
+  position: Vec3,
+  radius: number,
+  obstacles: SolidObstacle[]
+) => {
+  let hit = false;
+  let x = position[0];
+  let z = position[2];
+
+  for (const obstacle of obstacles) {
+    const minDistance = radius + obstacle.radius;
+    const dx = x - obstacle.x;
+    const dz = z - obstacle.z;
+    const distance = Math.hypot(dx, dz);
+
+    if (distance >= minDistance) {
+      continue;
+    }
+
+    hit = true;
+    if (distance <= 0.001) {
+      x += minDistance;
+      continue;
+    }
+
+    x += (dx / distance) * (minDistance - distance);
+    z += (dz / distance) * (minDistance - distance);
+  }
+
+  return {
+    hit,
+    position: [x, position[1], z] as Vec3,
+  };
+};
+
+const shotHitsObstacle = (
+  from: Vec3,
+  to: Vec3,
+  radius: number,
+  obstacles: SolidObstacle[]
+) => {
+  const moveX = to[0] - from[0];
+  const moveZ = to[2] - from[2];
+  const moveLength2 = moveX * moveX + moveZ * moveZ || 1;
+
+  for (const obstacle of obstacles) {
+    const t = Math.max(
+      0,
+      Math.min(
+        1,
+        ((obstacle.x - from[0]) * moveX + (obstacle.z - from[2]) * moveZ) /
+          moveLength2
+      )
+    );
+    const dx = from[0] + moveX * t - obstacle.x;
+    const dz = from[2] + moveZ * t - obstacle.z;
+
+    if (Math.hypot(dx, dz) <= radius + obstacle.radius) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 const findActiveHazard = (hazards: RoomHazard[], position: Vec3) =>
   hazards.find(
@@ -132,42 +243,6 @@ const getEnemyConveyorVelocity = (ctx: StepContext, enemy: ActiveEnemy): Vec3 =>
     enemy.radius * 0.2
   ) ?? [0, 0, 0];
 
-const pushEnemyFromPlatforms = (
-  position: Vec3,
-  radius: number,
-  platforms: RoomPlatform[]
-): Vec3 => {
-  let next = position;
-
-  for (const platform of platforms) {
-    const dx = next[0] - platform.position[0];
-    const dz = next[2] - platform.position[2];
-    const xOverlap = platform.args[0] + radius - Math.abs(dx);
-    const zOverlap = platform.args[2] + radius - Math.abs(dz);
-
-    if (xOverlap <= 0 || zOverlap <= 0) {
-      continue;
-    }
-
-    next =
-      xOverlap < zOverlap
-        ? [
-            platform.position[0] +
-              Math.sign(dx || 1) * (platform.args[0] + radius),
-            next[1],
-            next[2],
-          ]
-        : [
-            next[0],
-            next[1],
-            platform.position[2] +
-              Math.sign(dz || 1) * (platform.args[2] + radius),
-          ];
-  }
-
-  return clampToRoom(next, radius);
-};
-
 const countActiveBombs = (combat: CombatStore, originId: string) => {
   let count = 0;
 
@@ -180,6 +255,37 @@ const countActiveBombs = (combat: CombatStore, originId: string) => {
   return count;
 };
 
+const getEnemyTarget = (ctx: StepContext, enemy: ActiveEnemy, now: number) => {
+  const playerPos = ctx.player.lastPosition;
+  const playerDx = playerPos[0] - enemy.position[0];
+  const playerDz = playerPos[2] - enemy.position[2];
+  const playerDistance = Math.hypot(playerDx, playerDz) || 1;
+  const patrolCenter = enemy.patrolCenter;
+  const patrolling =
+    ctx.currentRoomTemplate.layout === "outside-yard" &&
+    !!patrolCenter &&
+    playerDistance > 13;
+  const patrolAngle = now * (enemy.patrolSpeed ?? 0) + enemy.radius;
+  const targetX = patrolling
+    ? patrolCenter[0] + Math.cos(patrolAngle) * (enemy.patrolRadius ?? 0)
+    : playerPos[0];
+  const targetZ = patrolling
+    ? patrolCenter[2] + Math.sin(patrolAngle) * (enemy.patrolRadius ?? 0)
+    : playerPos[2];
+  const dx = targetX - enemy.position[0];
+  const dz = targetZ - enemy.position[2];
+  const distance = Math.hypot(dx, dz) || 1;
+
+  return {
+    distance,
+    dx,
+    dz,
+    moveIntent: patrolling ? 0.62 : getEnemyMoveIntent(enemy, playerDistance),
+    playerDistance,
+    playerPos,
+  };
+};
+
 const stepEnemy = (
   ctx: StepContext,
   enemy: ActiveEnemy,
@@ -188,18 +294,23 @@ const stepEnemy = (
   spentProjectiles: Set<string>
 ) => {
   const { combat, player } = ctx;
-  const playerPos = player.lastPosition;
-  const dx = playerPos[0] - enemy.position[0];
-  const dz = playerPos[2] - enemy.position[2];
-  const distance = Math.hypot(dx, dz) || 1;
-  const moveIntent = getEnemyMoveIntent(enemy, distance);
-  const step = Math.min(distance, enemy.moveSpeed * delta) * moveIntent;
+  const { distance, dx, dz, moveIntent, playerDistance, playerPos } =
+    getEnemyTarget(ctx, enemy, now);
+  const waterSpeedFactor = getWaterSpeedFactor(
+    ctx.currentRoomTemplate.layout,
+    enemy.position[0],
+    enemy.position[2],
+    enemy.radius
+  );
+  const step =
+    Math.min(distance, enemy.moveSpeed * delta) * moveIntent * waterSpeedFactor;
   const strafeStep =
     enemy.radius > 1
       ? Math.sin(now * 0.0042 + enemy.position[0] * 0.18) *
         enemy.moveSpeed *
         delta *
-        0.82
+        0.82 *
+        waterSpeedFactor
       : 0;
   const conveyor = getEnemyConveyorVelocity(ctx, enemy);
   let knockbackVelocity = enemy.knockbackVelocity;
@@ -247,12 +358,28 @@ const stepEnemy = (
     position,
     knockbackVelocity,
     hp,
-    now
+    now,
+    getRoomBounds(ctx.currentRoomTemplate.layout)
   );
   hp = wallImpact.hp;
   knockbackVelocity = wallImpact.knockbackVelocity;
   lastHitAt = wallImpact.lastHitAt ?? lastHitAt;
   position = wallImpact.position;
+
+  const obstacleImpact = resolveObstacleImpact(
+    position,
+    enemy.radius,
+    ctx.obstacles
+  );
+  position = obstacleImpact.position;
+
+  if (obstacleImpact.hit) {
+    knockbackVelocity = [
+      knockbackVelocity[0] * 0.25,
+      0,
+      knockbackVelocity[2] * 0.25,
+    ];
+  }
 
   if (wallImpact.damage > 0) {
     combat.popDamage(
@@ -265,8 +392,6 @@ const stepEnemy = (
   if (hp <= 0) {
     return { enemy: null, playerDamage, shots, bombs };
   }
-
-  position = pushEnemyFromPlatforms(position, enemy.radius, ctx.roomPlatforms);
 
   if (
     Math.hypot(playerPos[0] - position[0], playerPos[2] - position[2]) <=
@@ -293,9 +418,14 @@ const stepEnemy = (
     (enemy.behavior === "shooter" || enemy.behavior === "bomber") &&
     enemy.shotIntervalMs &&
     now - lastShotAt >= enemy.shotIntervalMs &&
-    distance <= (enemy.preferredRange ?? 6.5) + 3.2
+    playerDistance <= (enemy.preferredRange ?? 6.5) + 3.2
   ) {
-    shots = createEnemyShots(enemy, position, dx, dz);
+    shots = createEnemyShots(
+      enemy,
+      position,
+      playerPos[0] - position[0],
+      playerPos[2] - position[2]
+    );
 
     if (shots.length > 0) {
       lastShotAt = now;
@@ -310,7 +440,13 @@ const stepEnemy = (
     countActiveBombs(combat, enemy.id) + (enemy.bombCount ?? 0) <=
       enemy.bombMaxActive
   ) {
-    bombs = createBombs(enemy, position, dx, dz, now);
+    bombs = createBombs(
+      enemy,
+      position,
+      playerPos[0] - position[0],
+      playerPos[2] - position[2],
+      now
+    );
 
     if (bombs.length > 0) {
       lastBombAt = now;
@@ -450,6 +586,7 @@ const stepBombs = (
 ) => {
   const { combat, player } = ctx;
   const playerPos = player.lastPosition;
+  const bounds = getRoomBounds(ctx.currentRoomTemplate.layout);
   let playerDamage = 0;
 
   const survivors: ActiveBomb[] = [];
@@ -466,8 +603,8 @@ const stepBombs = (
     ];
 
     if (
-      Math.abs(position[0]) > floorHalfWidth + 1 ||
-      Math.abs(position[2]) > floorHalfDepth + 1
+      Math.abs(position[0]) > bounds.floorHalfWidth + 1 ||
+      Math.abs(position[2]) > bounds.floorHalfDepth + 1
     ) {
       continue;
     }
@@ -517,6 +654,7 @@ const stepBombs = (
 const stepEnemyShots = (ctx: StepContext, delta: number, now: number) => {
   const { combat, player } = ctx;
   const playerPos = player.lastPosition;
+  const bounds = getRoomBounds(ctx.currentRoomTemplate.layout);
   let playerDamage = 0;
 
   combat.enemyShots = combat.enemyShots.filter((shot) => {
@@ -529,9 +667,13 @@ const stepEnemyShots = (ctx: StepContext, delta: number, now: number) => {
 
     if (
       ttlMs <= 0 ||
-      Math.abs(position[0]) > floorHalfWidth + 1 ||
-      Math.abs(position[2]) > floorHalfDepth + 1
+      Math.abs(position[0]) > bounds.floorHalfWidth + 1 ||
+      Math.abs(position[2]) > bounds.floorHalfDepth + 1
     ) {
+      return false;
+    }
+
+    if (shotHitsObstacle(shot.position, position, shot.radius, ctx.obstacles)) {
       return false;
     }
 
@@ -606,7 +748,7 @@ const syncRoomDoorState = (
   room.doorOpenAmount = 0;
 };
 
-interface StepEnemiesArgs extends StepContext {
+interface StepEnemiesArgs extends Omit<StepContext, "obstacles"> {
   delta: number;
   doorOpenDelayMs: number;
   doorOpenDurationMs: number;
@@ -635,14 +777,18 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
   const spawnedEnemyShots: ActiveEnemyShot[] = [];
   const spawnedBombs: ActiveBomb[] = [];
   let nextHealth = player.health;
+  const ctx: StepContext = {
+    ...args,
+    obstacles: getSolidObstacles(currentRoomTemplate.layout),
+  };
 
-  syncRoomDoorState(args, now, args.doorOpenDelayMs, args.doorOpenDurationMs);
+  syncRoomDoorState(ctx, now, args.doorOpenDelayMs, args.doorOpenDurationMs);
 
-  nextHealth = Math.max(0, nextHealth - applyHazardDamage(args, now));
-  nextHealth = Math.max(0, nextHealth - stepEnemyShots(args, delta, now));
+  nextHealth = Math.max(0, nextHealth - applyHazardDamage(ctx, now));
+  nextHealth = Math.max(0, nextHealth - stepEnemyShots(ctx, delta, now));
   nextHealth = Math.max(
     0,
-    nextHealth - stepBombs(args, delta, now, spentProjectiles)
+    nextHealth - stepBombs(ctx, delta, now, spentProjectiles)
   );
 
   const nextEnemies: ActiveEnemy[] = [];
@@ -650,7 +796,7 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
   for (const enemy of combat.enemies) {
     const result = enemiesSleeping
       ? { enemy, playerDamage: 0, shots: [], bombs: [] }
-      : stepEnemy(args, enemy, delta, now, spentProjectiles);
+      : stepEnemy(ctx, enemy, delta, now, spentProjectiles);
 
     nextHealth = Math.max(0, nextHealth - result.playerDamage);
 

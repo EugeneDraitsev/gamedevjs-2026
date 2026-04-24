@@ -1,5 +1,6 @@
 <script lang="ts">
   import { T } from "@threlte/core";
+  import { Collider, RigidBody } from "@threlte/rapier";
   import { outsidePlan } from "$lib/game/outside-chunk-context";
 
   const plan = outsidePlan();
@@ -21,11 +22,29 @@
 {#each plan.pois as poi (poi.id)}
   <T.Group position={[poi.x, poi.y, poi.z]} rotation={[0, poi.rotationY, 0]}>
     <!-- ground ring marker visible from any angle -->
-    <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
+    <T.Mesh
+      receiveShadow
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, 0.04, 0]}
+    >
       <T.RingGeometry args={[1.3, 1.8, 24]} />
-      <T.MeshBasicMaterial color={kindColor(poi.kind)} transparent opacity={0.55} />
+      <T.MeshBasicMaterial
+        color={kindColor(poi.kind)}
+        transparent
+        opacity={0.55}
+      />
     </T.Mesh>
     {#if poi.kind === "camp"}
+      <T.Group position={[-1.2, 0.42, -0.15]}>
+        <RigidBody type="fixed">
+          <Collider shape="cuboid" args={[0.9, 0.42, 0.55]} friction={0.9} />
+        </RigidBody>
+      </T.Group>
+      <T.Group position={[1.2, 0.32, 0.55]}>
+        <RigidBody type="fixed">
+          <Collider shape="cuboid" args={[0.55, 0.32, 0.55]} friction={0.9} />
+        </RigidBody>
+      </T.Group>
       <T.Mesh castShadow receiveShadow position={[-1.2, 0.42, -0.15]}>
         <T.BoxGeometry args={[1.8, 0.84, 1.1]} />
         <T.MeshStandardMaterial color="#7a6442" roughness={0.9} />
@@ -48,6 +67,11 @@
         />
       </T.Mesh>
     {:else if poi.kind === "shrine"}
+      <T.Group position={[0, 0.9, 0]}>
+        <RigidBody type="fixed">
+          <Collider shape="cuboid" args={[0.42, 0.9, 0.42]} friction={0.9} />
+        </RigidBody>
+      </T.Group>
       <T.Mesh castShadow receiveShadow position={[0, 0.9, 0]}>
         <T.BoxGeometry args={[0.8, 1.8, 0.8]} />
         <T.MeshStandardMaterial
@@ -65,6 +89,11 @@
         position={[0, 1.8, 0]}
       />
     {:else if poi.kind === "landmark" || poi.kind === "lookout"}
+      <T.Group position={[0, 0.8, 0]}>
+        <RigidBody type="fixed">
+          <Collider shape="cylinder" args={[0.8, 0.65]} friction={0.9} />
+        </RigidBody>
+      </T.Group>
       <T.Mesh castShadow receiveShadow position={[0, 0.8, 0]}>
         <T.CylinderGeometry args={[0.45, 0.65, 1.6, 7]} />
         <T.MeshStandardMaterial color="#5f5545" roughness={0.95} />

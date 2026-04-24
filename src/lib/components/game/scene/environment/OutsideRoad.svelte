@@ -14,12 +14,12 @@
   const plan = outsidePlan();
 
   const material = new MeshStandardMaterial({
-    color: new Color("#8c6f46"),
+    color: new Color("#5b5143"),
     roughness: 0.98,
     metalness: 0.0,
     polygonOffset: true,
-    polygonOffsetFactor: -4,
-    polygonOffsetUnits: -4,
+    polygonOffsetFactor: -8,
+    polygonOffsetUnits: -8,
     transparent: true,
     depthWrite: false,
   });
@@ -73,7 +73,7 @@
         // UV: v runs along the road, u is 0..1 across the width (0.5 = centre).
         float acrossT = vUvRoad.x - 0.5;           // -0.5..0.5
         float acrossAbs = abs(acrossT);
-        float edge = 1.0 - smoothstep(0.36, 0.5, acrossAbs);
+        float edge = 1.0 - smoothstep(0.44, 0.5, acrossAbs);
 
         // World-space noise keyed off road ribbon so the texture stays
         // put when the path bends, rather than smearing along UVs.
@@ -81,6 +81,8 @@
         float gravel = rFbm(wp * 2.4);
         float fineGravel = rFbm(wp * 8.6);
         float dirt = rFbm(wp * 0.6);
+        float breakup = rFbm(wp * 0.32);
+        float crackN = rFbm(wp * 5.8 + vec2(11.0, 4.0));
 
         // Two parallel wheel ruts running along the ribbon. The ruts
         // are darker and slightly packed (lower roughness).
@@ -91,25 +93,29 @@
 
         // Scatter pebbles: sparse high-contrast specks.
         float pebbleN = rHash21(floor(wp * 3.2));
-        float pebble = step(0.93, pebbleN);
+        float pebble = step(0.9, pebbleN);
+        float crack = smoothstep(0.76, 0.88, crackN) * (1.0 - smoothstep(0.46, 0.5, acrossAbs));
         vec3 pebbleCol = mix(vec3(0.46, 0.43, 0.38), vec3(0.68, 0.63, 0.55), rHash21(floor(wp * 3.2) + 17.0));
 
         // Tyre-track dust staining outside of the ruts.
         float dust = smoothstep(0.38, 0.5, acrossAbs) * (0.4 + 0.6 * dirt);
 
         vec3 base = diffuseColor.rgb;
-        vec3 warm = vec3(0.62, 0.50, 0.32);
-        vec3 cool = vec3(0.42, 0.36, 0.28);
+        vec3 asphalt = vec3(0.20, 0.19, 0.17);
+        vec3 dirtRoad = vec3(0.56, 0.43, 0.28);
+        vec3 dustRoad = vec3(0.67, 0.58, 0.43);
 
-        vec3 col = mix(cool, warm, gravel);
-        col = mix(col, col * 0.78, ruts * 0.65);
-        col = mix(col, col * 1.08, centreCrown * 0.25);
-        col = mix(col, pebbleCol, pebble * 0.75);
-        col = mix(col, col * 0.9, fineGravel * 0.35);
-        col = mix(col, base * 0.75, dust * 0.45);
+        vec3 col = mix(asphalt, dirtRoad, smoothstep(0.34, 0.72, breakup));
+        col = mix(col, dustRoad, dust * 0.55);
+        col = mix(col, col * 0.54, ruts * 0.72);
+        col = mix(col, col * 1.12, centreCrown * 0.22);
+        col = mix(col, pebbleCol, pebble * 0.62);
+        col = mix(col, col * 0.72, crack * 0.86);
+        col = mix(col, col * 0.88, fineGravel * 0.3);
+        col = mix(col, base * 0.5, smoothstep(0.47, 0.5, acrossAbs) * 0.65);
 
         diffuseColor.rgb = col;
-        diffuseColor.a = edge;
+        diffuseColor.a = mix(0.4, 0.98, edge);
         `
       )
       .replace(
@@ -122,7 +128,7 @@
         `
       );
   };
-  material.customProgramCacheKey = () => "outside-road-v3";
+  material.customProgramCacheKey = () => "outside-road-v4";
 
   const buildRibbonGeometry = (
     points: Array<[number, number]>,
@@ -131,42 +137,34 @@
     const verts: number[] = [];
     const uvs: number[] = [];
     const indices: number[] = [];
-    const n = points.length;
-    for (let i = 0; i < n; i++) {
-      const [x, z] = points[i];
-      let nx: number, nz: number;
-      if (i === 0) {
-        const [x2, z2] = points[i + 1];
-        const dx = x2 - x;
-        const dz = z2 - z;
-        const len = Math.hypot(dx, dz) || 1;
-        nx = -dz / len;
-        nz = dx / len;
-      } else if (i === n - 1) {
-        const [x0, z0] = points[i - 1];
-        const dx = x - x0;
-        const dz = z - z0;
-        const len = Math.hypot(dx, dz) || 1;
-        nx = -dz / len;
-        nz = dx / len;
-      } else {
-        const [x0, z0] = points[i - 1];
-        const [x2, z2] = points[i + 1];
-        const dx = x2 - x0;
-        const dz = z2 - z0;
-        const len = Math.hypot(dx, dz) || 1;
-        nx = -dz / len;
-        nz = dx / len;
-      }
-      const y = plan.sampleHeight(x, z) + 0.12;
-      verts.push(x + nx * widthHalf, y, z + nz * widthHalf);
-      verts.push(x - nx * widthHalf, y, z - nz * widthHalf);
-      uvs.push(0, i);
-      uvs.push(1, i);
-      if (i < n - 1) {
-        const a = i * 2;
-        indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-      }
+    for (let i = 0; i < points.length - 1; i++) {
+      const [x0, z0] = points[i];
+      const [x1, z1] = points[i + 1];
+      const dx = x1 - x0;
+      const dz = z1 - z0;
+      const len = Math.hypot(dx, dz) || 1;
+      const nx = -dz / len;
+      const nz = dx / len;
+      const y0 = plan.sampleHeight(x0, z0) + 0.12;
+      const y1 = plan.sampleHeight(x1, z1) + 0.12;
+      const a = verts.length / 3;
+
+      verts.push(
+        x0 + nx * widthHalf,
+        y0,
+        z0 + nz * widthHalf,
+        x0 - nx * widthHalf,
+        y0,
+        z0 - nz * widthHalf,
+        x1 + nx * widthHalf,
+        y1,
+        z1 + nz * widthHalf,
+        x1 - nx * widthHalf,
+        y1,
+        z1 - nz * widthHalf
+      );
+      uvs.push(0, i, 1, i, 0, i + 1, 1, i + 1);
+      indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
     }
     const g = new BufferGeometry();
     g.setIndex(indices);
@@ -176,17 +174,12 @@
     return g;
   };
 
-  const geometries = plan.roads.map((r) => ({
-    id: `${r.points.length}-${r.points[0]?.[0].toFixed(2)}`,
+  const geometries = plan.roads.map((r, index) => ({
+    id: `road-${index}`,
     geometry: buildRibbonGeometry(r.points, r.widthHalf),
   }));
 </script>
 
 {#each geometries as road (road.id)}
-  <T.Mesh
-    geometry={road.geometry}
-    {material}
-    receiveShadow
-    renderOrder={1}
-  />
+  <T.Mesh geometry={road.geometry} {material} receiveShadow renderOrder={1} />
 {/each}

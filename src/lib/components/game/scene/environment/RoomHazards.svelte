@@ -71,7 +71,7 @@
         <T.MeshStandardMaterial
           color={`hsl(${28 + lavaPulse * 4} 78% ${38 + lavaPulse * 6}%)`}
           emissive="#ff5a16"
-          emissiveIntensity={0.34 + lavaPulse * 0.18}
+          emissiveIntensity={0.1 + lavaPulse * 0.08}
           map={lavaSurfaceTexture}
           metalness={0.04}
           roughness={0.36}

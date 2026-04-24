@@ -6,6 +6,7 @@ export class PlayerStore {
   readonly magazineSize = 8;
   health = $state(playerMaxHealth);
   ammo = $state(this.magazineSize);
+  facingYaw = $state(0);
   lastPosition = $state<Vec3>([0, 1, 0]);
   lastHitAt = $state(0);
   recoverDuration = $state(0);
@@ -74,6 +75,7 @@ export class PlayerStore {
   resetForRespawn() {
     this.health = playerMaxHealth;
     this.ammo = this.magazineSize;
+    this.facingYaw = 0;
     this.reloading = false;
     this.shotCount = 0;
     this.recoverDuration = 0;
@@ -87,6 +89,7 @@ export class PlayerStore {
   resetForFloor() {
     this.health = playerMaxHealth;
     this.ammo = this.magazineSize;
+    this.facingYaw = 0;
     this.reloading = false;
     this.shotCount = 0;
     this.lastHitAt = 0;

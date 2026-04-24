@@ -2,9 +2,13 @@
   import type { SceneOverlayProps } from "$lib/types/game";
 
   let {
-    dungeonFloor,
     floorIntroProgress,
-  }: Pick<SceneOverlayProps, "dungeonFloor" | "floorIntroProgress"> = $props();
+    floorIntroSubtitle,
+    floorIntroTitle,
+  }: Pick<
+    SceneOverlayProps,
+    "floorIntroProgress" | "floorIntroSubtitle" | "floorIntroTitle"
+  > = $props();
 
   const floorIntroStrength = $derived(
     Math.sin((1 - floorIntroProgress) * Math.PI)
@@ -17,8 +21,10 @@
       class="floor-intro-card"
       style:transform={`translateY(${(1 - floorIntroStrength) * 18}px) scale(${0.985 + floorIntroStrength * 0.015})`}
     >
-      <strong>Polygon Foundry</strong>
-      <span>Floor {dungeonFloor}</span>
+      <strong>{floorIntroTitle}</strong>
+      {#if floorIntroSubtitle}
+        <span>{floorIntroSubtitle}</span>
+      {/if}
     </div>
   </div>
 {/if}

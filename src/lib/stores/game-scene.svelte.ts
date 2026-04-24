@@ -11,6 +11,7 @@ import {
   createDoorSeals,
   createRoomWalls,
   floorThemes,
+  getRoomBounds,
   getRoomHazards,
   getRoomPlatforms,
   getRoomSkin,
@@ -20,7 +21,6 @@ import {
   getMinimapBounds,
   projectDamagePopups,
   renderDeflectBursts,
-  renderHealBursts,
 } from "$lib/game/scene-ui";
 import { CombatStore } from "$lib/stores/combat.svelte";
 import { CrosshairStore } from "$lib/stores/crosshair.svelte";
@@ -72,6 +72,9 @@ export class GameSceneStore {
   );
   readonly currentFloorPalette = $derived(
     floorThemes[this.currentRoomSkin?.floorTheme ?? this.settings.floorTheme]
+  );
+  readonly roomBounds = $derived(
+    getRoomBounds(this.currentRoomTemplate.layout)
   );
   readonly currentWallPalette = $derived(
     wallThemes[this.currentRoomSkin?.wallTheme ?? this.settings.wallTheme]
@@ -184,9 +187,6 @@ export class GameSceneStore {
   readonly deflectBurstsRendered = $derived(
     renderDeflectBursts(this.combat.deflectBursts, this.timing.now)
   );
-  readonly healBurstsRendered = $derived(
-    renderHealBursts(this.combat.healBursts, this.timing.now)
-  );
   readonly overlays = $derived.by<SceneOverlayProps>(() => ({
     animationNow: this.timing.now,
     artifactPickupAt: this.timing.pickedArtifactAt,
@@ -201,13 +201,24 @@ export class GameSceneStore {
     dungeonFloor: this.dungeon.floor,
     floorIntroStartedAt: this.timing.floorIntroStartedAt,
     floorIntroProgress: this.timing.floorIntroProgress,
+    floorIntroSubtitle:
+      this.currentRoomTemplate.layout === "outside-yard"
+        ? null
+        : `Floor ${this.dungeon.floor}`,
+    floorIntroTitle:
+      this.currentRoomTemplate.layout === "outside-yard"
+        ? "Outside"
+        : "Polygon Foundry",
     pickedArtifactTemplate: this.pickedArtifactTemplate,
     playerHitFlash: this.playerHitFlash,
     playerReloadRatio: this.playerReloadRatio,
     playerReloading: this.player.reloading,
     projectedDamagePopups: this.projectedDamagePopups,
     roomTransitionProgress: this.timing.roomTransitionProgress,
-    vignetteIntensity: this.settings.vignetteIntensity,
+    vignetteIntensity:
+      this.currentRoomTemplate.layout === "outside-yard"
+        ? 0.08
+        : this.settings.vignetteIntensity,
   }));
   readonly sceneUiVisible = $derived(
     this.timing.floorIntroStartedAt > 0 &&

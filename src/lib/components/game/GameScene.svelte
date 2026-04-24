@@ -370,15 +370,15 @@
 <div class="scene">
   <Canvas shadows={PCFSoftShadowMap} dpr={2}>
     <SceneRendererConfig
-      backgroundColor={outside ? "#d7ded8" : "#050403"}
-      exposure={scene.settings.toneMappingExposure}
+      backgroundColor={outside ? "#c7d0c0" : "#050403"}
+      exposure={outside ? 0.82 : scene.settings.toneMappingExposure}
     />
     <T.Fog
       attach="fog"
       args={[
-        outside ? '#d7ded8' : '#080604',
-        outside ? 70 : scene.settings.fogNear,
-        outside ? 230 : scene.settings.fogFar,
+        outside ? '#b8c3ad' : '#080604',
+        outside ? 46 : scene.settings.fogNear,
+        outside ? 190 : scene.settings.fogFar,
       ]}
     />
 
@@ -412,21 +412,21 @@
 
     <T.HemisphereLight
       args={[
-        outside ? '#f2f0d5' : '#c18455',
-        outside ? '#77846f' : '#050403',
-        outside ? 1.2 : scene.settings.hemisphereLightIntensity,
+        outside ? '#ead7a4' : '#c18455',
+        outside ? '#435d4c' : '#050403',
+        outside ? 0.95 : scene.settings.hemisphereLightIntensity,
       ]}
     />
-    <T.AmbientLight intensity={scene.settings.ambientLightIntensity} />
+    <T.AmbientLight intensity={outside ? 0.42 : scene.settings.ambientLightIntensity} />
     <T.DirectionalLight
       bind:ref={sunLight}
       castShadow
-      color={outside ? '#fff0ca' : '#ffbd76'}
-      intensity={outside ? 2.55 : scene.settings.sunIntensity}
+      color={outside ? '#ffd18a' : '#ffbd76'}
+      intensity={outside ? 3.25 : scene.settings.sunIntensity}
       position={[
-        scene.settings.sunPositionX,
-        scene.settings.sunPositionY,
-        scene.settings.sunPositionZ,
+        outside ? -12 : scene.settings.sunPositionX,
+        outside ? 8 : scene.settings.sunPositionY,
+        outside ? -10 : scene.settings.sunPositionZ,
       ]}
     />
 

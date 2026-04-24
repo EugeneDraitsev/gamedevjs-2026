@@ -68,6 +68,9 @@ export interface ActiveEnemy {
   lastShotAt: number;
   maxHp: number;
   moveSpeed: number;
+  patrolCenter?: Vec3;
+  patrolRadius?: number;
+  patrolSpeed?: number;
   position: Vec3;
   preferredRange?: number;
   radius: number;
@@ -110,7 +113,6 @@ export interface ActiveBomb {
 export type PickupKind = "gear" | "heal";
 
 export interface ActivePickup {
-  collectedAt?: number;
   createdAt: number;
   id: string;
   kind: PickupKind;
@@ -121,13 +123,6 @@ export interface ActivePickup {
 
 export interface DeflectBurst {
   color: string;
-  createdAt: number;
-  id: string;
-  position: Vec3;
-  radius: number;
-}
-
-export interface HealBurst {
   createdAt: number;
   id: string;
   position: Vec3;
@@ -145,17 +140,6 @@ export interface RenderedDeflectBurst extends DeflectBurst {
   age: number;
   fade: number;
   shards: DeflectBurstShard[];
-}
-
-export interface RenderedHealBurst extends HealBurst {
-  age: number;
-  fade: number;
-  particles: Array<{
-    color: string;
-    opacity: number;
-    position: Vec3;
-    scale: number;
-  }>;
 }
 
 export interface DoorMarker {
@@ -184,7 +168,7 @@ export interface DamagePopup {
   createdAt: number;
   id: string;
   position: Vec3;
-  variant: "enemy" | "heal" | "player";
+  variant: "enemy" | "player";
 }
 
 export interface ProjectedDamagePopup extends DamagePopup {
@@ -274,6 +258,8 @@ export interface SceneOverlayProps {
   dungeonFloor: number;
   floorIntroProgress: number;
   floorIntroStartedAt?: number;
+  floorIntroSubtitle: string | null;
+  floorIntroTitle: string;
   pickedArtifactTemplate: WeaponNodeTemplate | null;
   playerHitFlash: number;
   playerReloading: boolean;

@@ -1,164 +1,76 @@
 <script lang="ts">
   import { T } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
-  import { PlaneGeometry, type Texture } from "three";
+  import type { Texture } from "three";
   import type { RoomTemplate } from "$lib/config/room-templates";
-  import { floorHalfDepth, floorHalfWidth } from "$lib/game/scene-layout";
-
-  const roomNoise = (roomId: string, salt: number) => {
-    let hash = 17;
-    const key = `${roomId}:${salt}`;
-
-    for (let index = 0; index < key.length; index += 1) {
-      hash = (hash * 131 + key.charCodeAt(index) * (index + 7)) % 1_000_003;
-    }
-
-    const value = Math.sin(hash * 12.9898) * 43_758.5453;
-
-    return value - Math.floor(value);
-  };
-
-  const makeDecalGeometry = (
-    width: number,
-    depth: number,
-    u: number,
-    v: number,
-    uSize: number,
-    vSize: number
-  ) => {
-    const geometry = new PlaneGeometry(width, depth);
-    const uv = geometry.attributes.uv;
-
-    uv.setXY(0, u, v);
-    uv.setXY(1, u + uSize, v);
-    uv.setXY(2, u, v + vSize);
-    uv.setXY(3, u + uSize, v + vSize);
-    uv.needsUpdate = true;
-
-    return geometry;
-  };
-
-  const decalSources = [
-    { u: 0.02, v: 0.82, width: 0.18, height: 0.14 },
-    { u: 0.18, v: 0.78, width: 0.19, height: 0.2 },
-    { u: 0.45, v: 0.74, width: 0.26, height: 0.23 },
-    { u: 0.72, v: 0.78, width: 0.22, height: 0.18 },
-    { u: 0.44, v: 0.48, width: 0.31, height: 0.36 },
-    { u: 0.62, v: 0.5, width: 0.29, height: 0.34 },
-    { u: 0.02, v: 0.57, width: 0.2, height: 0.18 },
-    { u: 0.27, v: 0.52, width: 0.19, height: 0.2 },
-    { u: 0.78, v: 0.36, width: 0.2, height: 0.16 },
-  ].map((source) => ({
-    ...source,
-    aspect: source.width / source.height,
-    geometry: makeDecalGeometry(
-      1,
-      1,
-      source.u,
-      source.v,
-      source.width,
-      source.height
-    ),
-  }));
+  import type { RoomBounds } from "$lib/game/scene-layout";
 
   let {
     bossFloorTexture = null,
-    currentRoomId,
+    bounds,
     currentRoomTemplate,
     foundryFloorDecalTexture = null,
     foundryFloorTexture = null,
     treasureFloorTexture = null,
   }: {
     bossFloorTexture?: Texture | null;
-    currentRoomId: string;
+    bounds: RoomBounds;
     currentRoomTemplate: RoomTemplate;
     foundryFloorDecalTexture?: Texture | null;
     foundryFloorTexture?: Texture | null;
     treasureFloorTexture?: Texture | null;
   } = $props();
 
-  const isBossFloor = $derived(
-    currentRoomTemplate.layout === "boss-foundry" ||
-      currentRoomTemplate.layout === "boss-crucible" ||
-      currentRoomTemplate.layout === "boss-bomber"
-  );
-  const floorMarks = $derived.by(() =>
-    Array.from({ length: 54 }, (_, index) => {
-      const source =
-        decalSources[
-          Math.floor(
-            roomNoise(currentRoomId, 101 + index * 37) * decalSources.length
-          )
-        ];
-      const depth = 0.5 + roomNoise(currentRoomId, 307 + index * 41) * 1.35;
-      const width =
-        depth *
-        source.aspect *
-        (0.8 + roomNoise(currentRoomId, 509 + index * 43) * 0.55);
-
-      return {
-        depth,
-        geometry: source.geometry,
-        opacity: 0.2 + roomNoise(currentRoomId, 701 + index * 47) * 0.16,
-        rotation: roomNoise(currentRoomId, 907 + index * 53) * Math.PI * 2,
-        width,
-        x:
-          (roomNoise(currentRoomId, 1103 + index * 59) - 0.5) *
-          floorHalfWidth *
-          1.55,
-        z:
-          (roomNoise(currentRoomId, 1301 + index * 61) - 0.5) *
-          floorHalfDepth *
-          1.55,
-      };
-    })
-  );
+  const outside = $derived(currentRoomTemplate.layout === "outside-yard");
 </script>
 
 <T.Group position={[0, -0.35, 0]}>
   <RigidBody type="fixed">
     <Collider
       shape="cuboid"
-      args={[floorHalfWidth, 0.35, floorHalfDepth]}
+      args={[bounds.floorHalfWidth, 0.35, bounds.floorHalfDepth]}
       friction={0.92}
       restitution={0.08}
     />
 
-    {#if !isBossFloor}
+    {#if !outside}
       <T.Mesh
         position={[0, 0.36, 0]}
         receiveShadow
         rotation={[-Math.PI / 2, 0, 0]}
       >
-        <T.PlaneGeometry args={[floorHalfWidth * 2, floorHalfDepth * 2]} />
+        <T.PlaneGeometry
+          args={[bounds.floorHalfWidth * 2, bounds.floorHalfDepth * 2]}
+        />
         <T.MeshStandardMaterial
+          color="#ffffff"
           map={foundryFloorTexture}
           metalness={0.16}
           roughness={0.78}
         />
       </T.Mesh>
+    {/if}
 
-      {#if foundryFloorDecalTexture}
-        {#each floorMarks as mark, index}
-          <T.Mesh
-            geometry={mark.geometry}
-            position={[mark.x, 0.365 + index * 0.0002, mark.z]}
-            rotation={[-Math.PI / 2, 0, mark.rotation]}
-            scale={[mark.width, mark.depth, 1]}
-          >
-            <T.MeshBasicMaterial
-              map={foundryFloorDecalTexture}
-              color="#312a21"
-              transparent
-              alphaTest={0.04}
-              depthWrite={false}
-              opacity={mark.opacity}
-              polygonOffset
-              polygonOffsetFactor={-1}
-            />
-          </T.Mesh>
-        {/each}
-      {/if}
+    {#if foundryFloorDecalTexture && !outside}
+      <T.Mesh
+        position={[0, 0.365, 0]}
+        receiveShadow
+        rotation={[-Math.PI / 2, 0, Math.PI]}
+      >
+        <T.PlaneGeometry
+          args={[bounds.floorHalfWidth * 2, bounds.floorHalfDepth * 2]}
+        />
+        <T.MeshBasicMaterial
+          map={foundryFloorDecalTexture}
+          color="#312a21"
+          transparent
+          alphaTest={0.05}
+          depthWrite={false}
+          opacity={0.26}
+          polygonOffset
+          polygonOffsetFactor={-1}
+        />
+      </T.Mesh>
     {/if}
   </RigidBody>
 </T.Group>
@@ -169,7 +81,9 @@
     receiveShadow
     rotation={[-Math.PI / 2, 0, 0]}
   >
-    <T.PlaneGeometry args={[floorHalfWidth * 2, floorHalfDepth * 2]} />
+    <T.PlaneGeometry
+      args={[bounds.floorHalfWidth * 2, bounds.floorHalfDepth * 2]}
+    />
     <T.MeshStandardMaterial
       map={treasureFloorTexture}
       transparent
@@ -181,17 +95,28 @@
   </T.Mesh>
 {/if}
 
-{#if isBossFloor && bossFloorTexture}
+{#if (currentRoomTemplate.layout === "boss-foundry" ||
+  currentRoomTemplate.layout === "boss-crucible" ||
+  currentRoomTemplate.layout === "boss-bomber") &&
+  bossFloorTexture}
   <T.Mesh
-    position={[0, 0.031, 0]}
+    position={[0, 0.032, 0]}
     receiveShadow
     rotation={[-Math.PI / 2, 0, 0]}
   >
-    <T.PlaneGeometry args={[floorHalfWidth * 2, floorHalfDepth * 2]} />
+    <T.PlaneGeometry
+      args={[bounds.floorHalfWidth * 2, bounds.floorHalfDepth * 2]}
+    />
     <T.MeshStandardMaterial
       map={bossFloorTexture}
-      metalness={0.24}
-      roughness={0.7}
+      color="#ffd0b2"
+      emissive="#ff8f70"
+      emissiveIntensity={0.18}
+      transparent
+      alphaTest={0.08}
+      metalness={0.26}
+      opacity={0.94}
+      roughness={0.66}
     />
   </T.Mesh>
 {/if}

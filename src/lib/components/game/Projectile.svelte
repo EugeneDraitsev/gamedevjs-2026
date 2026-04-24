@@ -3,7 +3,7 @@
   import { T, useTask } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
   import { onMount } from "svelte";
-  import { MathUtils, Vector3 } from "three";
+  import { GreaterDepth, MathUtils, Vector3 } from "three";
   import { getDamageAtDistance } from "$lib/config/weapon-graph";
   import type { Vec3 } from "$lib/types/game";
   import type { ProjectileProps } from "$lib/types/game-components";
@@ -269,6 +269,19 @@
           0,
         ]}
       >
+        <T.Mesh renderOrder={28} rotation={[Math.PI / 2, 0, 0]}>
+          <T.CylinderGeometry
+            args={[data.build.radius * 0.72, data.build.radius * 0.84, data.build.radius * 4.9, 12]}
+          />
+          <T.MeshBasicMaterial
+            color="#dffcff"
+            depthFunc={GreaterDepth}
+            depthWrite={false}
+            opacity={0.34}
+            transparent
+          />
+        </T.Mesh>
+
         <T.Mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
           <T.CylinderGeometry
             args={[data.build.radius * 0.42, data.build.radius * 0.58, data.build.radius * 3.2, 12]}
@@ -317,6 +330,24 @@
       </T.Group>
     {:else}
       <T.Group rotation={[0, visualYaw, 0]}>
+        <T.Mesh
+          renderOrder={28}
+          position={[0, 0, data.build.radius * 0.2]}
+          rotation={[Math.PI / 2, 0, 0]}
+          scale={[1, 1, trailStretch]}
+        >
+          <T.CylinderGeometry
+            args={[data.build.radius * 0.86, data.build.radius * 0.42, data.build.radius * 4.3, 12]}
+          />
+          <T.MeshBasicMaterial
+            color="#dffcff"
+            depthFunc={GreaterDepth}
+            depthWrite={false}
+            opacity={0.34}
+            transparent
+          />
+        </T.Mesh>
+
         <T.Mesh
           position={[0, 0, -data.build.radius * (1.2 + trailStretch * 0.52)]}
           rotation={[Math.PI / 2, 0, 0]}

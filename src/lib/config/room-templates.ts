@@ -26,16 +26,18 @@ const roomLayoutSchema = z.enum([
   "lava-cross",
   "lava-lane",
   "lava-ring",
+  "outside-yard",
   "zigzag",
 ]);
 
 const roomEnvironmentSchema = z.enum([
   "boss-gears",
+  "outside-start",
   "training-range",
   "treasure-gears",
 ]);
 
-const roomSkinSchema = z.enum(["boss", "foundry", "treasure"]);
+const roomSkinSchema = z.enum(["boss", "foundry", "outside", "treasure"]);
 
 const enemyTemplateSchema = z
   .object({
@@ -134,6 +136,7 @@ const roomTemplateSchema = z
       "crossfire",
       "line",
       "none",
+      "outside",
       "pincer",
     ]),
   })

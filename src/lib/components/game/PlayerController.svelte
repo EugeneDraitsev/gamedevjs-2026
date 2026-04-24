@@ -37,6 +37,7 @@
   } from "$lib/components/game/player/melee-trail";
   import PlayerDebugMarkers from "$lib/components/game/player/PlayerDebugMarkers.svelte";
   import PlayerMeleeVisuals from "$lib/components/game/player/PlayerMeleeVisuals.svelte";
+  import { outsidePlan } from "$lib/game/outside-chunk-context";
   import { getDesiredHorizontalVelocity as resolveHorizontalVelocity } from "$lib/game/player-controls";
   import { clampToRoom, getConveyorVelocity } from "$lib/game/scene-layout";
   import { mobileInput } from "$lib/stores/mobile-input.svelte";
@@ -117,6 +118,7 @@
   let trailGeometry = $state<BufferGeometry>();
   let trailMaterial = $state<ShaderMaterial>();
   let previousCameraMode: CameraMode | undefined;
+  let waterDip = 0;
 
   const meleeParams = $derived(scene.meleeParams);
   const meleeCooldownMs = $derived(settings.meleeCooldownMs);
@@ -208,21 +210,8 @@
 
   $effect(() => {
     room.teleportNonce;
-    const body = rigidBody;
-    const target = room.teleportTarget;
-
-    if (!(body && target)) {
-      return;
-    }
-
-    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    body.setTranslation({ x: target[0], y: target[1], z: target[2] }, true);
-    body.wakeUp();
-
-    playerPosition.set(...target);
-    smoothedAnchor.set(...target);
-    cameraTarget.set(...target);
-    lookTarget.set(target[0], target[1] + settings.lookHeight, target[2]);
+    rigidBody;
+    applyTeleportTarget();
   });
 
   $effect(() => {
@@ -306,8 +295,27 @@
     pressed.clear();
   };
 
-  onMount(() =>
-    bindPlayerInput({
+  function applyTeleportTarget() {
+    const body = rigidBody;
+    const target = room.teleportTarget;
+
+    if (!(body && target)) {
+      return;
+    }
+
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setTranslation({ x: target[0], y: target[1], z: target[2] }, true);
+    body.wakeUp();
+
+    player.lastPosition = target;
+    playerPosition.set(...target);
+    smoothedAnchor.set(...target);
+    cameraTarget.set(...target);
+    lookTarget.set(target[0], target[1] + settings.lookHeight, target[2]);
+  }
+
+  onMount(() => {
+    const cleanup = bindPlayerInput({
       getCameraMode: () => settings.cameraMode,
       getControlsLocked: () => scene.sceneControlsLocked,
       onJump: () => {
@@ -337,11 +345,18 @@
       },
       orbitPressed,
       pressed,
-    })
-  );
+    });
+    const teleportFrame = requestAnimationFrame(applyTeleportTarget);
+
+    return () => {
+      cancelAnimationFrame(teleportFrame);
+      cleanup();
+    };
+  });
 
   const getDesiredHorizontalVelocity = (
-    velocity: ReturnType<RapierRigidBody["linvel"]>
+    velocity: ReturnType<RapierRigidBody["linvel"]>,
+    terrainSpeedFactor = 1
   ) => {
     const analog = mobileInput.moveVector;
     const analogActive = analog.x !== 0 || analog.y !== 0;
@@ -350,11 +365,23 @@
       pressed,
       moveDirection,
       settings.moveSpeed,
-      scene.moveSpeedFactor,
+      scene.moveSpeedFactor * terrainSpeedFactor,
       velocity,
       analogActive ? { x: analog.x, z: analog.y } : null
     );
   };
+
+  const outsideWaterDepth = (x: number, z: number) =>
+    scene.currentRoomTemplate.layout === "outside-yard"
+      ? Math.max(
+          0,
+          -outsidePlan().sampleHeight(x, z),
+          -outsidePlan().sampleHeight(x + playerBodyRadius, z),
+          -outsidePlan().sampleHeight(x - playerBodyRadius, z),
+          -outsidePlan().sampleHeight(x, z + playerBodyRadius),
+          -outsidePlan().sampleHeight(x, z - playerBodyRadius)
+        )
+      : 0;
 
   const updateBodyMovement = (body: RapierRigidBody, delta: number) => {
     const velocity = body.linvel();
@@ -362,8 +389,18 @@
 
     if (settings.cameraMode !== "orbit" && !scene.sceneControlsLocked) {
       const response = Math.min(1, delta * settings.moveResponsiveness);
-      const desiredVelocity = getDesiredHorizontalVelocity(velocity);
       const translation = body.translation();
+      const waterDepth = outsideWaterDepth(translation.x, translation.z);
+      const waterSpeedFactor = waterDepth > 0.04 ? 0.5 : 1;
+      const desiredVelocity = getDesiredHorizontalVelocity(
+        velocity,
+        waterSpeedFactor
+      );
+      waterDip = MathUtils.lerp(
+        waterDip,
+        waterDepth > 0.04 ? Math.min(0.38, 0.18 + waterDepth * 0.35) : 0,
+        Math.min(1, delta * 9)
+      );
       const conveyor = isGroundedState
         ? getConveyorVelocity(
             scene.roomPlatforms,
@@ -808,7 +845,8 @@
     const translation = body.translation();
     const clamped = clampToRoom(
       [translation.x, translation.y, translation.z],
-      playerBodyRadius
+      playerBodyRadius,
+      scene.roomBounds
     );
 
     if (
@@ -939,13 +977,15 @@
       const yawAlpha = Math.min(1, delta * shellYawSmoothing);
       const visualPosition = clampToRoom(
         [translation.x, translation.y, translation.z],
-        playerBodyRadius + wallUnstuckInset
+        playerBodyRadius + wallUnstuckInset,
+        scene.roomBounds
       );
 
+      scene.player.facingYaw = aimYaw;
       shellYaw = lerpAngleShortest(shellYaw, aimYaw, yawAlpha);
       shellGroup.position.set(
         visualPosition[0],
-        visualPosition[1],
+        visualPosition[1] - waterDip,
         visualPosition[2]
       );
       shellGroup.rotation.set(0, shellYaw, 0);
