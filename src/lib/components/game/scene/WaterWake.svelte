@@ -62,13 +62,17 @@
           float y = p.y / max(grow, 0.08);
           float fade = smoothstep(0.0, 0.08, p.y) * (1.0 - smoothstep(0.82, 1.0, y));
           float noise = fbm2(vec2(p.x * 8.0, p.y * 12.0 - uTime * 1.8));
-          float spread = 0.06 + y * 0.28 + uAge * 0.38 + (noise - 0.5) * 0.08;
-          float arm = 1.0 - smoothstep(0.02, 0.105, abs(abs(p.x) - spread));
-          float inside = 1.0 - smoothstep(spread * 0.72, spread * 1.06, abs(p.x));
+          float bendNoise = fbm2(vec2(p.y * 5.0 + uTime * 0.35, p.x * 4.0 + uAge * 2.0));
+          float bend = sin(p.y * 9.0 + uAge * 6.0 + noise * 3.0) * (0.025 + y * 0.075);
+          float curvedX = p.x + (bend + (bendNoise - 0.5) * 0.1 * y) * smoothstep(0.03, 0.5, p.y);
+          float spread = 0.06 + y * 0.28 + uAge * 0.38 + (noise - 0.5) * 0.08 + sin(y * 6.0 + uAge * 4.0) * 0.035 * y;
+          float waveBand = 0.55 + 0.45 * sin(y * 18.0 + curvedX * 7.0 + uTime * 1.2);
+          float arm = 1.0 - smoothstep(0.025, 0.145, abs(abs(curvedX) - spread));
+          float inside = 1.0 - smoothstep(spread * 0.72, spread * 1.06, abs(curvedX));
           float wash = inside * smoothstep(0.05, 0.34, p.y) * (1.0 - smoothstep(0.72, 1.0, p.y));
-          float center = (1.0 - smoothstep(0.03, 0.15, abs(p.x))) * exp(-p.y * 1.2);
-          float foam = smoothstep(0.45, 0.9, fbm2(vec2(p.x * 18.0, p.y * 24.0 - uTime * 3.0)));
-          float wake = fade * yMask * life * (arm * (0.46 + noise * 0.38) + wash * foam * 0.2 + center * 0.1);
+          float center = (1.0 - smoothstep(0.03, 0.15, abs(curvedX))) * exp(-p.y * 1.2);
+          float foam = smoothstep(0.45, 0.9, fbm2(vec2(curvedX * 18.0 + sin(y * 7.0) * 0.8, p.y * 24.0 - uTime * 3.0)));
+          float wake = fade * yMask * life * (arm * (0.32 + noise * 0.26) * waveBand + wash * foam * 0.24 + center * 0.1);
           vec3 col = vec3(wake * 0.68, wake * 0.9, wake);
           float alpha = wake * uOpacity;
           if (alpha < 0.008) discard;
@@ -156,27 +160,19 @@
       segments = live;
     }
 
-    if (
-      inWater &&
-      previousX !== null &&
-      previousZ !== null &&
-      distance > 0.0001 &&
-      speed > 0.45
-    ) {
+    if (inWater && previousX !== null && previousZ !== null && speed > 0.45) {
       const emitSpacing = radius * 0.32;
       const yaw = Math.atan2(-dx, -dz);
       const strength = Math.min(1, speed / 3.8);
-      let nextEmitDistance = emitSpacing - distanceSinceLastEmit;
 
-      while (nextEmitDistance <= distance + 0.000_001) {
-        const t = Math.min(1, Math.max(0, nextEmitDistance / distance));
-
-        emit(previousX + dx * t, previousZ + dz * t, yaw, strength);
-
-        nextEmitDistance += emitSpacing;
+      if (distance > 0.0001) {
+        distanceSinceLastEmit += distance;
       }
 
-      distanceSinceLastEmit = (distanceSinceLastEmit + distance) % emitSpacing;
+      if (distanceSinceLastEmit >= emitSpacing) {
+        distanceSinceLastEmit %= emitSpacing;
+        emit(position[0], position[2], yaw, strength);
+      }
     } else {
       distanceSinceLastEmit = 0;
     }
