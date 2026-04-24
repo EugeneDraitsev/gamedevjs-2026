@@ -29,6 +29,7 @@ interface PickupCollectContext {
   meleeFrame?: MeleeFrame;
   meleeParams?: SwingParams;
   obstacles?: RoomPlatform[];
+  pickupRadiusBonus?: number;
 }
 
 export const pickupConfigs = {
@@ -210,7 +211,11 @@ export const collectPickups = (
         }
       );
 
-    if (distance > playerRadius + pickup.radius && !slashed) {
+    if (
+      distance >
+        playerRadius + pickup.radius + (context.pickupRadiusBonus ?? 0) &&
+      !slashed
+    ) {
       remaining.push(pickup);
       continue;
     }

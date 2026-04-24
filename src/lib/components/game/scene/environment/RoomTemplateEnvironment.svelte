@@ -13,12 +13,17 @@
     bossBannerTexture = null,
     currentFloorPalette,
     environment = null,
+    floorExitOpenAmount = 0,
   }: {
     animationNow?: number;
     bossBannerTexture?: Texture | null;
     currentFloorPalette: SceneFloorPalette;
     environment?: RoomEnvironmentId | null;
+    floorExitOpenAmount?: number;
   } = $props();
+
+  const exitReveal = $derived(Math.max(0, Math.min(1, floorExitOpenAmount)));
+  const bannerLift = $derived(exitReveal * exitReveal);
 </script>
 
 <T.Mesh position={[0, -0.39, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
@@ -327,7 +332,14 @@
     </T.Mesh>
 
     {#each [-5.2, 0, 5.2] as x}
-      <T.Group position={[x, 0, 0.15]}>
+      <T.Group
+        position={[
+          x,
+          x === 0 ? bannerLift * 3.65 : 0,
+          x === 0 ? 0.15 - bannerLift * 0.16 : 0.15,
+        ]}
+        scale={[1, x === 0 ? Math.max(0.08, 1 - bannerLift * 0.72) : 1, 1]}
+      >
         <T.Mesh castShadow receiveShadow position={[0, 0.04, 0]}>
           <T.PlaneGeometry args={[2.7, 3.25]} />
           <T.MeshStandardMaterial
@@ -336,8 +348,10 @@
             emissiveIntensity={0.12}
             map={bossBannerTexture}
             metalness={0.02}
+            opacity={x === 0 ? Math.max(0, 1 - bannerLift * 1.24) : 1}
             roughness={0.92}
             side={DoubleSide}
+            transparent={x === 0}
           />
         </T.Mesh>
         {#each [-1, 1] as side}
@@ -346,7 +360,9 @@
             <T.MeshStandardMaterial
               color="#9b6938"
               metalness={0.68}
+              opacity={x === 0 ? Math.max(0, 1 - bannerLift * 1.18) : 1}
               roughness={0.38}
+              transparent={x === 0}
             />
           </T.Mesh>
         {/each}
@@ -355,7 +371,9 @@
           <T.MeshStandardMaterial
             color="#c08545"
             metalness={0.7}
+            opacity={x === 0 ? Math.max(0, 1 - bannerLift * 1.18) : 1}
             roughness={0.34}
+            transparent={x === 0}
           />
         </T.Mesh>
       </T.Group>

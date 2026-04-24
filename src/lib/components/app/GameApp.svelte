@@ -4,33 +4,50 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { DEFAULT_SWING, type SwingParams } from "$lib/combat/melee-swing";
+  import FloorAdvanceTransition from "$lib/components/app/FloorAdvanceTransition.svelte";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import GameScene from "$lib/components/game/GameScene.svelte";
   import MobileControls from "$lib/components/game/MobileControls.svelte";
-  import WeaponLabModal from "$lib/components/weapon-lab/WeaponLabModal.svelte";
+  import MachineBayModal from "$lib/components/machine-bay/MachineBayModal.svelte";
   import { createDungeonLayout } from "$lib/config/dungeon-layout";
+  import {
+    computeMachineStats,
+    createDefaultMachineLoadout,
+    createDefaultModuleInventory,
+    getMachineModule,
+    hasMachineModule,
+    type MachineLoadout,
+    type MachineModuleId,
+    type MachineSlotId,
+    moduleFitsSlot,
+  } from "$lib/config/machine-modules";
   import {
     createSceneSettings,
     loadSceneSettings,
     type SceneSettings,
     saveSceneSettings,
   } from "$lib/config/scene-settings";
-  import {
-    computeWeaponBuild,
-    createDefaultWeaponGraph,
-    type WeaponFlowEdge,
-    type WeaponFlowNode,
-    type WeaponNodeType,
-  } from "$lib/config/weapon-graph";
   import { isEditableTarget } from "$lib/game/dom";
   import { isTouchDevice } from "$lib/game/mobile";
-  import { clearRunSave, loadRunSave, saveRunSave } from "$lib/game/run-save";
+  import {
+    clearRunSave,
+    createDefaultRunState,
+    loadRunSave,
+    type SavedRunState,
+    saveRunSave,
+  } from "$lib/game/run-save";
   import { mobileInput } from "$lib/stores/mobile-input.svelte";
   import type { MeleeTrailSettings } from "$lib/types/game";
 
   interface GameAppProps {
     seed: string;
   }
+
+  type FloorAdvancePhase = "covered" | "closing" | "idle" | "opening";
+
+  const floorAdvanceCloseMs = 620;
+  const floorAdvanceHoldMs = 520;
+  const floorAdvanceOpenMs = 760;
 
   let { seed }: GameAppProps = $props();
 
@@ -44,28 +61,27 @@
   let settings = $state(loadSceneSettings());
   let settingsOpen = $state(false);
   let sceneResetKey = $state(0);
-  let weaponLabOpen = $state(false);
+  let machineBayOpen = $state(false);
   let collectedArtifactRooms = $state<string[]>([]);
   let floorIndex = $state(1);
+  let floorAdvancePending = $state(false);
+  let floorAdvancePhase = $state<FloorAdvancePhase>("idle");
+  let floorAdvanceTimers: number[] = [];
   let gearCount = $state(0);
   let runReady = $state(page.url.searchParams.get("continue") !== "1");
   let touchControls = $state(false);
-
-  const startingDungeon = $derived.by(() =>
-    createDungeonLayout(`${seed}-f1`, 1)
+  let machineLoadout = $state<MachineLoadout>(createDefaultMachineLoadout());
+  let moduleInventory = $state<MachineModuleId[]>(
+    createDefaultModuleInventory()
   );
+
   const dungeon = $derived(
     createDungeonLayout(`${seed}-f${floorIndex}`, floorIndex)
   );
-  let looseModules = $state<WeaponNodeType[]>([]);
-
-  const defaultWeaponGraph = createDefaultWeaponGraph();
-
-  let weaponNodes = $state.raw<WeaponFlowNode[]>(defaultWeaponGraph.nodes);
-  let weaponEdges = $state.raw<WeaponFlowEdge[]>(defaultWeaponGraph.edges);
-
-  const weaponPreview = $derived(computeWeaponBuild(weaponNodes, weaponEdges));
-  const controlsLocked = $derived(settingsOpen || weaponLabOpen);
+  const machineStats = $derived(computeMachineStats(machineLoadout));
+  const controlsLocked = $derived(
+    settingsOpen || machineBayOpen || floorAdvancePhase !== "idle"
+  );
   const debugEnabled = $derived(page.url.searchParams.get("debug") === "true");
 
   const swingParams = $derived<SwingParams>({
@@ -100,14 +116,43 @@
     sceneResetKey += 1;
   };
 
+  const clearFloorAdvanceTimers = () => {
+    for (const timer of floorAdvanceTimers) {
+      window.clearTimeout(timer);
+    }
+
+    floorAdvanceTimers = [];
+  };
+
+  const scheduleFloorAdvanceStep = (callback: () => void, delayMs: number) => {
+    const timer = window.setTimeout(() => {
+      floorAdvanceTimers = floorAdvanceTimers.filter(
+        (entry) => entry !== timer
+      );
+      callback();
+    }, delayMs);
+
+    floorAdvanceTimers = [...floorAdvanceTimers, timer];
+  };
+
+  const resetFloorAdvanceTransition = () => {
+    clearFloorAdvanceTimers();
+    floorAdvancePending = false;
+    floorAdvancePhase = "idle";
+  };
+
+  const applyRunState = (state: SavedRunState) => {
+    collectedArtifactRooms = [...state.collectedArtifactRooms];
+    floorIndex = state.floorIndex;
+    gearCount = state.gearCount ?? 0;
+    machineLoadout = { ...state.machineLoadout };
+    moduleInventory = [...state.moduleInventory];
+  };
+
   const resetLevel = () => {
+    resetFloorAdvanceTransition();
     clearRunSave(seed);
-    collectedArtifactRooms = [];
-    floorIndex = 1;
-    gearCount = 0;
-    looseModules = [...startingDungeon.initialModules];
-    weaponEdges = defaultWeaponGraph.edges;
-    weaponNodes = defaultWeaponGraph.nodes;
+    applyRunState(createDefaultRunState());
     resetScene();
   };
 
@@ -121,16 +166,16 @@
   };
 
   const openSettings = () => {
-    weaponLabOpen = false;
+    machineBayOpen = false;
     settingsOpen = true;
   };
 
-  const openWeaponLab = () => {
+  const openMachineBay = () => {
     if (settingsOpen) {
       return;
     }
 
-    weaponLabOpen = true;
+    machineBayOpen = true;
   };
 
   const withDebugParam = (path: string) => {
@@ -163,30 +208,99 @@
     });
   };
 
-  const installModule = (type: WeaponNodeType) => {
-    const index = looseModules.indexOf(type);
+  const removeInventoryModule = (moduleId: MachineModuleId) => {
+    const index = moduleInventory.indexOf(moduleId);
 
-    if (index !== -1) {
-      looseModules = looseModules.toSpliced(index, 1);
+    if (index === -1) {
+      return null;
+    }
+
+    moduleInventory = moduleInventory.toSpliced(index, 1);
+    return moduleId;
+  };
+
+  const installModule = (moduleId: MachineModuleId, slotId: MachineSlotId) => {
+    if (!moduleFitsSlot(moduleId, slotId)) {
+      return;
+    }
+
+    const removed = removeInventoryModule(moduleId);
+
+    if (!removed) {
+      return;
+    }
+
+    const previous = machineLoadout[slotId];
+
+    machineLoadout = { ...machineLoadout, [slotId]: moduleId };
+
+    if (previous) {
+      moduleInventory = [...moduleInventory, previous];
     }
   };
 
-  const returnModule = (type: WeaponNodeType) => {
-    looseModules = [...looseModules, type];
+  const ejectModule = (slotId: MachineSlotId) => {
+    const moduleId = machineLoadout[slotId];
+
+    if (!moduleId) {
+      return;
+    }
+
+    machineLoadout = { ...machineLoadout, [slotId]: null };
+    moduleInventory = [...moduleInventory, moduleId];
   };
 
-  const collectArtifact = (roomId: string, type: WeaponNodeType) => {
+  const scrapModule = (moduleId: MachineModuleId) => {
+    const removed = removeInventoryModule(moduleId);
+
+    if (!removed) {
+      return;
+    }
+
+    gearCount +=
+      getMachineModule(moduleId).scrapValue + machineStats.scrapYieldBonus;
+  };
+
+  const collectArtifact = (roomId: string, type: MachineModuleId) => {
     if (collectedArtifactRooms.includes(roomId)) {
       return;
     }
 
     collectedArtifactRooms = [...collectedArtifactRooms, roomId];
-    looseModules = [...looseModules, type];
 
-    if (floorIndex === 1 && dungeon.rooms[roomId]?.kind === "boss") {
+    if (hasMachineModule(machineLoadout, moduleInventory, type)) {
+      gearCount +=
+        getMachineModule(type).scrapValue + machineStats.scrapYieldBonus;
+    } else {
+      moduleInventory = [...moduleInventory, type];
+    }
+  };
+
+  const advanceFloor = () => {
+    if (floorAdvancePending || floorIndex !== 1) {
+      return;
+    }
+
+    clearFloorAdvanceTimers();
+    floorAdvancePending = true;
+    settingsOpen = false;
+    machineBayOpen = false;
+    floorAdvancePhase = "closing";
+
+    scheduleFloorAdvanceStep(() => {
+      floorAdvancePhase = "covered";
       collectedArtifactRooms = [];
       floorIndex = 2;
-    }
+
+      scheduleFloorAdvanceStep(() => {
+        floorAdvancePhase = "opening";
+
+        scheduleFloorAdvanceStep(() => {
+          floorAdvancePhase = "idle";
+          floorAdvancePending = false;
+        }, floorAdvanceOpenMs);
+      }, floorAdvanceHoldMs);
+    }, floorAdvanceCloseMs);
   };
 
   $effect(() => {
@@ -202,28 +316,23 @@
       collectedArtifactRooms,
       floorIndex,
       gearCount,
-      looseModules,
-      weaponEdges,
-      weaponNodes,
+      machineLoadout,
+      moduleInventory,
+      version: 2,
     });
   });
 
   $effect(() => {
     seed;
-    gearCount = 0;
-    looseModules = [...startingDungeon.initialModules];
+    resetFloorAdvanceTransition();
+    applyRunState(createDefaultRunState());
   });
 
   onMount(() => {
     const savedRun = loadRunSave(seed);
 
     if (page.url.searchParams.get("continue") === "1" && savedRun) {
-      collectedArtifactRooms = savedRun.collectedArtifactRooms;
-      floorIndex = savedRun.floorIndex;
-      gearCount = savedRun.gearCount ?? 0;
-      looseModules = savedRun.looseModules;
-      weaponEdges = savedRun.weaponEdges;
-      weaponNodes = savedRun.weaponNodes;
+      applyRunState(savedRun);
     }
 
     runReady = true;
@@ -240,8 +349,8 @@
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === "Escape") {
-        if (weaponLabOpen) {
-          weaponLabOpen = false;
+        if (machineBayOpen) {
+          machineBayOpen = false;
         } else {
           settingsOpen = !settingsOpen;
         }
@@ -255,7 +364,7 @@
       }
 
       if (event.code === "KeyE" && !event.repeat && !settingsOpen) {
-        weaponLabOpen = !weaponLabOpen;
+        machineBayOpen = !machineBayOpen;
         event.preventDefault();
       }
     };
@@ -276,6 +385,7 @@
 
     return () => {
       isActive = false;
+      clearFloorAdvanceTimers();
       window.removeEventListener("keydown", handleKeyDown);
       coarseQuery.removeEventListener("change", onCoarseChange);
       mobileInput.reset();
@@ -307,17 +417,21 @@
         {gearCount}
         meleeParams={swingParams}
         meleeTrailSettings={trailSettings}
+        onAdvanceFloor={advanceFloor}
         onCollectArtifact={collectArtifact}
         onGearCountChange={(value) => (gearCount = value)}
         onOpenSettings={openSettings}
-        onOpenWeaponLab={openWeaponLab}
+        onOpenWeaponLab={openMachineBay}
         {settings}
-        weaponBuild={weaponPreview}
+        {machineStats}
+        weaponBuild={machineStats.weaponBuild}
       />
     {/key}
   {/if}
 
   <MobileControls visible={touchControls && !controlsLocked} />
+
+  <FloorAdvanceTransition nextFloor={2} phase={floorAdvancePhase} />
 
   {#if debugEnabled && DebugPane}
     <DebugPane
@@ -351,15 +465,16 @@
     </dialog>
   {/if}
 
-  <WeaponLabModal
-    availableModules={looseModules}
-    bind:edges={weaponEdges}
-    bind:nodes={weaponNodes}
-    onAddModule={installModule}
-    open={weaponLabOpen}
-    onReturnModule={returnModule}
-    preview={weaponPreview}
-    onClose={() => (weaponLabOpen = false)}
+  <MachineBayModal
+    {gearCount}
+    {machineLoadout}
+    {machineStats}
+    {moduleInventory}
+    onClose={() => (machineBayOpen = false)}
+    onEjectModule={ejectModule}
+    onInstallModule={installModule}
+    onScrapModule={scrapModule}
+    open={machineBayOpen}
   />
 </main>
 

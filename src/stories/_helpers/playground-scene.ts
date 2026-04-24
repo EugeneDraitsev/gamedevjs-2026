@@ -1,11 +1,11 @@
 import { DEFAULT_SWING, type SwingParams } from "$lib/combat/melee-swing";
 import type { DungeonLayout } from "$lib/config/dungeon-layout";
+import {
+  computeMachineStats,
+  createDefaultMachineLoadout,
+} from "$lib/config/machine-modules";
 import { roomTemplateById } from "$lib/config/room-templates";
 import type { SceneSettings } from "$lib/config/scene-settings";
-import {
-  computeWeaponBuild,
-  createDefaultWeaponGraph,
-} from "$lib/config/weapon-graph";
 import type { MeleeTrailSettings } from "$lib/types/game";
 
 export const playgroundRoomId = "playground-room";
@@ -39,6 +39,9 @@ export const buildPlaygroundDungeon = (
         kind: template.kind,
         label: template.label,
         templateId,
+        ...(template.kind === "treasure"
+          ? { artifactType: "ammo-hopper" }
+          : {}),
       },
     },
     seed,
@@ -77,17 +80,17 @@ export const buildPlaygroundDungeon = (
       kind: "treasure",
       label: "Treasure",
       templateId: "treasure-artifact",
+      artifactType: "ammo-hopper",
     };
   }
 
   return dungeon;
 };
 
-const defaultGraph = createDefaultWeaponGraph();
-export const playgroundWeaponBuild = computeWeaponBuild(
-  defaultGraph.nodes,
-  defaultGraph.edges
+export const playgroundMachineStats = computeMachineStats(
+  createDefaultMachineLoadout()
 );
+export const playgroundWeaponBuild = playgroundMachineStats.weaponBuild;
 
 export const noop = () => {
   // Intentional no-op handler used by playground stories.

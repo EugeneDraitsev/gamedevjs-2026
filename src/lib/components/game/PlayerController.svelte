@@ -82,8 +82,6 @@
   const orbitKeyboardPanSpeed = 0.9;
   const projectileForwardOffset = 1.1;
   const projectileHeightOffset = 0.18;
-  const shootCooldownMs = 350;
-  const reloadDurationMs = 900;
   const DYNAMIC_BODY_TYPE: RigidBodyType = 0 as RigidBodyType;
   const shellYawSmoothing = 14;
   const playerBodyRadius = 0.55;
@@ -650,7 +648,7 @@
     }
 
     if (reloadRequested || player.ammo <= 0) {
-      player.startReload(now, reloadDurationMs);
+      player.startReload(now, scene.machineStats.reloadDurationMs);
     }
 
     reloadRequested = false;
@@ -676,11 +674,11 @@
     const now = performance.now();
 
     if (player.ammo <= 0) {
-      player.startReload(now, reloadDurationMs);
+      player.startReload(now, scene.machineStats.reloadDurationMs);
       return;
     }
 
-    if (now - lastShotAt < shootCooldownMs) {
+    if (now - lastShotAt < scene.machineStats.shootCooldownMs) {
       return;
     }
 
@@ -741,7 +739,7 @@
     lastShotAt = now;
 
     if (player.ammo <= 0) {
-      player.startReload(now, reloadDurationMs);
+      player.startReload(now, scene.machineStats.reloadDurationMs);
     }
 
     shootRequested = shootingHeld;

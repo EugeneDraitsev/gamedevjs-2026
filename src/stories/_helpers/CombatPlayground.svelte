@@ -13,6 +13,7 @@
     type CombatPreset,
     combatPresets,
     noop,
+    playgroundMachineStats,
     playgroundWeaponBuild,
   } from "./playground-scene";
 
@@ -72,6 +73,7 @@
       {dungeon}
       {meleeParams}
       meleeTrailSettings={trailSettings}
+      machineStats={playgroundMachineStats}
       onCollectArtifact={noop}
       onOpenSettings={noop}
       onOpenWeaponLab={noop}

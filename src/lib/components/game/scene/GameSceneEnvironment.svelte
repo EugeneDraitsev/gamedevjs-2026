@@ -1,5 +1,6 @@
 <script lang="ts">
   import { T } from "@threlte/core";
+  import FloorExitPortal from "$lib/components/game/scene/environment/FloorExitPortal.svelte";
   import RoomArtifactPedestal from "$lib/components/game/scene/environment/RoomArtifactPedestal.svelte";
   import RoomDoors from "$lib/components/game/scene/environment/RoomDoors.svelte";
   import RoomFloor from "$lib/components/game/scene/environment/RoomFloor.svelte";
@@ -108,11 +109,18 @@
   bossBannerTexture={textures.bossBanner}
   currentFloorPalette={scene.currentFloorPalette}
   environment={scene.roomEnvironment}
+  floorExitOpenAmount={scene.floorExitOpenAmount}
 />
 
 <RoomArtifactPedestal
   animationNow={timing.now}
   currentArtifactTemplate={scene.currentArtifactTemplate}
+/>
+
+<FloorExitPortal
+  active={scene.floorExitActive}
+  animationNow={timing.now}
+  openAmount={scene.floorExitOpenAmount}
 />
 
 <T.Group position={[0, 0.08, 0]} scale={[0.001, 0.001, 0.001]}>

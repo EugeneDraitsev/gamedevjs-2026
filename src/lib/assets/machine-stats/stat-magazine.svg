@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="blue-shell" x1="20" x2="110" y1="17" y2="112">
+      <stop offset="0" stop-color="#e8f8ff"/>
+      <stop offset=".32" stop-color="#69bdff"/>
+      <stop offset=".72" stop-color="#15548c"/>
+      <stop offset="1" stop-color="#061324"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="33" x2="91" y1="19" y2="108">
+      <stop offset="0" stop-color="#fff3c6"/>
+      <stop offset=".34" stop-color="#9eadb7"/>
+      <stop offset=".72" stop-color="#2b3b49"/>
+      <stop offset="1" stop-color="#080d13"/>
+    </linearGradient>
+    <filter id="glow" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000814" flood-opacity=".55"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#69bdff" flood-opacity=".62"/>
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <path d="M26 19h76l10 18-10 72H26L16 37z" fill="url(#blue-shell)" stroke="#d8f2ff" stroke-linejoin="round" stroke-width="3"/>
+    <path d="M38 31h52l7 12-7 53H38l-7-53z" fill="#07111d" stroke="#7ed1ff" stroke-linejoin="round" stroke-width="4"/>
+    <path d="M31 30a45 45 0 0 1 67-2" fill="none" stroke="#f4fbff" stroke-linecap="round" stroke-width="6" opacity=".32"/>
+    <g stroke="#edf8ff" stroke-linejoin="round" stroke-width="2.4">
+      <path d="M44 37h10l4 46-9 16-9-16z" fill="url(#steel)"/>
+      <path d="M59 31h10l4 52-9 16-9-16z" fill="url(#steel)"/>
+      <path d="M74 37h10l4 46-9 16-9-16z" fill="url(#steel)"/>
+    </g>
+    <path d="M43 48h42" stroke="#9de0ff" stroke-linecap="round" stroke-width="4" opacity=".38"/>
+    <path d="M41 76h46" stroke="#9de0ff" stroke-linecap="round" stroke-width="4" opacity=".3"/>
+  </g>
+</svg>

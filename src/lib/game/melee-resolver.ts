@@ -36,6 +36,24 @@ export const handleMeleeFrame = (combat: CombatStore, frame: MeleeFrame) => {
   }
 };
 
+const pushEnemyDeathBurst = (
+  combat: CombatStore,
+  enemy: ActiveEnemy,
+  now: number
+) => {
+  combat.deflectBursts.push({
+    color: enemy.color,
+    createdAt: now,
+    id: crypto.randomUUID(),
+    position: [
+      enemy.position[0],
+      enemy.position[1] + enemy.radius * 0.28,
+      enemy.position[2],
+    ],
+    radius: enemy.radius > 1 ? enemy.radius * 2.2 : enemy.radius * 1.4,
+  });
+};
+
 interface ApplyMeleeArgs {
   combat: CombatStore;
   frame: MeleeFrame;
@@ -228,6 +246,8 @@ export const applyMeleeHitsToEnemies = ({
 
     if (enemy.hp > 0) {
       nextEnemies.push(enemy);
+    } else {
+      pushEnemyDeathBurst(combat, enemy, now);
     }
   }
 

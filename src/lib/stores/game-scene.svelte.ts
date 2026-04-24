@@ -2,14 +2,20 @@ import type { Camera } from "three";
 import type { SwingParams } from "$lib/combat/melee-swing";
 import { getHazardBrakeFactor } from "$lib/components/game/scene/utils";
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
+import {
+  getMachineModule,
+  type MachineModuleTemplate,
+  type MachineStats,
+} from "$lib/config/machine-modules";
 import { roomTemplateById } from "$lib/config/room-templates";
 import type { SceneSettings } from "$lib/config/scene-settings";
-import type { WeaponBuild, WeaponNodeTemplate } from "$lib/config/weapon-graph";
-import { getWeaponNodeTemplate } from "$lib/config/weapon-graph";
+import type { WeaponBuild } from "$lib/config/weapon-graph";
 import {
   createDoorMarkers,
   createDoorSeals,
   createRoomWalls,
+  floorExitOpenDelayMs,
+  floorExitOpenDurationMs,
   floorThemes,
   getRoomHazards,
   getRoomPlatforms,
@@ -37,6 +43,7 @@ interface GameSceneStoreInput {
   dungeon: DungeonLayout;
   floorReliefMaps: boolean;
   floorReliefStrength: number;
+  machineStats: MachineStats;
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;
   settings: SceneSettings;
@@ -59,6 +66,7 @@ export class GameSceneStore {
   floorReliefStrength = $state(1.4);
   meleeParams = $state.raw<SwingParams>(null as never);
   meleeTrailSettings = $state.raw<MeleeTrailSettings>(null as never);
+  machineStats = $state.raw<MachineStats>(null as never);
   settings = $state.raw<SceneSettings>(null as never);
   weaponBuild = $state.raw<WeaponBuild>(null as never);
   camera = $state<Camera>();
@@ -135,14 +143,12 @@ export class GameSceneStore {
 
     return available ? (this.currentRoom.artifactType ?? null) : null;
   });
-  readonly currentArtifactTemplate = $derived<WeaponNodeTemplate | null>(
-    this.currentArtifactType
-      ? getWeaponNodeTemplate(this.currentArtifactType)
-      : null
+  readonly currentArtifactTemplate = $derived<MachineModuleTemplate | null>(
+    this.currentArtifactType ? getMachineModule(this.currentArtifactType) : null
   );
-  readonly pickedArtifactTemplate = $derived<WeaponNodeTemplate | null>(
+  readonly pickedArtifactTemplate = $derived<MachineModuleTemplate | null>(
     this.timing.pickedArtifactType
-      ? getWeaponNodeTemplate(this.timing.pickedArtifactType)
+      ? getMachineModule(this.timing.pickedArtifactType)
       : null
   );
   readonly playerHitFlash = $derived(
@@ -195,6 +201,8 @@ export class GameSceneStore {
     animationNow: this.timing.now,
     artifactPickupAt: this.timing.pickedArtifactAt,
     artifactPickupProgress: this.timing.artifactPickupProgress,
+    bossDeathProgress: this.timing.bossDeathProgress,
+    bossDeathStartedAt: this.timing.bossDeathStartedAt,
     bossIntroStartedAt: this.timing.bossIntroStartedAt,
     bossIntroProgress: this.timing.bossIntroProgress,
     bossIntroTitle: this.timing.bossIntroTitle,
@@ -224,6 +232,35 @@ export class GameSceneStore {
   readonly currentRoomUnlocked = $derived(
     !this.isCurrentRoomCombat || this.room.releasedSet.has(this.currentRoom.id)
   );
+  readonly floorExitOpenAmount = $derived.by(() => {
+    if (
+      this.dungeon.floor !== 1 ||
+      this.currentRoom.kind !== "boss" ||
+      !this.room.clearedSet.has(this.currentRoom.id)
+    ) {
+      return 0;
+    }
+
+    const startedAt =
+      this.timing.bossDeathStartedAt || this.room.unlockStartedAt;
+
+    if (startedAt <= 0) {
+      return this.room.doorOpenAmount;
+    }
+
+    return Math.max(
+      0,
+      Math.min(
+        1,
+        (this.timing.now - startedAt - floorExitOpenDelayMs) /
+          floorExitOpenDurationMs
+      )
+    );
+  });
+  readonly floorExitActive = $derived(
+    this.dungeon.floor === 1 && this.currentRoom.kind === "boss"
+  );
+  readonly floorExitReady = $derived(this.floorExitOpenAmount >= 0.98);
   readonly activeEnemyTargets = $derived(
     this.combat.enemies.map((enemy) => enemy.position)
   );
@@ -237,10 +274,12 @@ export class GameSceneStore {
     this.dungeon = input.dungeon;
     this.floorReliefMaps = input.floorReliefMaps;
     this.floorReliefStrength = input.floorReliefStrength;
+    this.machineStats = input.machineStats;
     this.meleeParams = input.meleeParams;
     this.meleeTrailSettings = input.meleeTrailSettings;
     this.settings = input.settings;
     this.weaponBuild = input.weaponBuild;
+    this.player.applyMachineStats(input.machineStats);
   }
 
   isRoomUnlocked(candidate: DungeonRoom) {

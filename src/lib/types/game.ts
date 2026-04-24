@@ -1,8 +1,8 @@
 import type {
-  WeaponBuild,
-  WeaponNodeTemplate,
-  WeaponNodeType,
-} from "$lib/config/weapon-graph";
+  MachineModuleId,
+  MachineModuleTemplate,
+} from "$lib/config/machine-modules";
+import type { WeaponBuild } from "$lib/config/weapon-graph";
 
 export type Vec3 = [number, number, number];
 export type CameraMode = "follow" | "orbit";
@@ -265,6 +265,8 @@ export interface SceneOverlayProps {
   animationNow: number;
   artifactPickupAt?: number;
   artifactPickupProgress: number;
+  bossDeathProgress: number;
+  bossDeathStartedAt?: number;
   bossIntroProgress: number;
   bossIntroStartedAt?: number;
   bossIntroTitle: string;
@@ -275,7 +277,7 @@ export interface SceneOverlayProps {
   dungeonFloor: number;
   floorIntroProgress: number;
   floorIntroStartedAt?: number;
-  pickedArtifactTemplate: WeaponNodeTemplate | null;
+  pickedArtifactTemplate: MachineModuleTemplate | null;
   playerHitFlash: number;
   playerReloading: boolean;
   playerReloadRatio: number;
@@ -292,5 +294,5 @@ export interface RoomEnemyContext {
 
 export interface ArtifactCollection {
   roomId: string;
-  type: WeaponNodeType;
+  type: MachineModuleId;
 }

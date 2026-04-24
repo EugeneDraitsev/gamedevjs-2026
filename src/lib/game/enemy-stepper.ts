@@ -180,6 +180,21 @@ const countActiveBombs = (combat: CombatStore, originId: string) => {
   return count;
 };
 
+const pushEnemyDeathBurst = (
+  combat: CombatStore,
+  enemy: ActiveEnemy,
+  position: Vec3,
+  now: number
+) => {
+  combat.deflectBursts.push({
+    color: enemy.color,
+    createdAt: now,
+    id: crypto.randomUUID(),
+    position: [position[0], position[1] + enemy.radius * 0.28, position[2]],
+    radius: enemy.radius > 1 ? enemy.radius * 2.2 : enemy.radius * 1.4,
+  });
+};
+
 const stepEnemy = (
   ctx: StepContext,
   enemy: ActiveEnemy,
@@ -239,6 +254,7 @@ const stepEnemy = (
   ];
 
   if (hp <= 0) {
+    pushEnemyDeathBurst(combat, enemy, position, now);
     return { enemy: null, playerDamage, shots, bombs };
   }
 
@@ -263,6 +279,7 @@ const stepEnemy = (
   }
 
   if (hp <= 0) {
+    pushEnemyDeathBurst(combat, enemy, position, now);
     return { enemy: null, playerDamage, shots, bombs };
   }
 

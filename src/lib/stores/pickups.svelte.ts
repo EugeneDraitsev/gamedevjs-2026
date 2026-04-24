@@ -73,6 +73,7 @@ export class PickupStore {
     health: number,
     maxHealth: number,
     obstacles: RoomPlatform[] = [],
+    pickupRadiusBonus = 0,
     meleeFrame?: MeleeFrame,
     meleeParams?: SwingParams
   ) {
@@ -91,7 +92,7 @@ export class PickupStore {
       health,
       maxHealth,
       performance.now(),
-      { meleeFrame, meleeParams, obstacles }
+      { meleeFrame, meleeParams, obstacles, pickupRadiusBonus }
     );
 
     if (

@@ -36,6 +36,8 @@
     damagePopupDurationMs,
     doorOpenDelayMs,
     doorOpenDurationMs,
+    floorExitTriggerHalfWidth,
+    floorExitTriggerZ,
   } from "$lib/game/scene-layout";
   import {
     deflectBurstDurationMs,
@@ -54,8 +56,10 @@
     floorReliefMaps = true,
     floorReliefStrength = 1.4,
     gearCount = 0,
+    machineStats,
     meleeParams,
     meleeTrailSettings,
+    onAdvanceFloor,
     onCollectArtifact,
     onGearCountChange,
     onOpenSettings,
@@ -73,6 +77,7 @@
       dungeon,
       floorReliefMaps,
       floorReliefStrength,
+      machineStats,
       meleeParams,
       meleeTrailSettings,
       settings,
@@ -227,6 +232,7 @@
       player.health,
       player.maxHealth,
       scene.roomPlatforms,
+      scene.machineStats.pickupRadiusBonus,
       meleeFrame ?? undefined,
       meleeFrame
         ? {
@@ -261,6 +267,17 @@
       room,
       timing,
     });
+
+    if (
+      scene.floorExitReady &&
+      scene.dungeon.floor === 1 &&
+      scene.currentRoom.kind === "boss" &&
+      !scene.currentArtifactType &&
+      Math.abs(position[0]) < floorExitTriggerHalfWidth &&
+      position[2] < floorExitTriggerZ
+    ) {
+      onAdvanceFloor?.();
+    }
   };
 
   const handleMelee = (frame: MeleeFrame) => {
@@ -324,6 +341,10 @@
       roomPlatforms: scene.roomPlatforms,
       timing,
     });
+
+    if (result.roomCleared && scene.currentRoom.kind === "boss") {
+      timing.beginBossDeath(time);
+    }
 
     if (cheats.infiniteHealth) {
       player.health = player.maxHealth;

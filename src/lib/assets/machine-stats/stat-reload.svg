@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="amber-dial" cx="35%" cy="23%" r="76%">
+      <stop offset="0" stop-color="#fff8c9"/>
+      <stop offset=".35" stop-color="#ffc545"/>
+      <stop offset=".78" stop-color="#a45c0d"/>
+      <stop offset="1" stop-color="#2c1403"/>
+    </radialGradient>
+    <linearGradient id="dark-face" x1="31" x2="98" y1="26" y2="101">
+      <stop offset="0" stop-color="#2d1b08"/>
+      <stop offset=".7" stop-color="#090603"/>
+      <stop offset="1" stop-color="#050301"/>
+    </linearGradient>
+    <filter id="glow" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000814" flood-opacity=".55"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#ffbe35" flood-opacity=".58"/>
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <circle cx="64" cy="64" r="51" fill="url(#amber-dial)" stroke="#fff0a8" stroke-width="3"/>
+    <circle cx="64" cy="64" r="36" fill="url(#dark-face)" stroke="#ffd363" stroke-width="4"/>
+    <path d="M32 37a43 43 0 0 1 60-6" fill="none" stroke="#fff6cf" stroke-linecap="round" stroke-width="6" opacity=".34"/>
+    <path d="M91 56a28 28 0 0 0-47-13" fill="none" stroke="#ffe078" stroke-linecap="round" stroke-width="8"/>
+    <path d="m91 56 4-19 14 13z" fill="#ffe078" stroke="#fff2bd" stroke-linejoin="round" stroke-width="2"/>
+    <path d="M37 72a28 28 0 0 0 47 13" fill="none" stroke="#ffae26" stroke-linecap="round" stroke-width="8"/>
+    <path d="m37 72-4 19-14-13z" fill="#ffae26" stroke="#ffe0a1" stroke-linejoin="round" stroke-width="2"/>
+    <circle cx="64" cy="64" r="7" fill="#fff0ad" stroke="#573008" stroke-width="3"/>
+    <path d="M64 45v12M64 71v12M45 64h12M71 64h12" stroke="#fff5c8" stroke-linecap="round" stroke-width="4" opacity=".55"/>
+  </g>
+</svg>
