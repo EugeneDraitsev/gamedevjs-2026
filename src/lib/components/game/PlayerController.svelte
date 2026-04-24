@@ -94,6 +94,7 @@
   let shootRequested = false;
   let shootingHeld = false;
   let meleeRequested = false;
+  let shotSfxId = 0;
   let mouseScreenX = 0;
   let mouseScreenY = 0;
   let lastMobileJumpPulse = 0;
@@ -762,6 +763,9 @@
     if (!player.consumeAmmo()) {
       return;
     }
+
+    shotSfxId += 1;
+    gameSfx.playPlayerLaserShot(shotSfxId, scene.weaponBuild.attackMode);
 
     onShoot?.({
       position: [

@@ -72,6 +72,8 @@ export class PickupStore {
         [roomId]: [...roomItems, ...drops],
       };
     }
+
+    return drops.length;
   }
 
   collectAt(

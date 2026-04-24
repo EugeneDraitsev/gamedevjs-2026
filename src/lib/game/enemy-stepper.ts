@@ -830,6 +830,8 @@ interface StepEnemiesArgs extends Omit<StepContext, "obstacles"> {
 }
 
 export interface StepEnemiesResult {
+  doorStartedOpening: boolean;
+  lootSpawned: boolean;
   nextHealth: number;
   roomCleared: boolean;
 }
@@ -851,13 +853,20 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
   const spentProjectiles = new Set<string>();
   const spawnedEnemyShots: ActiveEnemyShot[] = [];
   const spawnedBombs: ActiveBomb[] = [];
+  let lootSpawned = false;
   let nextHealth = player.health;
   const ctx: StepContext = {
     ...args,
     obstacles: getSolidObstacles(currentRoomTemplate.layout),
   };
+  const doorWasLocked =
+    room.unlockingRoomId === currentRoomId && room.doorOpenAmount <= 0.001;
 
   syncRoomDoorState(ctx, now, args.doorOpenDelayMs, args.doorOpenDurationMs);
+  const doorStartedOpening =
+    doorWasLocked &&
+    room.unlockingRoomId === currentRoomId &&
+    room.doorOpenAmount > 0.001;
 
   nextHealth = Math.max(0, nextHealth - applyHazardDamage(ctx, now));
   nextHealth = Math.max(0, nextHealth - stepEnemyShots(ctx, delta, now));
@@ -919,10 +928,10 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
     room.unlockingRoomId !== currentRoomId;
 
   if (roomCleared) {
-    pickups.dropRoom(currentRoomId, currentRoomTemplate, now);
+    lootSpawned = pickups.dropRoom(currentRoomId, currentRoomTemplate, now) > 0;
     room.markCleared(currentRoomId);
     room.beginUnlock(currentRoomId, now);
   }
 
-  return { nextHealth, roomCleared };
+  return { doorStartedOpening, lootSpawned, nextHealth, roomCleared };
 };

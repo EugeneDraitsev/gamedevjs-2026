@@ -311,6 +311,7 @@
     );
 
     if (pickupResult.healthDelta > 0) {
+      gameSfx.playRepairPickup();
       player.health = pickupResult.nextHealth;
       combat.popHeal(pickupResult.healthDelta, [
         position[0],
@@ -320,6 +321,7 @@
     }
 
     if (pickupResult.gearDelta > 0) {
+      gameSfx.playGearPickup();
       onGearCountChange?.(pickups.gears);
     }
 
@@ -414,6 +416,7 @@
         frame: combat.currentMeleeFrame,
         hitboxPadding: settings.meleeHitboxPadding,
         meleeParams: scene.meleeParams,
+        oneHitKill: cheats.oneHitKill,
         weaponBuild: scene.weaponBuild,
       });
       applyMeleeHitsToBombs({
@@ -421,6 +424,7 @@
         frame: combat.currentMeleeFrame,
         hitboxPadding: settings.meleeHitboxPadding,
         meleeParams: scene.meleeParams,
+        oneHitKill: cheats.oneHitKill,
         weaponBuild: scene.weaponBuild,
       });
       applyMeleeDeflects({
@@ -456,6 +460,14 @@
       roomPlatforms: scene.roomPlatforms,
       timing,
     });
+
+    if (result.doorStartedOpening) {
+      gameSfx.playDoorOpen();
+    }
+
+    if (result.lootSpawned) {
+      gameSfx.playLootSpawn();
+    }
 
     if (result.roomCleared && scene.currentRoom.kind === "boss") {
       timing.beginBossDeath(time);

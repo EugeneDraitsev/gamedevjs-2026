@@ -4,7 +4,6 @@ import {
   swingKnockbackDirection,
 } from "$lib/combat/melee-swing";
 import type { WeaponBuild } from "$lib/config/weapon-graph";
-import { cheats } from "$lib/stores/cheats.svelte";
 import type { CombatStore } from "$lib/stores/combat.svelte";
 import type {
   ActiveBomb,
@@ -192,6 +191,7 @@ export const applyMeleeDeflects = ({
 };
 
 interface ApplyMeleeHitsArgs extends ApplyMeleeArgs {
+  oneHitKill?: boolean;
   weaponBuild: WeaponBuild;
 }
 
@@ -200,6 +200,7 @@ export const applyMeleeHitsToBombs = ({
   frame,
   hitboxPadding,
   meleeParams,
+  oneHitKill = false,
   weaponBuild,
 }: ApplyMeleeHitsArgs) => {
   if (!frame.active || combat.bombs.length === 0) {
@@ -231,7 +232,7 @@ export const applyMeleeHitsToBombs = ({
       continue;
     }
 
-    const damage = cheats.oneHitKill ? bomb.hp : swingConfig.damage;
+    const damage = oneHitKill ? bomb.hp : swingConfig.damage;
 
     combat.popDamage(
       damage,
@@ -267,6 +268,7 @@ export const applyMeleeHitsToEnemies = ({
   frame,
   hitboxPadding,
   meleeParams,
+  oneHitKill = false,
   weaponBuild,
 }: ApplyMeleeHitsArgs) => {
   if (!frame.active) {
@@ -305,7 +307,7 @@ export const applyMeleeHitsToEnemies = ({
 
     hitSet.add(enemy.id);
 
-    const damage = cheats.oneHitKill ? enemy.hp : swingConfig.damage;
+    const damage = oneHitKill ? enemy.hp : swingConfig.damage;
     const [kx, kz] = swingKnockbackDirection(
       enemy.position,
       frame.center,
