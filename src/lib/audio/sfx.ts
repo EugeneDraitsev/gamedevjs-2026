@@ -31,12 +31,14 @@ interface RollingLoop {
   filter: BiquadFilterNode;
   gain: GainNode;
   oscillator: OscillatorNode;
+  source: AudioBufferSourceNode;
 }
 
 class GameSfxManager {
   #mix: SfxMixSettings = defaultSfxMix;
   #output: GainNode | null = null;
   #rollingLoop: RollingLoop | null = null;
+  #lastRollingTickAt = 0;
 
   syncMix(settings: SfxMixSettings) {
     this.#mix = {
@@ -91,7 +93,7 @@ class GameSfxManager {
   }
 
   playDoorOpen() {
-    const shot = this.#beginOneShot(0.68, 1350);
+    const shot = this.#beginOneShot(0.82, 1750);
 
     if (!shot) {
       return;
@@ -100,8 +102,9 @@ class GameSfxManager {
     const { context, root, start } = shot;
 
     this.#playDoorMotorRumble(context, root, start);
-    this.#playDoorChainTicks(context, root, start + 0.05);
-    this.#playDoorLatchThunk(context, root, start + 0.68);
+    this.#playDoorGearTrain(context, root, start + 0.035);
+    this.#playDoorChainTicks(context, root, start + 0.18);
+    this.#playDoorLatchThunk(context, root, start + 1.12);
   }
 
   playGearPickup() {
@@ -132,8 +135,8 @@ class GameSfxManager {
 
   playPlayerLaserShot(shotId: number, attackMode: "beam" | "projectile") {
     const shot = this.#beginOneShot(
-      attackMode === "beam" ? 0.72 : 0.78,
-      attackMode === "beam" ? 620 : 420,
+      attackMode === "beam" ? 0.76 : 0.84,
+      attackMode === "beam" ? 680 : 470,
       0.003
     );
 
@@ -145,7 +148,7 @@ class GameSfxManager {
     const variant = Math.abs(shotId) % 4;
 
     this.#playBlasterZap(context, root, start, variant, attackMode);
-    this.#playBlasterSnap(context, root, start + 0.004, variant, attackMode);
+    this.#playBlasterSnap(context, root, start + 0.002, variant, attackMode);
     this.#playBlasterBody(context, root, start, variant, attackMode);
   }
 
@@ -169,7 +172,7 @@ class GameSfxManager {
   }
 
   playRepairPickup() {
-    const shot = this.#beginOneShot(0.56, 860);
+    const shot = this.#beginOneShot(0.72, 1040);
 
     if (!shot) {
       return;
@@ -178,7 +181,9 @@ class GameSfxManager {
     const { context, root, start } = shot;
 
     this.#playRepairServo(context, root, start);
-    this.#playRepairChimes(context, root, start + 0.045);
+    this.#playRepairSweep(context, root, start + 0.018);
+    this.#playRepairChimes(context, root, start + 0.055);
+    this.#playRepairSparkleTail(context, root, start + 0.19);
   }
 
   playSwordSwing(swingId: number) {
@@ -219,7 +224,7 @@ class GameSfxManager {
 
     this.#rollingLoop ??= this.#createRollingLoop(context, output);
 
-    const { filter, gain, oscillator } = this.#rollingLoop;
+    const { filter, gain, oscillator, source } = this.#rollingLoop;
     const now = context.currentTime;
     const active =
       normalizedAmount > 0.045 &&
@@ -230,9 +235,20 @@ class GameSfxManager {
     const targetGain = active ? 0.055 + normalizedAmount * 0.18 : 0;
 
     gain.gain.setTargetAtTime(targetGain, now, active ? 0.055 : 0.16);
-    oscillator.frequency.setTargetAtTime(42 + normalizedAmount * 78, now, 0.08);
-    filter.frequency.setTargetAtTime(230 + normalizedAmount * 860, now, 0.09);
-    filter.Q.setTargetAtTime(0.8 + normalizedAmount * 1.1, now, 0.1);
+    oscillator.frequency.setTargetAtTime(58 + normalizedAmount * 64, now, 0.08);
+    source.playbackRate.setTargetAtTime(
+      0.65 + normalizedAmount * 1.75,
+      now,
+      0.08
+    );
+    filter.frequency.setTargetAtTime(125 + normalizedAmount * 620, now, 0.09);
+    filter.Q.setTargetAtTime(1.25 + normalizedAmount * 1.35, now, 0.1);
+
+    if (active) {
+      this.#playRollingContactTick(context, output, now, normalizedAmount);
+    } else {
+      this.#lastRollingTickAt = now;
+    }
   }
 
   #beginOneShot(
@@ -341,6 +357,23 @@ class GameSfxManager {
     return buffer;
   }
 
+  #createLoopNoiseBuffer(context: AudioContext, durationSeconds: number) {
+    const length = Math.max(
+      1,
+      Math.floor(context.sampleRate * durationSeconds)
+    );
+    const buffer = context.createBuffer(1, length, context.sampleRate);
+    const data = buffer.getChannelData(0);
+    let sample = 0;
+
+    for (let index = 0; index < length; index += 1) {
+      sample = sample * 0.86 + (Math.random() * 2 - 1) * 0.14;
+      data[index] = sample * 0.7;
+    }
+
+    return buffer;
+  }
+
   #createRollingLoop(context: AudioContext, output: GainNode): RollingLoop {
     const source = context.createBufferSource();
     const filter = context.createBiquadFilter();
@@ -349,17 +382,17 @@ class GameSfxManager {
     const oscillatorGain = context.createGain();
     const gain = context.createGain();
 
-    source.buffer = this.#createNoiseBuffer(context, 0.38);
+    source.buffer = this.#createLoopNoiseBuffer(context, 0.56);
     source.loop = true;
-    source.playbackRate.setValueAtTime(0.82, context.currentTime);
+    source.playbackRate.setValueAtTime(0.65, context.currentTime);
     filter.type = "bandpass";
-    filter.frequency.setValueAtTime(320, context.currentTime);
-    filter.Q.setValueAtTime(0.85, context.currentTime);
-    noiseGain.gain.setValueAtTime(0.68, context.currentTime);
+    filter.frequency.setValueAtTime(160, context.currentTime);
+    filter.Q.setValueAtTime(1.35, context.currentTime);
+    noiseGain.gain.setValueAtTime(0.74, context.currentTime);
 
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(48, context.currentTime);
-    oscillatorGain.gain.setValueAtTime(0.055, context.currentTime);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(58, context.currentTime);
+    oscillatorGain.gain.setValueAtTime(0.082, context.currentTime);
     gain.gain.setValueAtTime(0, context.currentTime);
 
     source.connect(filter);
@@ -371,7 +404,69 @@ class GameSfxManager {
     source.start();
     oscillator.start();
 
-    return { filter, gain, oscillator };
+    return { filter, gain, oscillator, source };
+  }
+
+  #playRollingContactTick(
+    context: AudioContext,
+    output: GainNode,
+    now: number,
+    amount: number
+  ) {
+    const interval = 0.17 - amount * 0.095 + randomBetween(-0.014, 0.01);
+
+    if (now < this.#lastRollingTickAt + interval) {
+      return;
+    }
+
+    this.#lastRollingTickAt = now;
+
+    const start = now + 0.002;
+    const oscillator = context.createOscillator();
+    const source = context.createBufferSource();
+    const toneFilter = context.createBiquadFilter();
+    const noiseFilter = context.createBiquadFilter();
+    const gain = context.createGain();
+    const duration = 0.055 + amount * 0.028;
+
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(
+      randomBetween(78, 118) + amount * 58,
+      start
+    );
+    oscillator.frequency.exponentialRampToValueAtTime(
+      randomBetween(44, 62),
+      start + duration
+    );
+    toneFilter.type = "lowpass";
+    toneFilter.frequency.setValueAtTime(360 + amount * 420, start);
+
+    source.buffer = this.#createNoiseBuffer(context, duration + 0.02);
+    source.playbackRate.setValueAtTime(0.74 + amount * 0.5, start);
+    noiseFilter.type = "bandpass";
+    noiseFilter.frequency.setValueAtTime(190 + amount * 380, start);
+    noiseFilter.Q.setValueAtTime(2.6, start);
+
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(
+      0.026 + amount * 0.045,
+      start + 0.004
+    );
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+    oscillator.connect(toneFilter);
+    toneFilter.connect(gain);
+    source.connect(noiseFilter);
+    noiseFilter.connect(gain);
+    gain.connect(output);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.012);
+    source.start(start);
+    source.stop(start + duration + 0.012);
+
+    window.setTimeout(() => {
+      gain.disconnect();
+    }, 140);
   }
 
   #playDullImpact(
@@ -502,18 +597,22 @@ class GameSfxManager {
     const highpass = context.createBiquadFilter();
     const bandpass = context.createBiquadFilter();
     const gain = context.createGain();
-    const duration = attackMode === "beam" ? 0.22 : 0.12;
+    const duration = attackMode === "beam" ? 0.24 : 0.16;
 
     source.buffer = this.#createNoiseBuffer(context, duration + 0.04);
-    source.playbackRate.setValueAtTime(1.35 + variant * 0.08, start);
+    source.playbackRate.setValueAtTime(1.8 + variant * 0.12, start);
     highpass.type = "highpass";
-    highpass.frequency.setValueAtTime(760 + variant * 90, start);
+    highpass.frequency.setValueAtTime(1400 + variant * 120, start);
     bandpass.type = "bandpass";
-    bandpass.frequency.setValueAtTime(2500 + variant * 380, start);
-    bandpass.Q.setValueAtTime(1.9, start);
+    bandpass.frequency.setValueAtTime(3400 + variant * 420, start);
+    bandpass.frequency.exponentialRampToValueAtTime(
+      1200 + variant * 160,
+      start + duration
+    );
+    bandpass.Q.setValueAtTime(4.4, start);
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(
-      attackMode === "beam" ? 0.18 : 0.25,
+      attackMode === "beam" ? 0.105 : 0.14,
       start + 0.006
     );
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
@@ -534,46 +633,60 @@ class GameSfxManager {
     attackMode: "beam" | "projectile"
   ) {
     const oscillator = context.createOscillator();
+    const detunedOscillator = context.createOscillator();
     const gain = context.createGain();
     const filter = context.createBiquadFilter();
     const panner = context.createStereoPanner();
     const startFrequency =
-      attackMode === "beam" ? 2300 + variant * 180 : 3250 + variant * 240;
+      attackMode === "beam" ? 1480 + variant * 80 : 1720 + variant * 110;
     const peakFrequency =
-      attackMode === "beam" ? 5200 + variant * 260 : 7200 + variant * 310;
+      attackMode === "beam" ? 3600 + variant * 190 : 4300 + variant * 230;
     const endFrequency =
-      attackMode === "beam" ? 520 + variant * 38 : 430 + variant * 42;
-    const duration = attackMode === "beam" ? 0.32 : 0.21;
+      attackMode === "beam" ? 360 + variant * 26 : 295 + variant * 34;
+    const duration = attackMode === "beam" ? 0.34 : 0.24;
 
-    oscillator.type = variant % 2 === 0 ? "square" : "sawtooth";
+    oscillator.type = "sawtooth";
+    detunedOscillator.type = "triangle";
     oscillator.frequency.setValueAtTime(startFrequency, start);
     oscillator.frequency.exponentialRampToValueAtTime(
       peakFrequency,
-      start + 0.018
+      start + 0.022
     );
     oscillator.frequency.exponentialRampToValueAtTime(
       endFrequency,
       start + duration
     );
+    detunedOscillator.frequency.setValueAtTime(startFrequency * 1.48, start);
+    detunedOscillator.frequency.exponentialRampToValueAtTime(
+      peakFrequency * 1.36,
+      start + 0.018
+    );
+    detunedOscillator.frequency.exponentialRampToValueAtTime(
+      endFrequency * 1.18,
+      start + duration * 0.92
+    );
     filter.type = "bandpass";
-    filter.frequency.setValueAtTime(2400 + variant * 320, start);
-    filter.frequency.exponentialRampToValueAtTime(7600, start + 0.052);
-    filter.frequency.exponentialRampToValueAtTime(900, start + duration);
-    filter.Q.setValueAtTime(6.4, start);
+    filter.frequency.setValueAtTime(1900 + variant * 180, start);
+    filter.frequency.exponentialRampToValueAtTime(5800, start + 0.038);
+    filter.frequency.exponentialRampToValueAtTime(720, start + duration);
+    filter.Q.setValueAtTime(7.8, start);
     panner.pan.setValueAtTime((variant - 1.5) * 0.08, start);
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(
-      attackMode === "beam" ? 0.2 : 0.28,
+      attackMode === "beam" ? 0.24 : 0.34,
       start + 0.006
     );
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
     oscillator.connect(filter);
+    detunedOscillator.connect(filter);
     filter.connect(gain);
     gain.connect(panner);
     panner.connect(root);
     oscillator.start(start);
+    detunedOscillator.start(start);
     oscillator.stop(start + duration + 0.02);
+    detunedOscillator.stop(start + duration + 0.02);
   }
 
   #playBlasterSnap(
@@ -583,41 +696,51 @@ class GameSfxManager {
     variant: number,
     attackMode: "beam" | "projectile"
   ) {
+    const source = context.createBufferSource();
+    const noiseFilter = context.createBiquadFilter();
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     const filter = context.createBiquadFilter();
-    const duration = attackMode === "beam" ? 0.07 : 0.052;
+    const duration = attackMode === "beam" ? 0.06 : 0.045;
     const frequency =
-      attackMode === "beam" ? 4300 + variant * 420 : 5600 + variant * 560;
+      attackMode === "beam" ? 5200 + variant * 320 : 6800 + variant * 440;
 
-    oscillator.type = "square";
+    source.buffer = this.#createNoiseBuffer(context, duration + 0.02);
+    source.playbackRate.setValueAtTime(2.1 + variant * 0.16, start);
+    noiseFilter.type = "highpass";
+    noiseFilter.frequency.setValueAtTime(3400, start);
+    oscillator.type = "sawtooth";
     oscillator.frequency.setValueAtTime(frequency, start);
     oscillator.frequency.exponentialRampToValueAtTime(
-      frequency * 0.42,
+      frequency * 0.64,
       start + duration
     );
     filter.type = "highpass";
     filter.frequency.setValueAtTime(2100, start);
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(
-      attackMode === "beam" ? 0.1 : 0.17,
+      attackMode === "beam" ? 0.09 : 0.13,
       start + 0.003
     );
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
+    source.connect(noiseFilter);
+    noiseFilter.connect(gain);
     oscillator.connect(filter);
     filter.connect(gain);
     gain.connect(root);
+    source.start(start);
+    source.stop(start + duration + 0.01);
     oscillator.start(start);
     oscillator.stop(start + duration + 0.01);
   }
 
   #playDoorChainTicks(context: AudioContext, root: GainNode, start: number) {
-    for (let index = 0; index < 8; index += 1) {
+    for (let index = 0; index < 6; index += 1) {
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       const filter = context.createBiquadFilter();
-      const tickStart = start + index * 0.075 + randomBetween(-0.008, 0.006);
+      const tickStart = start + index * 0.105 + randomBetween(-0.008, 0.006);
       const duration = randomBetween(0.022, 0.042);
       const frequency = randomBetween(430, 840);
 
@@ -638,6 +761,44 @@ class GameSfxManager {
       gain.connect(root);
       oscillator.start(tickStart);
       oscillator.stop(tickStart + duration + 0.01);
+    }
+  }
+
+  #playDoorGearTrain(context: AudioContext, root: GainNode, start: number) {
+    for (let index = 0; index < 26; index += 1) {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const filter = context.createBiquadFilter();
+      const panner = context.createStereoPanner();
+      const spin = index / 25;
+      const toothStart = start + index * (0.036 + spin * 0.014);
+      const duration = randomBetween(0.024, 0.045);
+      const frequency =
+        (index % 3 === 0 ? 310 : 520) + randomBetween(-40, 70) + spin * 180;
+
+      oscillator.type = index % 2 === 0 ? "square" : "triangle";
+      oscillator.frequency.setValueAtTime(frequency, toothStart);
+      oscillator.frequency.exponentialRampToValueAtTime(
+        frequency * randomBetween(0.62, 0.82),
+        toothStart + duration
+      );
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(frequency * 1.55, toothStart);
+      filter.Q.setValueAtTime(4.2, toothStart);
+      panner.pan.setValueAtTime(index % 2 === 0 ? -0.14 : 0.14, toothStart);
+      gain.gain.setValueAtTime(0.0001, toothStart);
+      gain.gain.exponentialRampToValueAtTime(
+        randomBetween(0.035, 0.07) * (1 - spin * 0.28),
+        toothStart + 0.003
+      );
+      gain.gain.exponentialRampToValueAtTime(0.0001, toothStart + duration);
+
+      oscillator.connect(filter);
+      filter.connect(gain);
+      gain.connect(panner);
+      panner.connect(root);
+      oscillator.start(toothStart);
+      oscillator.stop(toothStart + duration + 0.01);
     }
   }
 
@@ -671,26 +832,34 @@ class GameSfxManager {
 
   #playDoorMotorRumble(context: AudioContext, root: GainNode, start: number) {
     const oscillator = context.createOscillator();
+    const gearOscillator = context.createOscillator();
     const gain = context.createGain();
     const filter = context.createBiquadFilter();
 
     oscillator.type = "sawtooth";
-    oscillator.frequency.setValueAtTime(48, start);
-    oscillator.frequency.linearRampToValueAtTime(74, start + 0.52);
-    oscillator.frequency.exponentialRampToValueAtTime(36, start + 0.94);
+    oscillator.frequency.setValueAtTime(42, start);
+    oscillator.frequency.linearRampToValueAtTime(68, start + 0.6);
+    oscillator.frequency.exponentialRampToValueAtTime(32, start + 1.25);
+    gearOscillator.type = "square";
+    gearOscillator.frequency.setValueAtTime(118, start);
+    gearOscillator.frequency.linearRampToValueAtTime(164, start + 0.48);
+    gearOscillator.frequency.exponentialRampToValueAtTime(76, start + 1.1);
     filter.type = "lowpass";
-    filter.frequency.setValueAtTime(520, start);
-    filter.frequency.linearRampToValueAtTime(310, start + 0.9);
+    filter.frequency.setValueAtTime(720, start);
+    filter.frequency.linearRampToValueAtTime(380, start + 1.12);
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.15, start + 0.08);
-    gain.gain.linearRampToValueAtTime(0.1, start + 0.72);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 1.02);
+    gain.gain.exponentialRampToValueAtTime(0.19, start + 0.08);
+    gain.gain.linearRampToValueAtTime(0.13, start + 0.86);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 1.3);
 
     oscillator.connect(filter);
+    gearOscillator.connect(filter);
     filter.connect(gain);
     gain.connect(root);
     oscillator.start(start);
-    oscillator.stop(start + 1.04);
+    gearOscillator.start(start);
+    oscillator.stop(start + 1.32);
+    gearOscillator.stop(start + 1.32);
   }
 
   #playFractureNoise(
@@ -956,19 +1125,23 @@ class GameSfxManager {
   }
 
   #playRepairChimes(context: AudioContext, root: GainNode, start: number) {
-    const frequencies = [520, 780, 1040, 1560];
+    const frequencies = [620, 930, 1240, 1660, 2480];
 
     for (const [index, frequency] of frequencies.entries()) {
       const oscillator = context.createOscillator();
       const gain = context.createGain();
-      const toneStart = start + index * 0.058;
-      const duration = 0.26 + index * 0.04;
+      const toneStart = start + index * 0.046;
+      const duration = 0.24 + index * 0.045;
 
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(frequency, toneStart);
+      oscillator.frequency.exponentialRampToValueAtTime(
+        frequency * 1.04,
+        toneStart + duration
+      );
       gain.gain.setValueAtTime(0.0001, toneStart);
       gain.gain.exponentialRampToValueAtTime(
-        0.038 + index * 0.004,
+        0.052 - index * 0.003,
         toneStart + 0.012
       );
       gain.gain.exponentialRampToValueAtTime(0.0001, toneStart + duration);
@@ -992,7 +1165,7 @@ class GameSfxManager {
     filter.type = "lowpass";
     filter.frequency.setValueAtTime(900, start);
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.11, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.085, start + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.4);
 
     oscillator.connect(filter);
@@ -1000,6 +1173,61 @@ class GameSfxManager {
     gain.connect(root);
     oscillator.start(start);
     oscillator.stop(start + 0.42);
+  }
+
+  #playRepairSparkleTail(context: AudioContext, root: GainNode, start: number) {
+    for (let index = 0; index < 8; index += 1) {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const panner = context.createStereoPanner();
+      const sparkleStart = start + randomBetween(0, 0.38);
+      const duration = randomBetween(0.09, 0.2);
+      const frequency = randomBetween(1800, 5200);
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, sparkleStart);
+      oscillator.frequency.exponentialRampToValueAtTime(
+        frequency * 1.18,
+        sparkleStart + duration
+      );
+      panner.pan.setValueAtTime(randomBetween(-0.34, 0.34), sparkleStart);
+      gain.gain.setValueAtTime(0.0001, sparkleStart);
+      gain.gain.exponentialRampToValueAtTime(
+        randomBetween(0.018, 0.04),
+        sparkleStart + 0.01
+      );
+      gain.gain.exponentialRampToValueAtTime(0.0001, sparkleStart + duration);
+
+      oscillator.connect(gain);
+      gain.connect(panner);
+      panner.connect(root);
+      oscillator.start(sparkleStart);
+      oscillator.stop(sparkleStart + duration + 0.02);
+    }
+  }
+
+  #playRepairSweep(context: AudioContext, root: GainNode, start: number) {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const filter = context.createBiquadFilter();
+    const duration = 0.46;
+
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(240, start);
+    oscillator.frequency.exponentialRampToValueAtTime(1080, start + duration);
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(520, start);
+    filter.frequency.exponentialRampToValueAtTime(2100, start + duration);
+    filter.Q.setValueAtTime(4.4, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.13, start + 0.055);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+    oscillator.connect(filter);
+    filter.connect(gain);
+    gain.connect(root);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.02);
   }
 
   #playResonantGlassRings(
