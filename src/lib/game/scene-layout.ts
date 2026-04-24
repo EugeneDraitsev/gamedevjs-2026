@@ -3,7 +3,6 @@ import type {
   DungeonRoom,
   DungeonRoomDirection,
 } from "$lib/config/dungeon-layout";
-import { outsideGroundY, outsidePlan } from "$lib/game/outside-chunk-context";
 import {
   enemyTemplateById,
   type RoomSkinId,
@@ -11,6 +10,7 @@ import {
   roomTemplateById,
 } from "$lib/config/room-templates";
 import type { FloorTheme, WallTheme } from "$lib/config/scene-settings";
+import { outsidePlan } from "$lib/game/outside-chunk-context";
 import type {
   ActiveEnemy,
   ActivePickup,
@@ -237,28 +237,7 @@ export const gearTeeth: SceneGearTooth[] = Array.from(
   }
 );
 
-export const treasureGearMounts: SceneTreasureGearMount[] = [
-  {
-    panel: [3.2, 3.2, 0.24],
-    position: [-6.2, 3.1, -7.72],
-    size: 1.28,
-  },
-  {
-    panel: [3.2, 3.2, 0.24],
-    position: [6.2, 3.1, -7.72],
-    size: 1.28,
-  },
-  {
-    panel: [2.6, 2.6, 0.24],
-    position: [-4.5, 2.3, 7.72],
-    size: 0.94,
-  },
-  {
-    panel: [2.6, 2.6, 0.24],
-    position: [4.5, 2.3, 7.72],
-    size: 0.94,
-  },
-];
+export const treasureGearMounts: SceneTreasureGearMount[] = [];
 
 export const bossGearMounts: SceneBossGearMount[] = [
   { color: "#ffd166", position: [-5.4, 3.3, -7.72], size: 1.56 },

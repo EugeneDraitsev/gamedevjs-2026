@@ -8,47 +8,47 @@ import { buildHydrology } from "./hydrology";
 import { buildPois } from "./pois";
 import { createRng, hashSeed } from "./rng";
 import { buildRoads } from "./roads";
-import { buildVegetation } from "./vegetation";
 import {
   BIOME_ORDER,
   type BiomeId,
   type ChunkSize,
   type OutsideChunkPlan,
 } from "./types";
+import { buildVegetation } from "./vegetation";
 
 export interface BuildChunkConfig {
-  seed: string;
-  size: ChunkSize;
+  cliffSlope: number;
+  groundY: number;
+  guardsPerCamp: number;
+  guardsPerLandmark: number;
+  guardsPerShrine: number;
+  maxCamps: number;
+  maxLandmarks: number;
+  maxShrines: number;
+  minBushSpacing: number;
+  minPoiSpacing: number;
+  minRockSpacing: number;
+  minTreeSpacing: number;
+  minWandererDistFromSpawn: number;
+  mountainPeakHeight: number;
+  platformDensity: number;
+  platformPeakHeight: number;
+  playableHalfDepth: number;
   // Playable zone (flat area) extents. Outside this rectangle the
   // terrain ramps up into the decorative mountain ring.
   playableHalfWidth: number;
-  playableHalfDepth: number;
-  groundY: number;
-  platformDensity: number;
-  platformPeakHeight: number;
-  transitionBand: number;
-  waterLevel: number;
-  mountainPeakHeight: number;
-  snowLine: number;
-  riverHalfWidth: number;
-  riverDepth: number;
-  roadWidthHalf: number;
   riverbankRadius: number;
-  cliffSlope: number;
+  riverDepth: number;
+  riverHalfWidth: number;
+  roadWidthHalf: number;
   screeSlope: number;
-  minTreeSpacing: number;
-  minBushSpacing: number;
-  minRockSpacing: number;
-  minPoiSpacing: number;
-  maxCamps: number;
-  maxShrines: number;
-  maxLandmarks: number;
+  seed: string;
+  size: ChunkSize;
+  snowLine: number;
   spawnPoint: [number, number, number];
-  guardsPerCamp: number;
-  guardsPerShrine: number;
-  guardsPerLandmark: number;
+  transitionBand: number;
   wandererCount: number;
-  minWandererDistFromSpawn: number;
+  waterLevel: number;
 }
 
 export const DEFAULT_CHUNK_CONFIG: BuildChunkConfig = {
@@ -160,7 +160,7 @@ export const buildOutsideChunkPlan = (
   // meandering depending on the seed.
   const gateZ = -config.playableHalfDepth * 0.985;
   const spawnZ = config.spawnPoint[2];
-  const spineRng = createRng(seedHash + 0x5adb0715);
+  const spineRng = createRng(seedHash + 0x5a_db_07_15);
   const spineRows = 5 + Math.floor(spineRng() * 5); // 5..9
   const wiggleAmp = 3 + spineRng() * 10; // 3..13
   const wigglePhase = spineRng() * Math.PI * 2;
@@ -168,11 +168,12 @@ export const buildOutsideChunkPlan = (
   const harmonicAmp = spineRng() * 3.2; // 0..3.2
   const harmonicFreq = 2.1 + spineRng() * 1.9; // 2.1..4.0
   const maxAbsX = config.playableHalfWidth - 6;
-  const spine: Array<[number, number]> = [];
+  const spine: [number, number][] = [];
   for (let i = 0; i < spineRows; i++) {
     const t = i / (spineRows - 1);
     const z = gateZ + t * (spawnZ - gateZ);
-    const primary = Math.sin(wigglePhase + t * Math.PI * wiggleFreq) * wiggleAmp;
+    const primary =
+      Math.sin(wigglePhase + t * Math.PI * wiggleFreq) * wiggleAmp;
     const harmonic =
       Math.sin(wigglePhase * 0.7 + t * Math.PI * harmonicFreq) * harmonicAmp;
     const wiggle =
@@ -183,7 +184,7 @@ export const buildOutsideChunkPlan = (
   }
 
   // Branch routes — straight from the nearest spine waypoint to each POI.
-  const branches: Array<Array<[number, number]>> = [];
+  const branches: [number, number][][] = [];
   for (const poi of poisEarly) {
     let nearest = spine[0];
     let nearestD2 = Number.POSITIVE_INFINITY;
@@ -243,15 +244,22 @@ export const buildOutsideChunkPlan = (
   const sampleBiome = (x: number, z: number): BiomeId => {
     const col = Math.max(
       0,
-      Math.min(size.cols, Math.round(((x + size.width * 0.5) / size.width) * size.cols))
+      Math.min(
+        size.cols,
+        Math.round(((x + size.width * 0.5) / size.width) * size.cols)
+      )
     );
     const row = Math.max(
       0,
-      Math.min(size.rows, Math.round(((z + size.depth * 0.5) / size.depth) * size.rows))
+      Math.min(
+        size.rows,
+        Math.round(((z + size.depth * 0.5) / size.depth) * size.rows)
+      )
     );
     return BIOME_ORDER[biome[row * stride + col]];
   };
-  const isUnderwater = (x: number, z: number) => sampleHeight(x, z) < config.waterLevel;
+  const isUnderwater = (x: number, z: number) =>
+    sampleHeight(x, z) < config.waterLevel;
 
   // Spawn snaps to ground
   const spawnY = sampleHeight(config.spawnPoint[0], config.spawnPoint[2]);
@@ -306,5 +314,8 @@ export const getOutsideChunkPlan = (
     cachedPlan = buildOutsideChunkPlan(config);
     cachedKey = key;
   }
-  return cachedPlan!;
+  if (!cachedPlan) {
+    throw new Error("Outside chunk plan failed to build");
+  }
+  return cachedPlan;
 };

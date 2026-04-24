@@ -1,17 +1,18 @@
 <script lang="ts">
   import { T, useTask } from "@threlte/core";
-  import { RingGeometry, PlaneGeometry } from "three";
-  import { createWaterMaterial } from "./materials/water-material";
+  import { PlaneGeometry, RingGeometry } from "three";
   import type { OverworldRiverSegment } from "$lib/config/overworld-layout";
+  import { createWaterMaterial } from "./materials/water-material";
 
   interface Props {
+    rivers: OverworldRiverSegment[];
     seaInnerRadius: number;
     seaOuterRadius: number;
-    rivers: OverworldRiverSegment[];
     shorelineRadius: number;
   }
 
-  let { seaInnerRadius, seaOuterRadius, rivers, shorelineRadius }: Props = $props();
+  let { seaInnerRadius, seaOuterRadius, rivers, shorelineRadius }: Props =
+    $props();
 
   const sea = createWaterMaterial({
     deepColor: "#061b2a",
@@ -32,15 +33,10 @@
   });
 
   // High-tessellation ring so wave vertex shader produces rolling water
-  const seaGeometry = new RingGeometry(
-    seaInnerRadius,
-    seaOuterRadius,
-    96,
-    16
-  );
+  const seaGeometry = new RingGeometry(seaInnerRadius, seaOuterRadius, 96, 16);
 
-  const riverGeometries = rivers.map((r) =>
-    new PlaneGeometry(r.width, r.length, 24, 48)
+  const riverGeometries = rivers.map(
+    (r) => new PlaneGeometry(r.width, r.length, 24, 48)
   );
 
   useTask((delta) => {
@@ -61,7 +57,11 @@
 {#each rivers as river, i (river.id)}
   <T.Group position={river.position} rotation={[0, river.yaw, 0]}>
     <!-- riverbed (dark) -->
-    <T.Mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]} receiveShadow>
+    <T.Mesh
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, -0.08, 0]}
+      receiveShadow
+    >
       <T.PlaneGeometry args={[river.width * 1.35, river.length * 1.1]} />
       <T.MeshStandardMaterial color="#2a2016" roughness={0.95} />
     </T.Mesh>

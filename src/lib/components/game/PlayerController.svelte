@@ -381,6 +381,7 @@
         )
       : 0;
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: movement integration centralizes input, water, conveyors, and roll physics.
   const updateBodyMovement = (body: RapierRigidBody, delta: number) => {
     const velocity = body.linvel();
     isGroundedState = isGrounded(body);

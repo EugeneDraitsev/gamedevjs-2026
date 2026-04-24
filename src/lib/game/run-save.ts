@@ -6,6 +6,10 @@ import {
   type MachineModuleId,
   normalizeMachineLoadout,
 } from "$lib/config/machine-modules";
+import {
+  initialDungeonFloor,
+  normalizeRunFloorIndex,
+} from "$lib/config/run-floor";
 
 export interface SavedRunState {
   collectedArtifactRooms: string[];
@@ -33,8 +37,8 @@ const parseSavedRun = (value: unknown): SavedRunState | null => {
     : [];
   const floorIndex =
     typeof value.floorIndex === "number" && Number.isFinite(value.floorIndex)
-      ? Math.max(1, Math.round(value.floorIndex))
-      : 1;
+      ? normalizeRunFloorIndex(value.floorIndex)
+      : initialDungeonFloor;
   const gearCount =
     typeof value.gearCount === "number" && Number.isFinite(value.gearCount)
       ? Math.max(0, Math.round(value.gearCount))
@@ -62,7 +66,7 @@ const parseSavedRun = (value: unknown): SavedRunState | null => {
 
 export const createDefaultRunState = (): SavedRunState => ({
   collectedArtifactRooms: [],
-  floorIndex: 1,
+  floorIndex: initialDungeonFloor,
   gearCount: 0,
   machineLoadout: createDefaultMachineLoadout(),
   moduleInventory: createDefaultModuleInventory(),

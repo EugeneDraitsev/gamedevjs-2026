@@ -1,19 +1,24 @@
-import { Color, MeshStandardMaterial, type IUniform, type Texture } from "three";
+import {
+  Color,
+  type IUniform,
+  MeshStandardMaterial,
+  type Texture,
+} from "three";
 import { glslHash, glslSimplex2D, glslValueNoise } from "./shader-noise";
 
 // Ground material that builds on Codex's PNG texture atlas and layers
 // procedural detail on top (moss patches, rust stain, wildflower bloom,
 // subtle overgrowth tint) without losing the original painted look.
 export interface OutsideGroundUniforms {
-  uTime: IUniform<number>;
-  uMossColor: IUniform<Color>;
-  uRustColor: IUniform<Color>;
   uBloomColor: IUniform<Color>;
+  uMossColor: IUniform<Color>;
   uMossStrength: IUniform<number>;
   uRockColor: IUniform<Color>;
+  uRockLine: IUniform<number>;
+  uRustColor: IUniform<Color>;
   uSnowColor: IUniform<Color>;
   uSnowLine: IUniform<number>;
-  uRockLine: IUniform<number>;
+  uTime: IUniform<number>;
 }
 
 export const createOutsideGroundMaterial = (opts?: {

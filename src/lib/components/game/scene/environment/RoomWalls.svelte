@@ -27,6 +27,8 @@
     !decoratedWallFacings || decoratedWallFacings.includes(wall.facing);
   const showGears = (wall: StaticWall) =>
     !gearlessWallFacings?.includes(wall.facing);
+  const wallOpacity = (wall: StaticWall) => wall.opacity ?? 1;
+  const wallOpaque = (wall: StaticWall) => wallOpacity(wall) >= 1;
 </script>
 
 {#each roomWalls as wall (wall.id)}
@@ -40,7 +42,7 @@
       />
 
       <T.Mesh
-        castShadow={!wall.opacity || wall.opacity >= 1}
+        castShadow={wallOpaque(wall)}
         position={[0, -0.25, 0]}
         receiveShadow
       >
@@ -50,16 +52,16 @@
         <T.MeshStandardMaterial
           color={wall.color}
           metalness={0.1}
-          opacity={wall.opacity ?? 1}
+          opacity={wallOpacity(wall)}
           roughness={0.86}
-          transparent={Boolean(wall.opacity && wall.opacity < 1)}
-          depthWrite={!wall.opacity || wall.opacity >= 1}
+          transparent={wallOpacity(wall) < 1}
+          depthWrite={wallOpaque(wall)}
         />
       </T.Mesh>
 
       {#if showWallKit &&
         wall.style === "mechanic" &&
-        (!wall.opacity || wall.opacity >= 1)}
+        wallOpaque(wall)}
         <FoundryWallKit
           {animationNow}
           showDecor={showDecor(wall)}

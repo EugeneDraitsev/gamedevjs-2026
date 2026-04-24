@@ -6,6 +6,7 @@ import {
   resolveEnemyWallImpact,
 } from "$lib/components/game/scene/utils";
 import type { RoomTemplate } from "$lib/config/room-templates";
+import { outsidePlan } from "$lib/game/outside-chunk-context";
 import {
   clampToRoom,
   getConveyorVelocity,
@@ -13,7 +14,6 @@ import {
   hazardTickMs,
   playerRadius,
 } from "$lib/game/scene-layout";
-import { outsidePlan } from "$lib/game/outside-chunk-context";
 import type { CombatStore } from "$lib/stores/combat.svelte";
 import type { PickupStore } from "$lib/stores/pickups.svelte";
 import type { PlayerStore } from "$lib/stores/player.svelte";
@@ -32,8 +32,8 @@ interface StepContext {
   combat: CombatStore;
   currentRoomId: string;
   currentRoomTemplate: RoomTemplate;
-  obstacles: SolidObstacle[];
   isCurrentRoomCombat: boolean;
+  obstacles: SolidObstacle[];
   pickups: PickupStore;
   player: PlayerStore;
   room: RoomStore;
@@ -59,13 +59,17 @@ const getSolidObstacles = (layout: RoomTemplate["layout"]): SolidObstacle[] => {
   const plan = outsidePlan();
   if (plan.seed !== obstacleSeed) {
     obstacleSeed = plan.seed;
-    outsideObstacles = plan.vegetation.instances
-      .filter((inst) => inst.collider)
-      .map((inst) => ({
-        radius: inst.collider!.radius * inst.scale,
-        x: inst.x,
-        z: inst.z,
-      }));
+    outsideObstacles = plan.vegetation.instances.flatMap((inst) =>
+      inst.collider
+        ? [
+            {
+              radius: inst.collider.radius * inst.scale,
+              x: inst.x,
+              z: inst.z,
+            },
+          ]
+        : []
+    );
   }
 
   return outsideObstacles;
@@ -339,6 +343,14 @@ const pushEnemyFromPlatforms = (
   return clampToRoom(next, radius, bounds);
 };
 
+const getEnemyBlockingPlatforms = (
+  enemy: ActiveEnemy,
+  platforms: RoomPlatform[]
+) =>
+  enemy.radius > 1
+    ? platforms.filter((platform) => !platform.id.includes("dais"))
+    : platforms;
+
 const stepEnemy = (
   ctx: StepContext,
   enemy: ActiveEnemy,
@@ -452,7 +464,7 @@ const stepEnemy = (
   position = pushEnemyFromPlatforms(
     position,
     enemy.radius,
-    ctx.roomPlatforms,
+    getEnemyBlockingPlatforms(enemy, ctx.roomPlatforms),
     bounds
   );
 

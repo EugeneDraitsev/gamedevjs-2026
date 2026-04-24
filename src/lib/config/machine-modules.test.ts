@@ -110,7 +110,7 @@ describe("machine modules", () => {
 
     saveRunSave("v2", {
       collectedArtifactRooms: ["treasure-1"],
-      floorIndex: 2,
+      floorIndex: -1,
       gearCount: 5,
       machineLoadout,
       moduleInventory: ["salvage-magnet"],
@@ -118,7 +118,7 @@ describe("machine modules", () => {
     });
 
     expect(loadRunSave("v2")).toMatchObject({
-      floorIndex: 2,
+      floorIndex: -1,
       gearCount: 5,
       machineLoadout,
       moduleInventory: ["salvage-magnet"],

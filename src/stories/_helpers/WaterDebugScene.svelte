@@ -14,14 +14,14 @@
     algaeColor: "#4f7f68",
     useShoreMask: false,
   });
-  const walls: Array<[number, number, number, number, number, number]> = [
+  const walls: [number, number, number, number, number, number][] = [
     [0, 0.45, -6.1, 18, 0.9, 0.4],
     [0, 0.45, 6.1, 18, 0.9, 0.4],
     [-9.1, 0.45, 0, 0.4, 0.9, 12],
     [9.1, 0.45, 0, 0.4, 0.9, 12],
   ];
   const bankXs = [-6, -2, 2, 6];
-  const banks: Array<[number, number, number, number]> = [
+  const banks: [number, number, number, number][] = [
     [0, -4.55, 18, 3.1],
     [0, 4.55, 18, 3.1],
     [-8.1, 0, 1.8, 6.2],

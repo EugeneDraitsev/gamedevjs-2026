@@ -6,34 +6,19 @@
   import OutsideAtmosphere from "$lib/components/game/scene/environment/OutsideAtmosphere.svelte";
   import OutsideDecal from "$lib/components/game/scene/environment/OutsideDecal.svelte";
   import OutsideFoliage from "$lib/components/game/scene/environment/OutsideFoliage.svelte";
-  import OutsidePOIs from "$lib/components/game/scene/environment/OutsidePOIs.svelte";
-  import OutsideVegetationColliders from "$lib/components/game/scene/environment/OutsideVegetationColliders.svelte";
   import OutsideMountainCollider from "$lib/components/game/scene/environment/OutsideMountainCollider.svelte";
+  import OutsidePoIs from "$lib/components/game/scene/environment/OutsidePoIs.svelte";
+  import OutsideProceduralWater from "$lib/components/game/scene/environment/OutsideProceduralWater.svelte";
   import OutsideRoad from "$lib/components/game/scene/environment/OutsideRoad.svelte";
   import OutsideSurface from "$lib/components/game/scene/environment/OutsideSurface.svelte";
   import OutsideTerrain from "$lib/components/game/scene/environment/OutsideTerrain.svelte";
-  import OutsideProceduralWater from "$lib/components/game/scene/environment/OutsideProceduralWater.svelte";
+  import OutsideVegetationColliders from "$lib/components/game/scene/environment/OutsideVegetationColliders.svelte";
   import FoundryGearSet from "$lib/components/game/scene/environment/walls/FoundryGearSet.svelte";
   import type { RoomEnvironmentId } from "$lib/config/room-templates";
   import { outsideGroundY } from "$lib/game/outside-chunk-context";
-  import {
-    gearTeeth,
-    treasureGearMounts,
-  } from "$lib/game/scene-layout";
+  import { gearTeeth, treasureGearMounts } from "$lib/game/scene-layout";
   import type { SceneFloorPalette, Vec3 } from "$lib/types/game";
 
-  const backdropGears: { position: Vec3; size: number }[] = [
-    { position: [-8.5, 2.75, -7.72], size: 1.45 },
-    { position: [8.5, 2.8, -7.72], size: 1.55 },
-    { position: [-4.7, 4.0, -7.7], size: 0.8 },
-    { position: [4.6, 4.0, -7.7], size: 0.8 },
-  ];
-
-  const backdropLamps: Vec3[] = [
-    [-6.5, 2.05, -7.64],
-    [6.5, 2.05, -7.64],
-    [0, 3.25, -7.64],
-  ];
   const outsideRoads: { args: Vec3; position: Vec3; rotation?: number }[] = [
     { args: [1.15, 0.035, 12], position: [0.8, 0.035, 63], rotation: 0.07 },
     { args: [1.05, 0.035, 12], position: [-0.7, 0.035, 39], rotation: -0.06 },
@@ -396,21 +381,21 @@
     topColor: { value: new Color("#d9e1d9") },
   };
   const outsideHazeVertex = `
-          varying vec2 vUv;
-          void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `;
+                  varying vec2 vUv;
+                  void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                  }
+                `;
   const outsideHazeFragment = `
-          varying vec2 vUv;
-          uniform vec3 bottomColor;
-          uniform vec3 topColor;
-          void main() {
-            vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
-            gl_FragColor = vec4(color, 0.42);
-          }
-        `;
+                  varying vec2 vUv;
+                  uniform vec3 bottomColor;
+                  uniform vec3 topColor;
+                  void main() {
+                    vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
+                    gl_FragColor = vec4(color, 0.42);
+                  }
+                `;
 
   let {
     animationNow = 0,
@@ -501,92 +486,29 @@
   </T.Mesh>
 
   <T.Mesh position={[0, 2.15, -10.2]} castShadow receiveShadow>
-    <T.BoxGeometry args={[24, 4.9, 0.55]} />
+    <T.PlaneGeometry args={[24, 4.9]} />
     <T.MeshStandardMaterial color="#18120d" metalness={0.42} roughness={0.74} />
   </T.Mesh>
 
-  <T.Mesh position={[-12.15, 2.05, -0.5]} castShadow receiveShadow>
-    <T.BoxGeometry args={[0.55, 4.7, 19.5]} />
+  <T.Mesh
+    position={[-12.15, 2.05, -0.5]}
+    castShadow
+    receiveShadow
+    rotation={[0, Math.PI / 2, 0]}
+  >
+    <T.PlaneGeometry args={[19.5, 4.7]} />
     <T.MeshStandardMaterial color="#120e0a" metalness={0.38} roughness={0.78} />
   </T.Mesh>
 
-  <T.Mesh position={[12.15, 2.05, -0.5]} castShadow receiveShadow>
-    <T.BoxGeometry args={[0.55, 4.7, 19.5]} />
+  <T.Mesh
+    position={[12.15, 2.05, -0.5]}
+    castShadow
+    receiveShadow
+    rotation={[0, -Math.PI / 2, 0]}
+  >
+    <T.PlaneGeometry args={[19.5, 4.7]} />
     <T.MeshStandardMaterial color="#120e0a" metalness={0.38} roughness={0.78} />
   </T.Mesh>
-
-  <T.Mesh position={[0, 2.28, -9.87]}>
-    <T.BoxGeometry args={[2.8, 2.45, 0.08]} />
-    <T.MeshBasicMaterial color="#ffbf78" opacity={0.2} transparent />
-  </T.Mesh>
-
-  <T.PointLight
-    color="#ffae5f"
-    distance={8}
-    intensity={2.8}
-    position={[0, 2.7, -7.8]}
-  />
-
-  {#each backdropLamps as lamp}
-    <T.PointLight
-      color="#ff9f4a"
-      distance={5.5}
-      intensity={1.4}
-      position={lamp}
-    />
-    <T.Mesh position={lamp}>
-      <T.SphereGeometry args={[0.13, 12, 8]} />
-      <T.MeshBasicMaterial color="#ffbd68" />
-    </T.Mesh>
-  {/each}
-
-  {#each [-7.2, -3.6, 3.6, 7.2] as x}
-    <T.Mesh position={[x, 2.35, -7.66]}>
-      <T.CylinderGeometry args={[0.026, 0.026, 2.55, 6]} />
-      <T.MeshStandardMaterial
-        color="#17100a"
-        metalness={0.7}
-        roughness={0.48}
-      />
-    </T.Mesh>
-  {/each}
-
-  {#each backdropGears as gear}
-    <T.Group position={gear.position}>
-      <T.Mesh castShadow>
-        <T.TorusGeometry args={[gear.size, 0.13, 12, 32]} />
-        <T.MeshStandardMaterial
-          color="#5d4325"
-          metalness={0.74}
-          roughness={0.4}
-        />
-      </T.Mesh>
-
-      <T.Mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
-        <T.CylinderGeometry args={[0.28, 0.28, 0.2, 16]} />
-        <T.MeshStandardMaterial
-          color="#2b2117"
-          metalness={0.68}
-          roughness={0.46}
-        />
-      </T.Mesh>
-
-      {#each gearTeeth as tooth}
-        <T.Mesh
-          castShadow
-          position={[tooth.x * gear.size, tooth.y * gear.size, 0.02]}
-          rotation={[0, 0, tooth.rotation]}
-        >
-          <T.BoxGeometry args={[0.18, 0.38, 0.16]} />
-          <T.MeshStandardMaterial
-            color="#5d4325"
-            metalness={0.72}
-            roughness={0.42}
-          />
-        </T.Mesh>
-      {/each}
-    </T.Group>
-  {/each}
 {/if}
 
 {#if outside}
@@ -662,33 +584,6 @@
       vertexShader={outsideHazeVertex}
     />
   </T.Mesh>
-
-  <T.Group position={[0, 0, -106]}>
-    <T.Mesh castShadow position={[-18, 3.2, 0]}>
-      <T.BoxGeometry args={[1.2, 6.4, 1.2]} />
-      <T.MeshStandardMaterial
-        color="#59472e"
-        metalness={0.22}
-        roughness={0.78}
-      />
-    </T.Mesh>
-    <T.Mesh castShadow position={[13, 2.2, 0]} rotation={[0, 0.3, 0]}>
-      <T.BoxGeometry args={[1.3, 4.4, 1.1]} />
-      <T.MeshStandardMaterial
-        color="#6c4f30"
-        metalness={0.24}
-        roughness={0.74}
-      />
-    </T.Mesh>
-    <T.Mesh castShadow position={[0, 4.4, 0]} rotation={[Math.PI / 2, 0, 0]}>
-      <T.TorusGeometry args={[4.8, 0.24, 8, 24]} />
-      <T.MeshStandardMaterial
-        color="#6f5532"
-        metalness={0.42}
-        roughness={0.6}
-      />
-    </T.Mesh>
-  </T.Group>
 
   <!-- Mountain ring is now carved directly into the terrain heightmap;
        we only need the invisible collider wall so the player can't walk
@@ -806,25 +701,42 @@
   <OutsideVegetationColliders />
 
   <!-- Rocks, camps, POIs etc are now picked procedurally by the
-       outside-chunk pipeline and rendered via OutsidePOIs / the rock
+       outside-chunk pipeline and rendered via OutsidePoIs / the rock
        instance pass inside OutsideFoliage. The codex hand-authored
        arrays were still around but conflicted with the plan's
        landmark selection. -->
-  <OutsidePOIs />
+  <OutsidePoIs />
 
-  <T.Group position={[0, 0.12, -78.8]}>
-    <RigidBody type="fixed">
-      <Collider shape="cuboid" args={[3.9, 0.06, 1.55]} friction={0.96} />
-    </RigidBody>
-    <T.Mesh receiveShadow>
-      <T.BoxGeometry args={[7.8, 0.12, 3.1]} />
-      <T.MeshStandardMaterial color="#3e4039" roughness={0.9} />
-    </T.Mesh>
-    <T.Mesh position={[0, 0.16, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <T.RingGeometry args={[1.25, 2.05, 24]} />
-      <T.MeshBasicMaterial color="#b59454" opacity={0.72} transparent />
-    </T.Mesh>
-  </T.Group>
+  <T.Mesh position={[0, 4.8, -82.4]}>
+    <T.PlaneGeometry args={[86, 12]} />
+    <T.MeshBasicMaterial
+      color="#26341d"
+      opacity={0.82}
+      side={DoubleSide}
+      transparent
+      depthWrite={false}
+    />
+  </T.Mesh>
+
+  {#each [-34, -27, -20, -13, -6, 1, 8, 15, 22, 29, 36] as x, index}
+    <T.Group
+      position={onGround([x, 0, -79.5 - (index % 2) * 2.4], 0)}
+      rotation={[0, (index % 3) * 0.28, 0]}
+    >
+      <T.Mesh castShadow position={[0, 1.2, 0]}>
+        <T.CylinderGeometry args={[0.42, 0.58, 2.4, 6]} />
+        <T.MeshStandardMaterial color="#3b2b1d" roughness={0.9} />
+      </T.Mesh>
+      <T.Mesh castShadow position={[0, 3.2, 0]}>
+        <T.SphereGeometry args={[2.1 + (index % 3) * 0.35, 7, 5]} />
+        <T.MeshStandardMaterial color="#334d23" roughness={0.94} />
+      </T.Mesh>
+      <T.Mesh castShadow position={[0.8, 4.2, -0.5]}>
+        <T.SphereGeometry args={[1.45 + (index % 2) * 0.32, 7, 5]} />
+        <T.MeshStandardMaterial color="#425d2b" roughness={0.94} />
+      </T.Mesh>
+    </T.Group>
+  {/each}
 {/if}
 
 {#if environment === "training-range"}
@@ -993,6 +905,55 @@
 {/if}
 
 {#if environment === "treasure-gears"}
+  <T.Group position={[0, 0.18, 0]}>
+    <T.Mesh castShadow receiveShadow>
+      <T.CylinderGeometry args={[1.55, 1.92, 0.36, 8]} />
+      <T.MeshStandardMaterial
+        color="#10283a"
+        metalness={0.42}
+        roughness={0.58}
+      />
+    </T.Mesh>
+
+    <T.Mesh
+      receiveShadow
+      position={[0, 0.21, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
+      <T.RingGeometry args={[1.68, 2.12, 8]} />
+      <T.MeshBasicMaterial color="#ffd166" opacity={0.42} transparent />
+    </T.Mesh>
+
+    <T.Mesh position={[0, 0.25, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <T.RingGeometry args={[0.72, 0.9, 48]} />
+      <T.MeshBasicMaterial color="#8ac6ff" opacity={0.62} transparent />
+    </T.Mesh>
+
+    {#each [-1, 1] as x}
+      {#each [-1, 1] as z}
+        <T.Group position={[x * 2.55, 0.15, z * 2.2]}>
+          <T.Mesh castShadow receiveShadow>
+            <T.CylinderGeometry args={[0.22, 0.34, 0.5, 6]} />
+            <T.MeshStandardMaterial
+              color="#183142"
+              metalness={0.48}
+              roughness={0.48}
+            />
+          </T.Mesh>
+          <T.Mesh castShadow position={[0, 0.39, 0]}>
+            <T.SphereGeometry args={[0.18, 14, 10]} />
+            <T.MeshStandardMaterial
+              color="#8ac6ff"
+              emissive="#8ac6ff"
+              emissiveIntensity={0.46}
+              roughness={0.18}
+            />
+          </T.Mesh>
+        </T.Group>
+      {/each}
+    {/each}
+  </T.Group>
+
   {#each treasureGearMounts as mount, index}
     <T.Group position={mount.position}>
       <T.Mesh receiveShadow>
@@ -1007,8 +968,8 @@
       <T.Mesh castShadow position={[0, 0, 0.2]}>
         <T.TorusGeometry args={[mount.size, 0.16, 12, 30]} />
         <T.MeshStandardMaterial
-          color={index < 2 ? "#ffd166" : "#8ac6ff"}
-          emissive={index < 2 ? "#ffd166" : "#8ac6ff"}
+          color={mount.position[2] < 0 ? "#ffd166" : "#8ac6ff"}
+          emissive={mount.position[2] < 0 ? "#ffd166" : "#8ac6ff"}
           emissiveIntensity={0.08}
           metalness={0.74}
           roughness={0.34}

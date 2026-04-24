@@ -39,6 +39,7 @@ export interface GameSceneProps {
   meleeTrailSettings: MeleeTrailSettings;
   onAdvanceFloor?: () => void;
   onCollectArtifact?: (roomId: string, type: MachineModuleId) => void;
+  onEndDemo?: () => void;
   onGearCountChange?: (gearCount: number) => void;
   onOpenSettings?: () => void;
   onOpenWeaponLab?: () => void;

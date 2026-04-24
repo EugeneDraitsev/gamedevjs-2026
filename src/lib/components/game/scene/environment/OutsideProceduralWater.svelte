@@ -5,15 +5,15 @@
     BufferGeometry,
     Color,
     DoubleSide,
+    type IUniform,
     PlaneGeometry,
     ShaderMaterial,
-    type IUniform,
   } from "three";
-  import { createWaterMaterial } from "$lib/components/overworld/materials/water-material";
   import {
     glslHash,
     glslValueNoise,
   } from "$lib/components/overworld/materials/shader-noise";
+  import { createWaterMaterial } from "$lib/components/overworld/materials/water-material";
   import { outsidePlan } from "$lib/game/outside-chunk-context";
 
   // One big water plane at waterLevel; terrain geometry occludes it
@@ -22,7 +22,7 @@
   const plan = outsidePlan();
   const geometry = new PlaneGeometry(plan.size.width, plan.size.depth, 64, 120);
   const buildRiverbedGeometry = (
-    points: Array<[number, number]>,
+    points: [number, number][],
     widthHalf: number
   ) => {
     const verts: number[] = [];
@@ -42,7 +42,7 @@
         [x0 - nx * widthHalf, z0 - nz * widthHalf],
         [x1 + nx * widthHalf, z1 + nz * widthHalf],
         [x1 - nx * widthHalf, z1 - nz * widthHalf],
-      ] as Array<[number, number]>) {
+      ] as [number, number][]) {
         verts.push(x, plan.sampleHeight(x, z) + 0.035, z);
       }
       uvs.push(0, i, 1, i, 0, i + 1, 1, i + 1);
@@ -65,30 +65,30 @@
       uSandB: { value: new Color("#d1bd84") },
     } as Record<string, IUniform>,
     vertexShader: /* glsl */ `
-      varying vec2 vRiverbedUv;
-      varying vec3 vWorldPos;
-      void main() {
-        vRiverbedUv = uv;
-        vec4 worldPos = modelMatrix * vec4(position, 1.0);
-        vWorldPos = worldPos.xyz;
-        gl_Position = projectionMatrix * viewMatrix * worldPos;
-      }
-    `,
+        varying vec2 vRiverbedUv;
+        varying vec3 vWorldPos;
+        void main() {
+          vRiverbedUv = uv;
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vWorldPos = worldPos.xyz;
+          gl_Position = projectionMatrix * viewMatrix * worldPos;
+        }
+      `,
     fragmentShader: /* glsl */ `
-      ${glslHash}
-      ${glslValueNoise}
-      uniform vec3 uSandA;
-      uniform vec3 uSandB;
-      varying vec2 vRiverbedUv;
-      varying vec3 vWorldPos;
-      void main() {
-        vec2 wp = vWorldPos.xz;
-        float grain = fbm2(wp * 1.4) * 0.7 + hash21(floor(wp * 7.0)) * 0.3;
-        float edge = 1.0 - smoothstep(0.42, 0.5, abs(vRiverbedUv.x - 0.5));
-        vec3 col = mix(uSandA, uSandB, grain);
-        gl_FragColor = vec4(col, edge * 0.78);
-      }
-    `,
+        ${glslHash}
+        ${glslValueNoise}
+        uniform vec3 uSandA;
+        uniform vec3 uSandB;
+        varying vec2 vRiverbedUv;
+        varying vec3 vWorldPos;
+        void main() {
+          vec2 wp = vWorldPos.xz;
+          float grain = fbm2(wp * 1.4) * 0.7 + hash21(floor(wp * 7.0)) * 0.3;
+          float edge = 1.0 - smoothstep(0.42, 0.5, abs(vRiverbedUv.x - 0.5));
+          vec3 col = mix(uSandA, uSandB, grain);
+          gl_FragColor = vec4(col, edge * 0.78);
+        }
+      `,
     depthWrite: false,
     polygonOffset: true,
     polygonOffsetFactor: -6,

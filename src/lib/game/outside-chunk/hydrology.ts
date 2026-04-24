@@ -11,22 +11,22 @@ import { createRng, makeNoise2D } from "./rng";
 import type { ChunkSize, PolyPath } from "./types";
 
 export interface HydrologyParams {
-  size: ChunkSize;
   height: Float32Array; // mutated (carved)
   playable: Uint8Array; // only carve inside
-  seedHash: number;
-  playableHalfWidth: number;
   playableHalfDepth: number;
-  waterLevel: number;
-  riverHalfWidth: number; // world units
+  playableHalfWidth: number;
+  protectedPoints?: [number, number, number][]; // x, z, clear radius
   riverDepth: number; // how deep to carve below waterLevel
-  protectedPoints?: Array<[number, number, number]>; // x, z, clear radius
+  riverHalfWidth: number; // world units
+  seedHash: number;
+  size: ChunkSize;
+  waterLevel: number;
 }
 
 export interface HydrologyResult {
   flow: Float32Array;
-  water: Uint8Array; // 1=flooded (below waterLevel), 2=river-carved
   rivers: PolyPath[];
+  water: Uint8Array; // 1=flooded (below waterLevel), 2=river-carved
 }
 
 const pointOnRiver = (
@@ -47,8 +47,7 @@ const pointOnRiver = (
   const len = Math.hypot(dx, dz) || 1;
   const nx = -dz / len;
   const nz = dx / len;
-  const wave =
-    meanderNoise(t * 3, 1.7) * 0.7 + meanderNoise(t * 7, 5.1) * 0.3;
+  const wave = meanderNoise(t * 3, 1.7) * 0.7 + meanderNoise(t * 7, 5.1) * 0.3;
   return [x + nx * wave * meanderAmp, z + nz * wave * meanderAmp];
 };
 
@@ -59,8 +58,9 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
   const water = new Uint8Array(total);
   const flow = new Float32Array(total);
 
-  const meanderNoise = makeNoise2D(p.seedHash ^ 0x1eadbeef);
-  const rng = createRng(p.seedHash + 0x6a09e667);
+  // biome-ignore lint/suspicious/noBitwiseOperators: deterministic seed mixing for river meanders.
+  const meanderNoise = makeNoise2D(p.seedHash ^ 0x1e_ad_be_ef);
+  const rng = createRng(p.seedHash + 0x6a_09_e6_67);
   const halfW = size.width * 0.5;
   const halfD = size.depth * 0.5;
   const playW = p.playableHalfWidth;
@@ -69,9 +69,15 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
   const pointOnSide = (side: number): [number, number] => {
     const x = (rng() * 2 - 1) * playW * 0.9;
     const z = (rng() * 2 - 1) * playD * 0.9;
-    if (side === 0) return [x, -playD * 0.96];
-    if (side === 1) return [playW * 0.96, z];
-    if (side === 2) return [x, playD * 0.96];
+    if (side === 0) {
+      return [x, -playD * 0.96];
+    }
+    if (side === 1) {
+      return [playW * 0.96, z];
+    }
+    if (side === 2) {
+      return [x, playD * 0.96];
+    }
     return [-playW * 0.96, z];
   };
   const distToSegment = (
@@ -84,12 +90,17 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
     const dz = b[1] - a[1];
     const t = Math.max(
       0,
-      Math.min(1, ((px - a[0]) * dx + (pz - a[1]) * dz) / (dx * dx + dz * dz || 1))
+      Math.min(
+        1,
+        ((px - a[0]) * dx + (pz - a[1]) * dz) / (dx * dx + dz * dz || 1)
+      )
     );
     return Math.hypot(px - (a[0] + dx * t), pz - (a[1] + dz * t));
   };
   const isSafe = (a: [number, number], b: [number, number]) =>
-    !(p.protectedPoints ?? []).some(([x, z, r]) => distToSegment(x, z, a, b) < r);
+    !(p.protectedPoints ?? []).some(
+      ([x, z, r]) => distToSegment(x, z, a, b) < r
+    );
 
   const rivers: {
     a: [number, number];
@@ -130,7 +141,9 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
         (x, y) => meanderNoise(x + main.noiseOffset, y),
         main.meanderAmp
       );
-      if (isSafe(a, b)) break;
+      if (isSafe(a, b)) {
+        break;
+      }
       side = Math.floor(rng() * 4);
       a = pointOnSide(side);
     }
@@ -147,7 +160,7 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
   const samplesPerRiver = 56;
 
   for (const spec of rivers) {
-    const pts: Array<[number, number]> = [];
+    const pts: [number, number][] = [];
     for (let i = 0; i <= samplesPerRiver; i++) {
       const t = i / samplesPerRiver;
       pts.push(
@@ -166,35 +179,45 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
   }
 
   // Carve each river: dip terrain below waterLevel within riverHalfWidth.
-  const carve = (wx: number, wz: number, widthHalf: number) => {
-    if (
-      (p.protectedPoints ?? []).some(
-        ([x, z, r]) => Math.hypot(x - wx, z - wz) < r
-      )
-    ) {
-      return;
-    }
-    const carveRadius = widthHalf + 0.8;
-    const colCenter = ((wx + halfW) / size.width) * size.cols;
-    const rowCenter = ((wz + halfD) / size.depth) * size.rows;
-    const r = Math.ceil((carveRadius / size.width) * size.cols) + 1;
-    for (let dr = -r; dr <= r; dr++) {
-      for (let dc = -r; dc <= r; dc++) {
-        const col = Math.round(colCenter + dc);
-        const row = Math.round(rowCenter + dr);
-        if (col < 0 || col > size.cols || row < 0 || row > size.rows) continue;
-        const idx = row * stride + col;
-        if (!playable[idx]) continue; // never carve into mountain
-        const { x, z } = cellToWorld(size, col, row);
-        const d = Math.hypot(x - wx, z - wz);
-        if (d > carveRadius) continue;
-        const t = 1 - d / carveRadius;
-        const depth = Math.pow(t, 1.3) * p.riverDepth;
-        const target = p.waterLevel - depth * 0.72; // river bed sits below waterLevel
-        if (height[idx] > target) height[idx] = target;
+  const carve =
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: river carving scans a bounded grid radius and applies several terrain safety gates.
+    (wx: number, wz: number, widthHalf: number) => {
+      if (
+        (p.protectedPoints ?? []).some(
+          ([x, z, r]) => Math.hypot(x - wx, z - wz) < r
+        )
+      ) {
+        return;
       }
-    }
-  };
+      const carveRadius = widthHalf + 0.8;
+      const colCenter = ((wx + halfW) / size.width) * size.cols;
+      const rowCenter = ((wz + halfD) / size.depth) * size.rows;
+      const r = Math.ceil((carveRadius / size.width) * size.cols) + 1;
+      for (let dr = -r; dr <= r; dr++) {
+        for (let dc = -r; dc <= r; dc++) {
+          const col = Math.round(colCenter + dc);
+          const row = Math.round(rowCenter + dr);
+          if (col < 0 || col > size.cols || row < 0 || row > size.rows) {
+            continue;
+          }
+          const idx = row * stride + col;
+          if (!playable[idx]) {
+            continue; // never carve into mountain
+          }
+          const { x, z } = cellToWorld(size, col, row);
+          const d = Math.hypot(x - wx, z - wz);
+          if (d > carveRadius) {
+            continue;
+          }
+          const t = 1 - d / carveRadius;
+          const depth = t ** 1.3 * p.riverDepth;
+          const target = p.waterLevel - depth * 0.72; // river bed sits below waterLevel
+          if (height[idx] > target) {
+            height[idx] = target;
+          }
+        }
+      }
+    };
 
   for (const river of riverPaths) {
     // Walk finely between sampled points so the carving is seamless.
@@ -213,7 +236,9 @@ export const buildHydrology = (p: HydrologyParams): HydrologyResult => {
 
   // Tag flooded cells
   for (let i = 0; i < total; i++) {
-    if (height[i] < p.waterLevel) water[i] = 1;
+    if (height[i] < p.waterLevel) {
+      water[i] = 1;
+    }
   }
 
   return { flow, water, rivers: riverPaths };

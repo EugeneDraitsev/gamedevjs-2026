@@ -21,17 +21,17 @@ import {
 export type VegetationCategory = "tree" | "shrub" | "rock";
 
 export interface VegetationKind {
-  id: VegetationKindId;
-  category: VegetationCategory;
-  // Biomes where this kind is allowed, with a multiplier.
-  biomeWeights: Partial<Record<BiomeId, number>>;
   // How dense the overall attempt rate is (combined with biomeWeights
   // to produce the final per-cell probability).
   baseRate: number;
-  minSpacing: number;
-  scaleMin: number;
-  scaleMax: number;
+  // Biomes where this kind is allowed, with a multiplier.
+  biomeWeights: Partial<Record<BiomeId, number>>;
+  category: VegetationCategory;
   collider?: VegetationColliderSpec;
+  id: VegetationKindId;
+  minSpacing: number;
+  scaleMax: number;
+  scaleMin: number;
 }
 
 export const VEGETATION_REGISTRY: VegetationKind[] = [
@@ -124,14 +124,14 @@ export const VEGETATION_REGISTRY: VegetationKind[] = [
 ];
 
 export interface VegetationParams {
-  size: ChunkSize;
-  seedHash: number;
-  height: Float32Array;
-  biome: Uint8Array;
-  playable: Uint8Array;
-  avoid: Array<[number, number, number]>; // world positions to keep clear (POIs, etc)
+  avoid: [number, number, number][]; // world positions to keep clear (POIs, etc)
   avoidRadius: number;
+  biome: Uint8Array;
+  height: Float32Array;
+  playable: Uint8Array;
   sampleHeight: (x: number, z: number) => number;
+  seedHash: number;
+  size: ChunkSize;
 }
 
 export interface VegetationResult {
@@ -140,8 +140,11 @@ export interface VegetationResult {
 }
 
 class OccupancyGrid {
-  private cells = new Map<string, Array<[number, number]>>();
-  constructor(private cellSize: number) {}
+  private readonly cells = new Map<string, [number, number][]>();
+  private readonly cellSize: number;
+  constructor(cellSize: number) {
+    this.cellSize = cellSize;
+  }
   accept(x: number, z: number, minDist: number): boolean {
     const r = Math.ceil(minDist / this.cellSize);
     const cx = Math.floor(x / this.cellSize);
@@ -150,9 +153,13 @@ class OccupancyGrid {
     for (let dz = -r; dz <= r; dz++) {
       for (let dx = -r; dx <= r; dx++) {
         const list = this.cells.get(`${cx + dx}|${cz + dz}`);
-        if (!list) continue;
+        if (!list) {
+          continue;
+        }
         for (const [ox, oz] of list) {
-          if ((x - ox) ** 2 + (z - oz) ** 2 < minDist2) return false;
+          if ((x - ox) ** 2 + (z - oz) ** 2 < minDist2) {
+            return false;
+          }
         }
       }
     }
@@ -164,10 +171,12 @@ class OccupancyGrid {
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: vegetation scatter keeps weighted biome picks and occupancy checks in one deterministic pass.
 export const buildVegetation = (p: VegetationParams): VegetationResult => {
   const { size, biome, playable } = p;
   const stride = size.cols + 1;
-  const rng = createRng(p.seedHash ^ 0x6b6f67e7);
+  // biome-ignore lint/suspicious/noBitwiseOperators: deterministic seed mixing for vegetation scatter.
+  const rng = createRng(p.seedHash ^ 0x6b_6f_67_e7);
 
   // Global occupancy (so bush-small can't sit exactly inside a conifer)
   const occAny = new OccupancyGrid(1.1);
@@ -187,9 +196,13 @@ export const buildVegetation = (p: VegetationParams): VegetationResult => {
   for (let row = 0; row <= size.rows; row++) {
     for (let col = 0; col <= size.cols; col++) {
       const idx = row * stride + col;
-      if (!playable[idx]) continue;
+      if (!playable[idx]) {
+        continue;
+      }
       const b = BIOME_ORDER[biome[idx]];
-      if (b === "water" || b === "cliff" || b === "snow" || b === "road") continue;
+      if (b === "water" || b === "cliff" || b === "snow" || b === "road") {
+        continue;
+      }
 
       const { x: cx, z: cz } = cellToWorld(size, col, row);
 
@@ -201,22 +214,30 @@ export const buildVegetation = (p: VegetationParams): VegetationResult => {
           break;
         }
       }
-      if (avoided) continue;
+      if (avoided) {
+        continue;
+      }
 
       // Build cumulative distribution of eligible kinds for this cell
       let total = 0;
-      const probs: Array<{ kind: VegetationKind; w: number }> = [];
+      const probs: { kind: VegetationKind; w: number }[] = [];
       for (const kind of VEGETATION_REGISTRY) {
         const bw = kind.biomeWeights[b] ?? 0;
-        if (bw <= 0) continue;
+        if (bw <= 0) {
+          continue;
+        }
         const w = kind.baseRate * bw;
         probs.push({ kind, w });
         total += w;
       }
-      if (total <= 0) continue;
+      if (total <= 0) {
+        continue;
+      }
 
       // Bernoulli gate on total rate
-      if (rng() > total) continue;
+      if (rng() > total) {
+        continue;
+      }
 
       // Choose kind by weighted pick
       let r = rng() * total;
@@ -232,11 +253,16 @@ export const buildVegetation = (p: VegetationParams): VegetationResult => {
       const jx = cx + (rng() - 0.5) * 1.1;
       const jz = cz + (rng() - 0.5) * 1.1;
 
-      if (!occByKind[chosen.id].accept(jx, jz, chosen.minSpacing)) continue;
+      if (!occByKind[chosen.id].accept(jx, jz, chosen.minSpacing)) {
+        continue;
+      }
       // also enforce a tiny global spacing so different kinds don't overlap
-      if (!occAny.accept(jx, jz, 0.9)) continue;
+      if (!occAny.accept(jx, jz, 0.9)) {
+        continue;
+      }
 
-      const scale = chosen.scaleMin + rng() * (chosen.scaleMax - chosen.scaleMin);
+      const scale =
+        chosen.scaleMin + rng() * (chosen.scaleMax - chosen.scaleMin);
       const inst: VegetationInstance = {
         id: `veg-${chosen.id}-${row}-${col}`,
         kind: chosen.id,

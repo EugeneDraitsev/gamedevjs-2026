@@ -1,20 +1,16 @@
-import { Color, MeshStandardMaterial, type IUniform } from "three";
-import {
-  glslHash,
-  glslSimplex2D,
-  glslValueNoise,
-} from "./shader-noise";
+import { Color, type IUniform, MeshStandardMaterial } from "three";
+import { glslHash, glslSimplex2D, glslValueNoise } from "./shader-noise";
 
 export interface GroundMaterialUniforms {
-  uTime: IUniform<number>;
-  uGrassLow: IUniform<Color>;
-  uGrassHigh: IUniform<Color>;
-  uDirt: IUniform<Color>;
-  uRust: IUniform<Color>;
-  uConcrete: IUniform<Color>;
   uBloom: IUniform<Color>;
-  uPlayerPos: IUniform<[number, number, number]>;
+  uConcrete: IUniform<Color>;
+  uDirt: IUniform<Color>;
+  uGrassHigh: IUniform<Color>;
+  uGrassLow: IUniform<Color>;
   uPlayableRadius: IUniform<number>;
+  uPlayerPos: IUniform<[number, number, number]>;
+  uRust: IUniform<Color>;
+  uTime: IUniform<number>;
 }
 
 export const createGroundMaterial = (): {
@@ -34,7 +30,7 @@ export const createGroundMaterial = (): {
   };
 
   const material = new MeshStandardMaterial({
-    color: 0xffffff,
+    color: 0xff_ff_ff,
     roughness: 0.94,
     metalness: 0.04,
   });

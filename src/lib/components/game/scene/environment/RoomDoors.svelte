@@ -2,6 +2,7 @@
   import { T } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
   import type { Texture } from "three";
+  import FoundryDoorFrame from "$lib/components/game/scene/environment/walls/FoundryDoorFrame.svelte";
   import type { DoorMarker, DoorSeal, Vec3 } from "$lib/types/game";
 
   let {
@@ -33,14 +34,10 @@
   const sealOpacity = (seal: DoorSeal) => (seal.position[2] > 0 ? 0.28 : 1);
   const sealSolid = (seal: DoorSeal) => sealOpacity(seal) >= 1;
   const gateSides = [-1, 1];
-  const gateChainLinks = [-1.05, -0.45, 0.15, 0.75];
-  const gateBarOffsets = [-0.32, 0, 0.32];
-  const gateRails = [-1.45, 0.95];
-  const gearTeeth = Array.from({ length: 10 }, (_, index) => {
-    const rotation = (index / 10) * Math.PI * 2;
-
-    return { rotation, x: Math.cos(rotation), y: Math.sin(rotation) };
-  });
+  const gateBarOffsets = [-0.28, 0, 0.28];
+  const gateRails = [-1.24, 0.92];
+  const gateRivetOffsets = [-0.34, 0.34];
+  const gateRivetRows = [-0.72, 0.42];
 </script>
 
 {#each roomDoors as door (door.id)}
@@ -76,210 +73,172 @@
 {#each roomDoorSeals as seal (seal.id)}
   {#if seal.style === "mechanic"}
     <T.Group position={seal.position}>
-      {#each gateSides as side}
-        <T.Mesh
-          castShadow={sealSolid(seal)}
-          receiveShadow
-          position={sealPosition(seal, side * (sealSpan(seal) * 0.5 + 0.34), 0)}
-        >
-          <T.BoxGeometry args={sealBox(seal, 0.42, seal.args[1] * 2.08, 0.5)} />
-          <T.MeshStandardMaterial
-            color="#25231d"
-            metalness={0.34}
-            opacity={sealOpacity(seal)}
-            roughness={0.66}
-            transparent={!sealSolid(seal)}
-            depthWrite={sealSolid(seal)}
-          />
-        </T.Mesh>
-
-        <T.Mesh
-          castShadow={sealSolid(seal)}
-          receiveShadow
-          position={sealPosition(
-            seal,
-            side * (sealSpan(seal) * 0.5 + 0.34),
-            -seal.args[1] - 0.1
-          )}
-        >
-          <T.BoxGeometry args={sealBox(seal, 0.72, 0.24, 0.72)} />
-          <T.MeshStandardMaterial
-            color={seal.trimColor ?? "#5d4528"}
-            metalness={0.58}
-            opacity={sealOpacity(seal)}
-            roughness={0.42}
-            transparent={!sealSolid(seal)}
-            depthWrite={sealSolid(seal)}
-          />
-        </T.Mesh>
-
-        {#each gateChainLinks as y}
-          <T.Mesh
-            castShadow={sealSolid(seal)}
-            position={sealPosition(seal, side * (sealSpan(seal) * 0.5 + 0.72), y)}
-            rotation={sealRotation(seal)}
-          >
-            <T.TorusGeometry args={[0.13, 0.035, 6, 10]} />
-            <T.MeshStandardMaterial
-              color="#16110b"
-              metalness={0.82}
-              opacity={sealOpacity(seal)}
-              roughness={0.34}
-              transparent={!sealSolid(seal)}
-              depthWrite={sealSolid(seal)}
-            />
-          </T.Mesh>
-        {/each}
-      {/each}
-
-      {#each [-seal.args[1] - 0.02, seal.args[1] - 0.14] as y}
-        <T.Mesh
-          castShadow={sealSolid(seal)}
-          receiveShadow
-          position={sealPosition(seal, 0, y)}
-        >
-          <T.BoxGeometry
-            args={sealBox(seal, sealSpan(seal) + 0.9, 0.22, 0.38)}
-          />
-          <T.MeshStandardMaterial
-            color={seal.trimColor ?? "#5d4528"}
-            metalness={0.62}
-            opacity={sealOpacity(seal)}
-            roughness={0.38}
-            transparent={!sealSolid(seal)}
-            depthWrite={sealSolid(seal)}
-          />
-        </T.Mesh>
-      {/each}
-
-      {#each gateSides as side}
+      {#if sealSolid(seal)}
         <T.Group
-          position={sealPosition(
-            seal,
-            side * (sealSpan(seal) * 0.24 + doorOpenAmount * 0.95),
-            0
-          )}
-        >
-          {#each gateBarOffsets as offset}
-            <T.Mesh
-              castShadow={sealSolid(seal)}
-              receiveShadow
-              position={sealPosition(seal, offset, -0.1)}
-            >
-              <T.BoxGeometry
-                args={sealBox(seal, 0.08, seal.args[1] * 1.55, 0.12)}
-              />
-              <T.MeshStandardMaterial
-                color="#191712"
-                metalness={0.78}
-                opacity={sealOpacity(seal)}
-                roughness={0.32}
-                transparent={!sealSolid(seal)}
-                depthWrite={sealSolid(seal)}
-              />
-            </T.Mesh>
-
-            <T.Mesh
-              castShadow={sealSolid(seal)}
-              position={sealPosition(seal, offset, seal.args[1] * 0.74)}
-            >
-              <T.ConeGeometry args={[0.1, 0.34, 4]} />
-              <T.MeshStandardMaterial
-                color={seal.trimColor ?? "#5d4528"}
-                metalness={0.78}
-                opacity={sealOpacity(seal)}
-                roughness={0.34}
-                transparent={!sealSolid(seal)}
-                depthWrite={sealSolid(seal)}
-              />
-            </T.Mesh>
-          {/each}
-
-          {#each gateRails as y}
-            <T.Mesh
-              castShadow={sealSolid(seal)}
-              receiveShadow
-              position={sealPosition(seal, 0, y)}
-            >
-              <T.BoxGeometry args={sealBox(seal, 0.9, 0.16, 0.16)} />
-              <T.MeshStandardMaterial
-                color={seal.trimColor ?? "#5d4528"}
-                metalness={0.72}
-                opacity={sealOpacity(seal)}
-                roughness={0.36}
-                transparent={!sealSolid(seal)}
-                depthWrite={sealSolid(seal)}
-              />
-            </T.Mesh>
-          {/each}
-
-          <T.Mesh
-            castShadow={sealSolid(seal)}
-            position={sealPosition(seal, 0, -0.1)}
-            rotation={sealRotation(seal)}
-          >
-            <T.TorusGeometry args={[0.28, 0.055, 8, 14]} />
-            <T.MeshStandardMaterial
-              color={seal.trimColor ?? "#5d4528"}
-              emissive={seal.emissive ?? "#ff9d43"}
-              emissiveIntensity={0.08}
-              metalness={0.82}
-              opacity={sealOpacity(seal)}
-              roughness={0.32}
-              transparent={!sealSolid(seal)}
-              depthWrite={sealSolid(seal)}
-            />
-          </T.Mesh>
-        </T.Group>
-      {/each}
-
-      <T.PointLight
-        color={seal.emissive ?? "#ff9d43"}
-        distance={4}
-        intensity={Math.max(0, 1.5 * (1 - doorOpenAmount / 0.92))}
-        position={sealPosition(seal, 0, -0.12)}
-      />
-      <T.Group visible={doorOpenAmount < 0.92}>
-        <T.Mesh
-          castShadow={sealSolid(seal)}
-          position={sealPosition(seal, 0, -0.1)}
+          position={sealPosition(seal, 0, 0.02)}
           rotation={sealRotation(seal)}
         >
-          <T.TorusGeometry args={[0.42, 0.09, 10, 18]} />
-          <T.MeshStandardMaterial
-            color={seal.trimColor ?? "#5d4528"}
-            emissive={seal.emissive ?? "#ff9d43"}
-            emissiveIntensity={0.12}
-            metalness={0.82}
-            opacity={sealOpacity(seal)}
-            roughness={0.3}
-            transparent={!sealSolid(seal)}
-            depthWrite={sealSolid(seal)}
+          <FoundryDoorFrame
+            height={seal.args[1] * 1.8}
+            trimColor={seal.trimColor ?? "#5d4528"}
+            width={sealSpan(seal) + 0.55}
           />
-        </T.Mesh>
+        </T.Group>
+      {/if}
 
-        {#each gearTeeth as tooth}
+      {#if doorOpenAmount < 0.98}
+        {#each gateSides as side}
           <T.Mesh
             castShadow={sealSolid(seal)}
-            position={sealPosition(seal, tooth.x * 0.42, -0.1 + tooth.y * 0.42)}
-            rotation={sealHorizontal(seal)
-              ? [0, 0, tooth.rotation]
-              : [0, Math.PI / 2, tooth.rotation]}
+            receiveShadow
+            position={sealPosition(
+              seal,
+              side * (sealSpan(seal) * 0.5 + 0.34),
+              0
+            )}
           >
-            <T.BoxGeometry args={sealBox(seal, 0.12, 0.26, 0.08)} />
+            <T.BoxGeometry
+              args={sealBox(seal, 0.42, seal.args[1] * 2.08, 0.5)}
+            />
+            <T.MeshStandardMaterial
+              color="#25231d"
+              metalness={0.34}
+              opacity={sealOpacity(seal)}
+              roughness={0.66}
+              transparent={!sealSolid(seal)}
+              depthWrite={sealSolid(seal)}
+            />
+          </T.Mesh>
+
+          <T.Mesh
+            castShadow={sealSolid(seal)}
+            receiveShadow
+            position={sealPosition(
+              seal,
+              side * (sealSpan(seal) * 0.5 + 0.34),
+              -seal.args[1] - 0.1
+            )}
+          >
+            <T.BoxGeometry args={sealBox(seal, 0.72, 0.24, 0.72)} />
             <T.MeshStandardMaterial
               color={seal.trimColor ?? "#5d4528"}
-              emissive={seal.emissive ?? "#ff9d43"}
-              emissiveIntensity={0.08}
-              metalness={0.82}
+              metalness={0.58}
               opacity={sealOpacity(seal)}
-              roughness={0.32}
+              roughness={0.42}
               transparent={!sealSolid(seal)}
               depthWrite={sealSolid(seal)}
             />
           </T.Mesh>
         {/each}
-      </T.Group>
+
+        {#each [-seal.args[1] - 0.02, seal.args[1] - 0.14] as y}
+          <T.Mesh
+            castShadow={sealSolid(seal)}
+            receiveShadow
+            position={sealPosition(seal, 0, y)}
+          >
+            <T.BoxGeometry
+              args={sealBox(seal, sealSpan(seal) + 0.9, 0.22, 0.38)}
+            />
+            <T.MeshStandardMaterial
+              color={seal.trimColor ?? "#5d4528"}
+              metalness={0.62}
+              opacity={sealOpacity(seal)}
+              roughness={0.38}
+              transparent={!sealSolid(seal)}
+              depthWrite={sealSolid(seal)}
+            />
+          </T.Mesh>
+        {/each}
+
+        {#each gateSides as side}
+          <T.Group
+            position={sealPosition(
+              seal,
+              side *
+                (sealSpan(seal) * 0.2 + doorOpenAmount * sealSpan(seal) * 0.62),
+              0
+            )}
+          >
+            {#each gateBarOffsets as offset}
+              <T.Mesh
+                castShadow={sealSolid(seal)}
+                receiveShadow
+                position={sealPosition(seal, offset, -0.1)}
+              >
+                <T.BoxGeometry
+                  args={sealBox(seal, 0.08, seal.args[1] * 1.4, 0.12)}
+                />
+                <T.MeshStandardMaterial
+                  color="#191712"
+                  metalness={0.78}
+                  opacity={sealOpacity(seal)}
+                  roughness={0.32}
+                  transparent={!sealSolid(seal)}
+                  depthWrite={sealSolid(seal)}
+                />
+              </T.Mesh>
+            {/each}
+
+            {#each gateRails as y}
+              <T.Mesh
+                castShadow={sealSolid(seal)}
+                receiveShadow
+                position={sealPosition(seal, 0, y)}
+              >
+                <T.BoxGeometry args={sealBox(seal, 0.88, 0.14, 0.14)} />
+                <T.MeshStandardMaterial
+                  color={seal.trimColor ?? "#5d4528"}
+                  metalness={0.72}
+                  opacity={sealOpacity(seal)}
+                  roughness={0.36}
+                  transparent={!sealSolid(seal)}
+                  depthWrite={sealSolid(seal)}
+                />
+              </T.Mesh>
+            {/each}
+
+            <T.Mesh
+              castShadow={sealSolid(seal)}
+              receiveShadow
+              position={sealPosition(seal, 0, -0.38)}
+            >
+              <T.BoxGeometry args={sealBox(seal, 0.38, 0.28, 0.18)} />
+              <T.MeshStandardMaterial
+                color={seal.trimColor ?? "#5d4528"}
+                emissive={seal.emissive ?? "#1b130c"}
+                emissiveIntensity={0.12}
+                metalness={0.76}
+                opacity={sealOpacity(seal)}
+                roughness={0.3}
+                transparent={!sealSolid(seal)}
+                depthWrite={sealSolid(seal)}
+              />
+            </T.Mesh>
+
+            {#each gateRivetRows as y}
+              {#each gateRivetOffsets as offset}
+                <T.Mesh
+                  castShadow={sealSolid(seal)}
+                  position={sealPosition(seal, offset, y)}
+                >
+                  <T.BoxGeometry args={sealBox(seal, 0.11, 0.11, 0.2)} />
+                  <T.MeshStandardMaterial
+                    color="#d18b3e"
+                    emissive="#5d2d08"
+                    emissiveIntensity={0.16}
+                    metalness={0.78}
+                    opacity={sealOpacity(seal)}
+                    roughness={0.26}
+                    transparent={!sealSolid(seal)}
+                    depthWrite={sealSolid(seal)}
+                  />
+                </T.Mesh>
+              {/each}
+            {/each}
+          </T.Group>
+        {/each}
+      {/if}
     </T.Group>
   {/if}
 {/each}

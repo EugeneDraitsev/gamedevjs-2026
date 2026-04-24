@@ -5,10 +5,10 @@
   import { createCanyonMaterial } from "./materials/canyon-material";
 
   interface Props {
-    innerRadius?: number;
-    wallHeight?: number;
-    thickness?: number;
     barrierSegments?: number;
+    innerRadius?: number;
+    thickness?: number;
+    wallHeight?: number;
   }
 
   let {

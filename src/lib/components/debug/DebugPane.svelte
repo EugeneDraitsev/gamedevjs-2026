@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ListOptions } from "svelte-tweakpane-ui";
+  import type { ListChangeEvent, ListOptions } from "svelte-tweakpane-ui";
   import {
     Button,
     Checkbox,
@@ -10,6 +10,11 @@
     Separator,
     Slider,
   } from "svelte-tweakpane-ui";
+  import {
+    formatRunFloorLabel,
+    initialDungeonFloor,
+    outsideFloor,
+  } from "$lib/config/run-floor";
   import type {
     CameraMode,
     FloorTheme,
@@ -20,9 +25,11 @@
   import { cheats } from "$lib/stores/cheats.svelte";
 
   interface DebugPaneProps {
+    currentFloor?: number;
     onResetDefaults: () => void;
     onResetLevel: () => void;
     onResetScene: () => void;
+    onSelectFloor?: (floor: number) => void;
     settings: SceneSettings;
   }
 
@@ -40,10 +47,18 @@
     Brass: "brass",
     Foundry: "foundry",
   };
+  const runFloorOptions: ListOptions<string> = {
+    [formatRunFloorLabel(initialDungeonFloor)]: String(initialDungeonFloor),
+    [formatRunFloorLabel(initialDungeonFloor + 1)]: String(
+      initialDungeonFloor + 1
+    ),
+    [formatRunFloorLabel(outsideFloor)]: String(outsideFloor),
+  };
 
   const formatAngle = (value: number) => `${value.toFixed(0)}°`;
   const formatFloat = (value: number) => value.toFixed(2);
   const formatShadowBias = (value: number) => value.toFixed(5);
+  const ignoreFloorSelection = (_floor: number) => undefined;
 
   const resetCameraDefaults = () => {
     const defaults = createSceneSettings();
@@ -127,22 +142,45 @@
   };
 
   let {
+    currentFloor = initialDungeonFloor,
     onResetDefaults,
     onResetLevel,
     onResetScene,
+    onSelectFloor = ignoreFloorSelection,
     settings = $bindable(),
   }: DebugPaneProps = $props();
+  let debugFloor = $state(String(initialDungeonFloor));
+
+  $effect(() => {
+    debugFloor = String(currentFloor);
+  });
 
   const resetAllDefaults = () => {
     cheats.reset();
     onResetDefaults();
     onResetLevel();
   };
+
+  const selectDebugFloor = (event: ListChangeEvent) => {
+    if (
+      event.detail.origin !== "internal" ||
+      typeof event.detail.value !== "string"
+    ) {
+      return;
+    }
+
+    const floor = Number.parseInt(event.detail.value, 10);
+    if (Number.isNaN(floor)) {
+      return;
+    }
+
+    onSelectFloor(floor);
+  };
 </script>
 
 <div class="debug-anchor">
   <Pane position="inline" title="Debug Controls" width={320}>
-    <Folder title="Camera">
+    <Folder title="Camera" expanded={false}>
       <List
         bind:value={settings.cameraMode}
         label="Mode"
@@ -533,7 +571,14 @@
       <Button on:click={() => cheats.reset()} title="Reset cheat defaults" />
     </Folder>
 
-    <Folder title="Debug" expanded={false}>
+    <Folder title="Debug">
+      <List
+        bind:value={debugFloor}
+        label="Run floor"
+        on:change={selectDebugFloor}
+        options={runFloorOptions}
+      />
+      <Separator />
       <Checkbox
         bind:value={settings.showDebugGeometry}
         label="Camera helpers"

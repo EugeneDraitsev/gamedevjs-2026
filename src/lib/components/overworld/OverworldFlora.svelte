@@ -12,12 +12,12 @@
   import { createGrassMaterial } from "./materials/grass-material";
 
   interface Props {
-    count?: number;
-    radius?: number;
-    playableRadius?: number;
-    seed?: number;
-    avoid?: Array<[number, number, number]>;
+    avoid?: [number, number, number][];
     avoidRadius?: number;
+    count?: number;
+    playableRadius?: number;
+    radius?: number;
+    seed?: number;
   }
 
   let {
@@ -51,9 +51,15 @@
         indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
       }
     }
-    geo.setAttribute("position", new BufferAttribute(new Float32Array(positions), 3));
+    geo.setAttribute(
+      "position",
+      new BufferAttribute(new Float32Array(positions), 3)
+    );
     geo.setAttribute("uv", new BufferAttribute(new Float32Array(uvs), 2));
-    geo.setAttribute("normal", new BufferAttribute(new Float32Array(normals), 3));
+    geo.setAttribute(
+      "normal",
+      new BufferAttribute(new Float32Array(normals), 3)
+    );
     geo.setIndex(indices);
     geo.computeBoundingSphere();
     return geo;
@@ -71,8 +77,9 @@
   const createRng = (s: number) => {
     let state = s;
     return () => {
+      // biome-ignore lint/suspicious/noBitwiseOperators: deterministic unsigned seed hashing.
       state = (state * 1_664_525 + 1_013_904_223) >>> 0;
-      return state / 0x100000000;
+      return state / 0x1_00_00_00_00;
     };
   };
 
@@ -92,10 +99,10 @@
       // simple noise-based density filter (patchy grass areas)
       const density =
         0.6 +
-        0.4 *
-          Math.sin(x * 0.12 + z * 0.17) *
-          Math.cos(x * 0.21 - z * 0.13);
-      if (rng() > density) continue;
+        0.4 * Math.sin(x * 0.12 + z * 0.17) * Math.cos(x * 0.21 - z * 0.13);
+      if (rng() > density) {
+        continue;
+      }
       // Check avoid list
       let skip = false;
       for (const av of avoid) {
@@ -106,7 +113,9 @@
           break;
         }
       }
-      if (skip) continue;
+      if (skip) {
+        continue;
+      }
       dummy.position.set(x, 0, z);
       dummy.rotation.set(0, rng() * Math.PI * 2, 0);
       const s = 0.9 + rng() * 0.6;
@@ -157,11 +166,13 @@
     for (let i = 0; i < pos.count; i++) {
       const y = pos.getY(i);
       const t = Math.max(0, Math.min(1, (y + 0.55) / 1.1));
-      const bloomNoise = Math.sin(i * 12.9898) * 43758.5453;
-      const isBloom = (bloomNoise - Math.floor(bloomNoise)) > 0.85 ? 1 : 0;
+      const bloomNoise = Math.sin(i * 12.9898) * 43_758.5453;
+      const isBloom = bloomNoise - Math.floor(bloomNoise) > 0.85 ? 1 : 0;
       for (let c = 0; c < 3; c++) {
         let v = base[c] * (1 - t) + tip[c] * t;
-        if (isBloom) v = v * 0.3 + bloom[c] * 0.8;
+        if (isBloom) {
+          v = v * 0.3 + bloom[c] * 0.8;
+        }
         colors[i * 3 + c] = v;
       }
     }
@@ -173,19 +184,16 @@
   bushMat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = grassUniforms.uTime;
     shader.vertexShader = shader.vertexShader
-      .replace(
-        "#include <common>",
-        "#include <common>\nuniform float uTime;"
-      )
+      .replace("#include <common>", "#include <common>\nuniform float uTime;")
       .replace(
         "#include <begin_vertex>",
         `#include <begin_vertex>
-         vec4 iw = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-         float seed = fract(sin(dot(iw.xz, vec2(12.9898, 78.233))) * 43758.5453);
-         float heightT = clamp(position.y + 0.5, 0.0, 1.0);
-         float sway = sin(uTime * 0.9 + seed * 6.28) * 0.09;
-         transformed.x += sway * heightT;
-         transformed.z += cos(uTime * 0.7 + seed * 6.28) * 0.06 * heightT;`
+           vec4 iw = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+           float seed = fract(sin(dot(iw.xz, vec2(12.9898, 78.233))) * 43758.5453);
+           float heightT = clamp(position.y + 0.5, 0.0, 1.0);
+           float sway = sin(uTime * 0.9 + seed * 6.28) * 0.09;
+           transformed.x += sway * heightT;
+           transformed.z += cos(uTime * 0.7 + seed * 6.28) * 0.06 * heightT;`
       );
   };
   bushMat.customProgramCacheKey = () => "overworld-bush-v2";
@@ -217,7 +225,9 @@
           break;
         }
       }
-      if (skip) continue;
+      if (skip) {
+        continue;
+      }
       dummy.position.set(x, 0.25, z);
       dummy.rotation.set(0, rng() * Math.PI * 2, 0);
       const sx = 0.9 + rng() * 1.1;

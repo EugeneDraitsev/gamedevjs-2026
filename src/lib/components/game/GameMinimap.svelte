@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { outsidePlan } from "$lib/game/outside-chunk-context";
   import { BIOME_COLORS, BIOME_ORDER } from "$lib/game/outside-chunk/types";
+  import { outsidePlan } from "$lib/game/outside-chunk-context";
   import { getRevealedDoors } from "$lib/game/scene-layout";
   import { getGameSceneContext } from "$lib/stores/scene-context";
 
@@ -26,7 +26,9 @@
   let outsideCanvas: HTMLCanvasElement | null = $state(null);
   const renderBiomeCanvas = (cv: HTMLCanvasElement) => {
     const ctx = cv.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
     const cols = plan.size.cols + 1;
     const rows = plan.size.rows + 1;
     cv.width = cols;
@@ -35,9 +37,9 @@
     for (let i = 0; i < cols * rows; i++) {
       const b = plan.grids.biome[i];
       const hex = BIOME_COLORS[BIOME_ORDER[b]];
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const bl = parseInt(hex.slice(5, 7), 16);
+      const r = Number.parseInt(hex.slice(1, 3), 16);
+      const g = Number.parseInt(hex.slice(3, 5), 16);
+      const bl = Number.parseInt(hex.slice(5, 7), 16);
       img.data[i * 4] = r;
       img.data[i * 4 + 1] = g;
       img.data[i * 4 + 2] = bl;
@@ -46,7 +48,9 @@
     ctx.putImageData(img, 0, 0);
   };
   $effect(() => {
-    if (outsideCanvas) renderBiomeCanvas(outsideCanvas);
+    if (outsideCanvas) {
+      renderBiomeCanvas(outsideCanvas);
+    }
   });
 
   // Convert world (x, z) → minimap percent [0..100] using chunk bounds
@@ -55,8 +59,10 @@
   const chunkY = (z: number) =>
     ((z + plan.size.depth * 0.5) / plan.size.depth) * 100;
 
-  const toPolyline = (points: Array<[number, number]>) =>
-    points.map(([x, z]) => `${chunkX(x).toFixed(1)},${chunkY(z).toFixed(1)}`).join(" ");
+  const toPolyline = (points: [number, number][]) =>
+    points
+      .map(([x, z]) => `${chunkX(x).toFixed(1)},${chunkY(z).toFixed(1)}`)
+      .join(" ");
 
   const toggleExpanded = () => {
     expanded = !expanded;
@@ -86,6 +92,7 @@
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
         >
+          <title>Outside routes</title>
           {#each plan.rivers as river, i (i)}
             <polyline
               class="mm-river"
@@ -249,8 +256,8 @@
     inset: 0;
     inline-size: 100%;
     block-size: 100%;
-    fill: none;
     pointer-events: none;
+    fill: none;
   }
 
   .outside-overlay .mm-river {

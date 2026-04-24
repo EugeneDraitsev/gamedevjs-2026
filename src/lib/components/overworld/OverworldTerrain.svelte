@@ -1,14 +1,14 @@
 <script lang="ts">
   import { T, useTask } from "@threlte/core";
   import { PlaneGeometry } from "three";
-  import OverworldTerrainCollider from "./OverworldTerrainCollider.svelte";
   import { createGroundMaterial } from "./materials/ground-material";
+  import OverworldTerrainCollider from "./OverworldTerrainCollider.svelte";
 
   interface Props {
-    radius?: number;
+    collider?: boolean;
     playableRadius?: number;
     playerPosition?: [number, number, number];
-    collider?: boolean;
+    radius?: number;
   }
 
   let {

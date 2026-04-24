@@ -1,16 +1,16 @@
-import { Color, DoubleSide, ShaderMaterial, type IUniform } from "three";
+import { Color, DoubleSide, type IUniform, ShaderMaterial } from "three";
 import { glslHash, glslSimplex2D, glslValueNoise } from "./shader-noise";
 
 export interface WaterMaterialUniforms {
-  uTime: IUniform<number>;
-  uDeepColor: IUniform<Color>;
-  uShallowColor: IUniform<Color>;
-  uFoamColor: IUniform<Color>;
   uAlgaeColor: IUniform<Color>;
-  uShoreRadius: IUniform<number>;
+  uDeepColor: IUniform<Color>;
+  uFoamColor: IUniform<Color>;
   uFoamEdge: IUniform<number>;
-  uUseShoreMask: IUniform<number>;
+  uShallowColor: IUniform<Color>;
+  uShoreRadius: IUniform<number>;
   uSunDir: IUniform<[number, number, number]>;
+  uTime: IUniform<number>;
+  uUseShoreMask: IUniform<number>;
 }
 
 const vertexShader = /* glsl */ `

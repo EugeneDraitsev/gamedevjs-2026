@@ -10,27 +10,43 @@
   const seed = "polygon-001";
   const layout = createOverworldLayout(seed);
 
-  const avoidList: Array<[number, number, number]> = [
+  const avoidList: [number, number, number][] = [
     ...layout.pois.map(
       (p) =>
-        [p.position[0], p.position[1], p.position[2]] as [number, number, number]
+        [p.position[0], p.position[1], p.position[2]] as [
+          number,
+          number,
+          number,
+        ]
     ),
     ...layout.chests.map(
       (c) =>
-        [c.position[0], c.position[1], c.position[2]] as [number, number, number]
+        [c.position[0], c.position[1], c.position[2]] as [
+          number,
+          number,
+          number,
+        ]
     ),
     ...layout.healthPickups.map(
       (p) =>
-        [p.position[0], p.position[1], p.position[2]] as [number, number, number]
+        [p.position[0], p.position[1], p.position[2]] as [
+          number,
+          number,
+          number,
+        ]
     ),
     ...layout.rivers.map(
       (r) =>
-        [r.position[0], r.position[1], r.position[2]] as [number, number, number]
+        [r.position[0], r.position[1], r.position[2]] as [
+          number,
+          number,
+          number,
+        ]
     ),
   ];
 
   const initialDpr =
-    typeof window !== "undefined" ? Math.min(2, window.devicePixelRatio) : 2;
+    typeof window === "undefined" ? 2 : Math.min(2, window.devicePixelRatio);
 </script>
 
 <svelte:head><title>Overworld preview</title></svelte:head>
@@ -61,16 +77,17 @@
   </Canvas>
 
   <div class="hint">
-    orbit: drag · zoom: scroll · pan: right-drag — post-apoc canyon overworld preview
+    orbit: drag · zoom: scroll · pan: right-drag — post-apoc canyon overworld
+    preview
   </div>
 </main>
 
 <style>
   :global(body) {
     margin: 0;
-    background: #040816;
-    color: #f4e8c7;
     font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    color: #f4e8c7;
+    background: #040816;
   }
   :global(html) {
     overflow: hidden;
@@ -89,14 +106,14 @@
     position: absolute;
     bottom: 1rem;
     left: 50%;
-    transform: translateX(-50%);
     padding: 0.45rem 0.9rem;
     font-size: 0.82rem;
     color: rgba(221, 205, 171, 0.72);
+    pointer-events: none;
     background: rgba(8, 12, 22, 0.66);
     border: 1px solid rgba(212, 190, 132, 0.2);
     border-radius: 0.6rem;
     backdrop-filter: blur(8px);
-    pointer-events: none;
+    transform: translateX(-50%);
   }
 </style>

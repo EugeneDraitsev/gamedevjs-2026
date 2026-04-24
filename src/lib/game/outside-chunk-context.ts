@@ -12,7 +12,9 @@ import type { OutsideChunkPlan } from "$lib/game/outside-chunk/types";
 let activeSeed = DEFAULT_CHUNK_CONFIG.seed;
 
 export const setOutsideChunkSeed = (seed: string) => {
-  if (!seed) return;
+  if (!seed) {
+    return;
+  }
   activeSeed = seed;
 };
 

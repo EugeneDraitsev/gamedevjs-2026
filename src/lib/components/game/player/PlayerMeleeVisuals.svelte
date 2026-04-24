@@ -29,6 +29,9 @@
   const trailLightIntensity = $derived(
     isSwingingVisual ? 6 * swingLingerFade : 0
   );
+  const trailVisibleOpacity = $derived(
+    isSwingingVisual ? 0.24 * swingLingerFade : 0
+  );
 </script>
 
 <T.Group
@@ -143,12 +146,13 @@
   rotation={[0, swingFacingYaw, 0]}
   renderOrder={28}
   frustumCulled={false}
+  visible={trailVisibleOpacity > 0.001}
 >
   <T.MeshBasicMaterial
     color="#eaffff"
     depthFunc={GreaterDepth}
     depthWrite={false}
-    opacity={0.24 * swingLingerFade}
+    opacity={trailVisibleOpacity}
     transparent
   />
 </T.Mesh>

@@ -1,7 +1,7 @@
 <script module lang="ts">
   import {
     BufferAttribute,
-    BufferGeometry,
+    type BufferGeometry,
     Color,
     ConeGeometry,
     CylinderGeometry,
@@ -19,12 +19,12 @@
   // The renderer below builds one InstancedMesh per part and pushes
   // matrices for every VegetationInstance of the matching kind.
   interface VegPart {
-    geometry: BufferGeometry;
-    material: MeshStandardMaterial;
-    localOffsetY: number;
-    localScaleY: number; // multiplied into the instance scale on Y
-    localScaleXZ: number;
     castShadow: boolean;
+    geometry: BufferGeometry;
+    localOffsetY: number;
+    localScaleXZ: number;
+    localScaleY: number; // multiplied into the instance scale on Y
+    material: MeshStandardMaterial;
     receiveShadow: boolean;
   }
 
@@ -59,7 +59,12 @@
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
     for (let i = 0; i < pos.count; i++) {
-      const v = axis === "x" ? pos.getX(i) : axis === "z" ? pos.getZ(i) : pos.getY(i);
+      let v = pos.getY(i);
+      if (axis === "x") {
+        v = pos.getX(i);
+      } else if (axis === "z") {
+        v = pos.getZ(i);
+      }
       const t = Math.max(0, Math.min(1, (v - axisMin) / (axisMax - axisMin)));
       colors[i * 3] = base[0] * (1 - t) + tip[0] * t;
       colors[i * 3 + 1] = base[1] * (1 - t) + tip[1] * t;
@@ -370,9 +375,15 @@
   const buildKindMeshes = (kind: VegetationKindId) => {
     const renderer = KIND_RENDERERS[kind];
     const instances = plan.vegetation.perKind[kind] ?? [];
-    if (!instances.length) return [] as InstancedMesh[];
+    if (!instances.length) {
+      return [] as InstancedMesh[];
+    }
     return renderer.parts.map((part) => {
-      const mesh = new InstancedMesh(part.geometry, part.material, instances.length);
+      const mesh = new InstancedMesh(
+        part.geometry,
+        part.material,
+        instances.length
+      );
       mesh.count = instances.length;
       mesh.castShadow = part.castShadow;
       mesh.receiveShadow = part.receiveShadow;

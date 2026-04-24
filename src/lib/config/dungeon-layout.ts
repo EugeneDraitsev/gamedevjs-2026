@@ -6,6 +6,11 @@ import {
   type DungeonRoomKind,
   roomTemplateById,
 } from "$lib/config/room-templates";
+import {
+  initialDungeonFloor,
+  normalizeRunFloorIndex,
+  outsideFloor,
+} from "$lib/config/run-floor";
 
 export type DungeonRoomDirection = "east" | "north" | "south" | "west";
 
@@ -69,7 +74,7 @@ const floor2NormalTemplateIds = [
 ] as const;
 
 const getCellKey = ([x, y]: [number, number]) => `${x}:${y}`;
-const dungeonFloorSeedSuffixPattern = /-f\d+$/;
+const dungeonFloorSeedSuffixPattern = /-f-?\d+$/;
 
 const createSeededRandom = (seed: string) => {
   let state =
@@ -97,7 +102,11 @@ const sampleUnique = <T>(items: T[], count: number, random: () => number) => {
   return picked;
 };
 
-export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
+export const createDungeonLayout = (
+  seed: string,
+  floor = initialDungeonFloor
+): DungeonLayout => {
+  const runFloor = normalizeRunFloorIndex(floor);
   const random = createSeededRandom(seed);
   const rewardRandom = createSeededRandom(
     seed.replace(dungeonFloorSeedSuffixPattern, "")
@@ -107,7 +116,7 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
     machineRewardModuleIds.length,
     rewardRandom
   );
-  const rewardOffset = (floor - 1) * 2;
+  const rewardOffset = (runFloor - initialDungeonFloor) * 2;
   const rooms: Record<string, DungeonRoom> = {};
   const occupied = new Map<string, string>();
   let roomIndex = 0;
@@ -153,14 +162,25 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
     right.exits[oppositeDirection[direction]] = left.id;
   };
 
+  if (runFloor === outsideFloor) {
+    const outside = createRoom("normal", [0, 0], "outside-start");
+
+    return {
+      floor: runFloor,
+      initialModules: [],
+      rooms,
+      seed,
+      startRoomId: outside.id,
+    };
+  }
+
   const normalTemplatePool =
-    floor === 1 ? floor1NormalTemplateIds : floor2NormalTemplateIds;
+    runFloor === initialDungeonFloor
+      ? floor1NormalTemplateIds
+      : floor2NormalTemplateIds;
   const sampleNormalTemplateId = () =>
     normalTemplatePool[Math.floor(random() * normalTemplatePool.length)];
-  const outside = createRoom("normal", [0, 1], "outside-start");
   const start = createRoom("polygon", [0, 0], "polygon-training");
-
-  connectRooms(outside, start, "north");
 
   const branches = sampleUnique(getFreeDirections(start.grid), 3, random).map(
     (direction) => {
@@ -176,7 +196,8 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
 
       for (
         let step = 0;
-        step < (floor === 1 ? 1 : 3) + Math.floor(random() * 2);
+        step <
+        (runFloor === initialDungeonFloor ? 1 : 3) + Math.floor(random() * 2);
         step += 1
       ) {
         const previous = rooms.at(-1) ?? firstRoom;
@@ -225,7 +246,7 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
       bossAnchor.grid[0] + bossDirection.dx,
       bossAnchor.grid[1] + bossDirection.dy,
     ],
-    floor === 1 ? "boss-warden" : "boss-bomber",
+    runFloor === initialDungeonFloor ? "boss-warden" : "boss-bomber",
     rewardModules[rewardOffset % rewardModules.length]
   );
 
@@ -255,10 +276,10 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
   connectRooms(treasureAnchor, treasure, treasureDirection.key);
 
   return {
-    floor,
+    floor: runFloor,
     initialModules: [],
     rooms,
     seed,
-    startRoomId: outside.id,
+    startRoomId: start.id,
   };
 };

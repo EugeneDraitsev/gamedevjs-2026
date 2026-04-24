@@ -3,17 +3,18 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import MainMenu from "$lib/components/app/MainMenu.svelte";
+  import { initialDungeonFloor } from "$lib/config/run-floor";
   import { loadRunSave } from "$lib/game/run-save";
 
   const seed = "polygon-001";
   let canResume = $state(false);
-  let floorIndex = $state(1);
+  let floorIndex = $state(initialDungeonFloor);
 
   onMount(() => {
     const savedRun = loadRunSave(seed);
 
     canResume = Boolean(savedRun);
-    floorIndex = savedRun?.floorIndex ?? 1;
+    floorIndex = savedRun?.floorIndex ?? initialDungeonFloor;
   });
 
   const withDebugParam = (path: string) => {

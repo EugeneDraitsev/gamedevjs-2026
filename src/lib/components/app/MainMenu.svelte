@@ -1,5 +1,6 @@
 <script lang="ts">
   import mainMenuArtUrl from "$lib/assets/main-menu-art-machine.png";
+  import { formatRunFloorLabel } from "$lib/config/run-floor";
 
   interface MainMenuProps {
     canResume: boolean;
@@ -43,7 +44,7 @@
           onclick={onContinue}
         >
           Continue Run
-          <small>Floor {floorIndex}</small>
+          <small>{formatRunFloorLabel(floorIndex)}</small>
         </button>
       {/if}
       <button type="button" class="menu-action" onclick={onPlay}>

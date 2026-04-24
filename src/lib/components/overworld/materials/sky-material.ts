@@ -1,14 +1,14 @@
-import { BackSide, Color, ShaderMaterial, type IUniform } from "three";
+import { BackSide, Color, type IUniform, ShaderMaterial } from "three";
 import { glslHash, glslSimplex2D, glslValueNoise } from "./shader-noise";
 
 export interface SkyMaterialUniforms {
-  uTime: IUniform<number>;
+  uCloudTint: IUniform<Color>;
   uHorizon: IUniform<Color>;
   uMid: IUniform<Color>;
-  uZenith: IUniform<Color>;
   uSunColor: IUniform<Color>;
   uSunDir: IUniform<[number, number, number]>;
-  uCloudTint: IUniform<Color>;
+  uTime: IUniform<number>;
+  uZenith: IUniform<Color>;
 }
 
 const vertexShader = /* glsl */ `

@@ -1,10 +1,6 @@
 <script lang="ts">
   import { useTask } from "@threlte/core";
   import { onMount } from "svelte";
-  import OverworldChestEntity from "./OverworldChest.svelte";
-  import OverworldHealthPickupEntity from "./OverworldHealthPickup.svelte";
-  import OverworldPoi from "./OverworldPoi.svelte";
-  import OverworldScenery from "./OverworldScenery.svelte";
   import {
     isInteractable,
     OVERWORLD_INTERACT_RADIUS,
@@ -14,6 +10,10 @@
   import { overworldState } from "$lib/stores/overworld-state.svelte";
   import { getGameSceneContext } from "$lib/stores/scene-context";
   import type { ActiveEnemy } from "$lib/types/game";
+  import OverworldChestEntity from "./OverworldChest.svelte";
+  import OverworldHealthPickupEntity from "./OverworldHealthPickup.svelte";
+  import OverworldPoi from "./OverworldPoi.svelte";
+  import OverworldScenery from "./OverworldScenery.svelte";
 
   interface Props {
     layout: OverworldLayout;
@@ -89,12 +89,16 @@
   });
 
   const handlePickupCollected = (id: string) => {
-    if (consumedPickupIds.has(id)) return;
+    if (consumedPickupIds.has(id)) {
+      return;
+    }
     consumedPickupIds = new Set([...consumedPickupIds, id]);
   };
 
   const handleChestOpened = (id: string) => {
-    if (openedChestIds.has(id)) return;
+    if (openedChestIds.has(id)) {
+      return;
+    }
     openedChestIds = new Set([...openedChestIds, id]);
   };
 
@@ -123,18 +127,38 @@
     }
   });
 
-  const avoidList = $derived<Array<[number, number, number]>>([
+  const avoidList = $derived<[number, number, number][]>([
     ...layout.pois.map(
-      (p) => [p.position[0], p.position[1], p.position[2]] as [number, number, number]
+      (p) =>
+        [p.position[0], p.position[1], p.position[2]] as [
+          number,
+          number,
+          number,
+        ]
     ),
     ...layout.chests.map(
-      (c) => [c.position[0], c.position[1], c.position[2]] as [number, number, number]
+      (c) =>
+        [c.position[0], c.position[1], c.position[2]] as [
+          number,
+          number,
+          number,
+        ]
     ),
     ...layout.healthPickups.map(
-      (p) => [p.position[0], p.position[1], p.position[2]] as [number, number, number]
+      (p) =>
+        [p.position[0], p.position[1], p.position[2]] as [
+          number,
+          number,
+          number,
+        ]
     ),
     ...layout.rivers.map(
-      (r) => [r.position[0], r.position[1], r.position[2]] as [number, number, number]
+      (r) =>
+        [r.position[0], r.position[1], r.position[2]] as [
+          number,
+          number,
+          number,
+        ]
     ),
   ]);
 </script>

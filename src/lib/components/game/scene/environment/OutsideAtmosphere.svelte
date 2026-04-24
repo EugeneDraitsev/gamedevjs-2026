@@ -9,10 +9,10 @@
   import { createGrassMaterial } from "$lib/components/overworld/materials/grass-material";
 
   interface Props {
-    grassCount?: number;
-    bounds?: { xMin: number; xMax: number; zMin: number; zMax: number };
     // positions that grass should avoid (roads, structures, water)
     avoid?: Array<{ x: number; z: number; r: number }>;
+    bounds?: { xMin: number; xMax: number; zMin: number; zMax: number };
+    grassCount?: number;
   }
 
   let {
@@ -67,8 +67,9 @@
   const createRng = (s: number) => {
     let state = s;
     return () => {
+      // biome-ignore lint/suspicious/noBitwiseOperators: deterministic unsigned seed hashing.
       state = (state * 1_664_525 + 1_013_904_223) >>> 0;
-      return state / 0x100000000;
+      return state / 0x1_00_00_00_00;
     };
   };
 
@@ -78,7 +79,7 @@
   grassMesh.frustumCulled = false;
 
   const setupGrass = () => {
-    const rng = createRng(13571);
+    const rng = createRng(13_571);
     const dummy = new Object3D();
     let placed = 0;
     const maxAttempts = grassCount * 4;
@@ -93,7 +94,9 @@
       const density =
         0.55 +
         0.45 * Math.sin(x * 0.11 + z * 0.16) * Math.cos(x * 0.19 - z * 0.11);
-      if (rng() > density) continue;
+      if (rng() > density) {
+        continue;
+      }
       // avoid roads, structures, water
       let skip = false;
       for (const a of avoid) {
@@ -104,7 +107,9 @@
           break;
         }
       }
-      if (skip) continue;
+      if (skip) {
+        continue;
+      }
       dummy.position.set(x, 0, z);
       dummy.rotation.set(0, rng() * Math.PI * 2, 0);
       const s = 0.45 + rng() * 0.35;

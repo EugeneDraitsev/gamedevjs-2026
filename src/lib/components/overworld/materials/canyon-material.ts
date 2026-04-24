@@ -1,13 +1,13 @@
-import { Color, DoubleSide, MeshStandardMaterial, type IUniform } from "three";
+import { Color, DoubleSide, type IUniform, MeshStandardMaterial } from "three";
 import { glslHash, glslSimplex2D, glslValueNoise } from "./shader-noise";
 
 export interface CanyonMaterialUniforms {
-  uRockLow: IUniform<Color>;
-  uRockHigh: IUniform<Color>;
-  uRust: IUniform<Color>;
-  uMoss: IUniform<Color>;
-  uWallHeight: IUniform<number>;
   uInnerRadius: IUniform<number>;
+  uMoss: IUniform<Color>;
+  uRockHigh: IUniform<Color>;
+  uRockLow: IUniform<Color>;
+  uRust: IUniform<Color>;
+  uWallHeight: IUniform<number>;
 }
 
 export const createCanyonMaterial = (): {
@@ -24,7 +24,7 @@ export const createCanyonMaterial = (): {
   };
 
   const material = new MeshStandardMaterial({
-    color: 0xffffff,
+    color: 0xff_ff_ff,
     roughness: 0.96,
     metalness: 0.08,
     side: DoubleSide,

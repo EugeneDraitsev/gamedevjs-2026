@@ -4,11 +4,11 @@
   import { Color, MeshStandardMaterial } from "three";
 
   interface Props {
-    seed?: number;
+    avoid?: [number, number, number][];
+    avoidRadius?: number;
     count?: number;
     playableRadius?: number;
-    avoid?: Array<[number, number, number]>;
-    avoidRadius?: number;
+    seed?: number;
   }
 
   let {
@@ -22,8 +22,9 @@
   const createRng = (s: number) => {
     let state = s;
     return () => {
+      // biome-ignore lint/suspicious/noBitwiseOperators: deterministic unsigned seed hashing.
       state = (state * 1_103_515_245 + 12_345) >>> 0;
-      return state / 0x100000000;
+      return state / 0x1_00_00_00_00;
     };
   };
 
@@ -31,14 +32,14 @@
   interface Ruin {
     id: string;
     kind: RuinKind;
-    x: number;
-    z: number;
-    y: number;
+    material: MeshStandardMaterial;
     rotY: number;
+    rust: number;
     scale: number;
     tilt: number;
-    rust: number;
-    matIdx: number;
+    x: number;
+    y: number;
+    z: number;
   }
 
   // Pre-build a few material variants shared across ruins
@@ -67,18 +68,18 @@
         .replace(
           "#include <color_fragment>",
           /* glsl */ `
-          #include <color_fragment>
-          vec3 rustA = vec3(0.42, 0.22, 0.12);
-          vec3 rustB = vec3(0.25, 0.13, 0.07);
-          vec3 mossC = vec3(0.22, 0.36, 0.14);
-          float stripe = abs(sin(vLocalPos.y * 6.0 + vLocalPos.x * 1.5));
-          float rustMask = mix(0.4, 1.0, stripe) * uRust;
-          float moss = smoothstep(-0.4, -1.0, vLocalPos.y) * 0.8;
-          vec3 col = mix(diffuseColor.rgb, rustA, rustMask * 0.85);
-          col = mix(col, rustB, rustMask * 0.35);
-          col = mix(col, mossC, moss * 0.7);
-          diffuseColor.rgb = col;
-          `
+            #include <color_fragment>
+            vec3 rustA = vec3(0.42, 0.22, 0.12);
+            vec3 rustB = vec3(0.25, 0.13, 0.07);
+            vec3 mossC = vec3(0.22, 0.36, 0.14);
+            float stripe = abs(sin(vLocalPos.y * 6.0 + vLocalPos.x * 1.5));
+            float rustMask = mix(0.4, 1.0, stripe) * uRust;
+            float moss = smoothstep(-0.4, -1.0, vLocalPos.y) * 0.8;
+            vec3 col = mix(diffuseColor.rgb, rustA, rustMask * 0.85);
+            col = mix(col, rustB, rustMask * 0.35);
+            col = mix(col, mossC, moss * 0.7);
+            diffuseColor.rgb = col;
+            `
         )
         .replace(
           "#include <roughnessmap_fragment>",
@@ -121,7 +122,10 @@
           break;
         }
       }
-      if (skip) continue;
+      if (skip) {
+        continue;
+      }
+      const material = sharedMats[Math.floor(rng() * sharedMats.length)];
       out.push({
         id: `ruin-${out.length}`,
         kind: kinds[Math.floor(rng() * kinds.length)],
@@ -132,7 +136,7 @@
         scale: 0.8 + rng() * 1.3,
         tilt: (rng() - 0.5) * 0.6,
         rust: 0.35 + rng() * 0.45,
-        matIdx: Math.floor(rng() * sharedMats.length),
+        material,
       });
     }
     return out;
@@ -140,19 +144,25 @@
 </script>
 
 {#each ruins as ruin (ruin.id)}
-  {@const mat = sharedMats[ruin.matIdx]}
   <T.Group
     position={[ruin.x, ruin.y, ruin.z]}
     rotation={[ruin.tilt, ruin.rotY, ruin.tilt * 0.3]}
   >
     {#if ruin.kind === "pipe"}
-      <T.Mesh castShadow receiveShadow scale={[ruin.scale, ruin.scale, ruin.scale]}>
+      <T.Mesh
+        castShadow
+        receiveShadow
+        scale={[ruin.scale, ruin.scale, ruin.scale]}
+      >
         <T.CylinderGeometry args={[0.55, 0.6, 3.2, 14, 1, true]} />
-        <T is={mat} attach="material" />
+        <T is={ruin.material} attach="material" />
       </T.Mesh>
-      <T.Mesh position={[0, 1.35, 0]} scale={[ruin.scale, ruin.scale, ruin.scale]}>
+      <T.Mesh
+        position={[0, 1.35, 0]}
+        scale={[ruin.scale, ruin.scale, ruin.scale]}
+      >
         <T.TorusGeometry args={[0.6, 0.12, 8, 20]} />
-        <T is={mat} attach="material" />
+        <T is={ruin.material} attach="material" />
       </T.Mesh>
       <RigidBody type="fixed">
         <Collider shape="cylinder" args={[1.6, 0.6 * ruin.scale]} />
@@ -165,7 +175,7 @@
         rotation={[Math.PI / 2, 0, 0]}
       >
         <T.TorusGeometry args={[1.3, 0.45, 6, 14]} />
-        <T is={mat} attach="material" />
+        <T is={ruin.material} attach="material" />
       </T.Mesh>
       <T.Mesh
         castShadow
@@ -173,15 +183,22 @@
         scale={[ruin.scale, ruin.scale, ruin.scale]}
       >
         <T.TorusGeometry args={[0.4, 0.15, 4, 8]} />
-        <T is={mat} attach="material" />
+        <T is={ruin.material} attach="material" />
       </T.Mesh>
       <RigidBody type="fixed">
-        <Collider shape="cylinder" args={[0.5 * ruin.scale, 1.7 * ruin.scale]} />
+        <Collider
+          shape="cylinder"
+          args={[0.5 * ruin.scale, 1.7 * ruin.scale]}
+        />
       </RigidBody>
     {:else if ruin.kind === "slab"}
-      <T.Mesh castShadow receiveShadow scale={[ruin.scale, ruin.scale, ruin.scale]}>
+      <T.Mesh
+        castShadow
+        receiveShadow
+        scale={[ruin.scale, ruin.scale, ruin.scale]}
+      >
         <T.BoxGeometry args={[2.6, 0.5, 1.5]} />
-        <T is={mat} attach="material" />
+        <T is={ruin.material} attach="material" />
       </T.Mesh>
       {#each Array.from({ length: 3 }) as _, j (j)}
         <T.Mesh position={[-1 + j * 1, 0.8, 0.1]}>
@@ -190,19 +207,32 @@
         </T.Mesh>
       {/each}
       <RigidBody type="fixed">
-        <Collider shape="cuboid" args={[1.3 * ruin.scale, 0.25 * ruin.scale, 0.75 * ruin.scale]} />
+        <Collider
+          shape="cuboid"
+          args={[1.3 * ruin.scale, 0.25 * ruin.scale, 0.75 * ruin.scale]}
+        />
       </RigidBody>
     {:else}
-      <T.Mesh castShadow receiveShadow scale={[ruin.scale, ruin.scale, ruin.scale]}>
+      <T.Mesh
+        castShadow
+        receiveShadow
+        scale={[ruin.scale, ruin.scale, ruin.scale]}
+      >
         <T.CylinderGeometry args={[0.7, 0.75, 1.5, 18]} />
-        <T is={mat} attach="material" />
+        <T is={ruin.material} attach="material" />
       </T.Mesh>
-      <T.Mesh position={[0, 0.78, 0]} scale={[ruin.scale, ruin.scale, ruin.scale]}>
+      <T.Mesh
+        position={[0, 0.78, 0]}
+        scale={[ruin.scale, ruin.scale, ruin.scale]}
+      >
         <T.TorusGeometry args={[0.72, 0.06, 6, 20]} />
-        <T is={mat} attach="material" />
+        <T is={ruin.material} attach="material" />
       </T.Mesh>
       <RigidBody type="fixed">
-        <Collider shape="cylinder" args={[0.75 * ruin.scale, 0.78 * ruin.scale]} />
+        <Collider
+          shape="cylinder"
+          args={[0.75 * ruin.scale, 0.78 * ruin.scale]}
+        />
       </RigidBody>
     {/if}
   </T.Group>

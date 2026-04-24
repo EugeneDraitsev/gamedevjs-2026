@@ -13,27 +13,27 @@
 // breaking the roll-ball character), while water and platform stones
 // give verticality and natural obstacles.
 
-import { fbm2, makeNoise2D, ridged2 } from "./rng";
+import { makeNoise2D, ridged2 } from "./rng";
 import type { ChunkSize } from "./types";
 
 export interface HeightmapParams {
-  seedHash: number;
-  size: ChunkSize;
-  playableHalfWidth: number; // world units — flat zone half-extent X
-  playableHalfDepth: number; // world units — flat zone half-extent Z
   groundY: number; // flat walkable height
   mountainPeakHeight: number; // canyon rim amplitude
-  transitionBand: number; // distance over which flat → mountain ramp
   platformDensity: number; // 0..1 probability-like knob
   platformPeakHeight: number; // max local rise for a platform
+  playableHalfDepth: number; // world units — flat zone half-extent Z
+  playableHalfWidth: number; // world units — flat zone half-extent X
+  seedHash: number;
+  size: ChunkSize;
+  transitionBand: number; // distance over which flat → mountain ramp
 }
 
 export interface HeightmapResult {
   height: Float32Array;
-  slope: Float32Array;
   // Mask: 1 inside playable zone, 0 outside. Roads / scatter / POIs
   // consult this so they stay on flat ground.
   playable: Uint8Array;
+  slope: Float32Array;
 }
 
 const cellToWorld = (size: ChunkSize, col: number, row: number) => {
@@ -42,13 +42,18 @@ const cellToWorld = (size: ChunkSize, col: number, row: number) => {
   return { x, z };
 };
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: height generation keeps terrain bands, ramps, and slope sampling together.
 export const buildHeightmap = (p: HeightmapParams): HeightmapResult => {
   const { size, mountainPeakHeight, transitionBand } = p;
   const nBase = makeNoise2D(p.seedHash);
-  const nWarp = makeNoise2D(p.seedHash ^ 0x1a2b3c4d);
-  const nRidge = makeNoise2D(p.seedHash ^ 0xdeadbeef);
-  const nAxis = makeNoise2D(p.seedHash ^ 0xcafebabe);
-  const nPlatform = makeNoise2D(p.seedHash ^ 0x9c1fca2e);
+  // biome-ignore lint/suspicious/noBitwiseOperators: deterministic seed mixing for independent terrain noise fields.
+  const nWarp = makeNoise2D(p.seedHash ^ 0x1a_2b_3c_4d);
+  // biome-ignore lint/suspicious/noBitwiseOperators: deterministic seed mixing for independent terrain noise fields.
+  const nRidge = makeNoise2D(p.seedHash ^ 0xde_ad_be_ef);
+  // biome-ignore lint/suspicious/noBitwiseOperators: deterministic seed mixing for independent terrain noise fields.
+  const nAxis = makeNoise2D(p.seedHash ^ 0xca_fe_ba_be);
+  // biome-ignore lint/suspicious/noBitwiseOperators: deterministic seed mixing for independent terrain noise fields.
+  const nPlatform = makeNoise2D(p.seedHash ^ 0x9c_1f_ca_2e);
 
   const stride = size.cols + 1;
   const totalVerts = (size.cols + 1) * (size.rows + 1);
@@ -71,7 +76,9 @@ export const buildHeightmap = (p: HeightmapParams): HeightmapResult => {
 
       const t = insideT(x, z); // <1 inside, >1 outside
       const inside = t < 1;
-      if (inside) playable[idx] = 1;
+      if (inside) {
+        playable[idx] = 1;
+      }
 
       // --- Platform stones — Poisson-like via noise peaks ---
       // Only raise the ground where nPlatform peaks above a threshold.
@@ -83,7 +90,7 @@ export const buildHeightmap = (p: HeightmapParams): HeightmapResult => {
       const platformMask = Math.max(0, pNoise - (1 - p.platformDensity));
       const platformShape =
         platformMask > 0
-          ? Math.pow(platformMask / Math.max(0.0001, p.platformDensity), 1.5)
+          ? (platformMask / Math.max(0.0001, p.platformDensity)) ** 1.5
           : 0;
       const platformH = platformShape * p.platformPeakHeight;
 
@@ -97,7 +104,7 @@ export const buildHeightmap = (p: HeightmapParams): HeightmapResult => {
         const tBand = Math.min(1, (t - 1) / transitionBand);
         // Steep-ish ramp so walls read as cliffs, softened by an
         // along-perimeter undulation so it's not a clean box.
-        const ramp = Math.pow(tBand, 0.45);
+        const ramp = tBand ** 0.45;
 
         // Domain-warped ridged noise for actual rocky silhouette
         const wx = x + nWarp(x * 0.03, z * 0.03) * 4;
@@ -113,7 +120,7 @@ export const buildHeightmap = (p: HeightmapParams): HeightmapResult => {
         // Blend between flat edge and mountain to avoid a visible
         // step right at the zone boundary.
         const flatEdge = p.groundY + platformH;
-        const mixT = Math.pow(Math.min(1, (t - 1) / 0.18), 1.2);
+        const mixT = Math.min(1, (t - 1) / 0.18) ** 1.2;
         groundH = flatEdge * (1 - mixT) + mountainH * mixT;
       }
 

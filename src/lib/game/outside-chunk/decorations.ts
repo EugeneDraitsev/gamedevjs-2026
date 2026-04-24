@@ -5,31 +5,34 @@
 // + what. Spacing is enforced with a simple grid-hash so we don't get
 // clumps on top of each other.
 
-import { biomeIndex, type ChunkDecoration, type ChunkSize } from "./types";
 import { cellToWorld } from "./heightmap";
 import { createRng } from "./rng";
+import { biomeIndex, type ChunkDecoration, type ChunkSize } from "./types";
 
 export interface DecorationParams {
-  size: ChunkSize;
-  height: Float32Array;
   biome: Uint8Array;
-  playable: Uint8Array;
-  seedHash: number;
-  minTreeSpacing: number; // world units
+  height: Float32Array;
   minBushSpacing: number;
   minRockSpacing: number;
+  minTreeSpacing: number; // world units
+  playable: Uint8Array;
+  seedHash: number;
+  size: ChunkSize;
 }
 
 export interface DecorationResult {
-  trees: ChunkDecoration[];
   bushes: ChunkDecoration[];
   rocks: ChunkDecoration[];
+  trees: ChunkDecoration[];
 }
 
 // Occupancy grid keyed by world position, coarse cells to keep min-distance.
 class OccupancyGrid {
-  private cells = new Map<string, [number, number][]>();
-  constructor(private cellSize: number) {}
+  private readonly cells = new Map<string, [number, number][]>();
+  private readonly cellSize: number;
+  constructor(cellSize: number) {
+    this.cellSize = cellSize;
+  }
   private key(x: number, z: number) {
     return `${Math.floor(x / this.cellSize)}|${Math.floor(z / this.cellSize)}`;
   }
@@ -40,9 +43,13 @@ class OccupancyGrid {
     for (let dz = -r; dz <= r; dz++) {
       for (let dx = -r; dx <= r; dx++) {
         const list = this.cells.get(`${cx + dx}|${cz + dz}`);
-        if (!list) continue;
+        if (!list) {
+          continue;
+        }
         for (const [ox, oz] of list) {
-          if ((x - ox) ** 2 + (z - oz) ** 2 < minDist * minDist) return false;
+          if ((x - ox) ** 2 + (z - oz) ** 2 < minDist * minDist) {
+            return false;
+          }
         }
       }
     }
@@ -54,6 +61,7 @@ class OccupancyGrid {
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: scatter rules are intentionally kept together so biome probabilities are easy to tune.
 export const buildDecorations = (p: DecorationParams): DecorationResult => {
   const { size, height, biome, seedHash } = p;
   const cols = size.cols + 1;
@@ -72,20 +80,26 @@ export const buildDecorations = (p: DecorationParams): DecorationResult => {
   const occRock = new OccupancyGrid(p.minRockSpacing);
 
   // Walk cells in a seeded order so deterministic across runs.
-  const rng = createRng(seedHash ^ 0x55aa55aa);
+  // biome-ignore lint/suspicious/noBitwiseOperators: deterministic seed mixing for procedural scatter.
+  const rng = createRng(seedHash ^ 0x55_aa_55_aa);
 
   for (let row = 0; row <= size.rows; row++) {
     for (let col = 0; col <= size.cols; col++) {
       const idx = row * stride + col;
-      if (!p.playable[idx]) continue;
+      if (!p.playable[idx]) {
+        continue;
+      }
       const b = biome[idx];
       const { x, z } = cellToWorld(size, col, row);
       const y = height[idx];
 
       // Tree probability: high in forest, medium in grass, zero elsewhere
       let pTree = 0;
-      if (b === forest) pTree = 0.16;
-      else if (b === grass) pTree = 0.05;
+      if (b === forest) {
+        pTree = 0.16;
+      } else if (b === grass) {
+        pTree = 0.05;
+      }
       if (pTree > 0 && rng() < pTree) {
         const jx = x + (rng() - 0.5) * 1.4;
         const jz = z + (rng() - 0.5) * 1.4;
@@ -104,9 +118,13 @@ export const buildDecorations = (p: DecorationParams): DecorationResult => {
 
       // Bush probability: high in grass + bank, some in forest
       let pBush = 0;
-      if (b === grass) pBush = 0.09;
-      else if (b === bank) pBush = 0.08;
-      else if (b === forest) pBush = 0.05;
+      if (b === grass) {
+        pBush = 0.09;
+      } else if (b === bank) {
+        pBush = 0.08;
+      } else if (b === forest) {
+        pBush = 0.05;
+      }
       if (pBush > 0 && rng() < pBush) {
         const jx = x + (rng() - 0.5) * 1.1;
         const jz = z + (rng() - 0.5) * 1.1;
@@ -125,8 +143,11 @@ export const buildDecorations = (p: DecorationParams): DecorationResult => {
 
       // Rocks: scree + cliff foot. Sparse.
       let pRock = 0;
-      if (b === scree) pRock = 0.12;
-      else if (b === bank) pRock = 0.03;
+      if (b === scree) {
+        pRock = 0.12;
+      } else if (b === bank) {
+        pRock = 0.03;
+      }
       if (pRock > 0 && rng() < pRock) {
         const jx = x + (rng() - 0.5) * 0.8;
         const jz = z + (rng() - 0.5) * 0.8;

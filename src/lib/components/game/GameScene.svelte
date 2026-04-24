@@ -20,13 +20,13 @@
   import GameSceneEnvironment from "$lib/components/game/scene/GameSceneEnvironment.svelte";
   import { roomTemplateById } from "$lib/config/room-templates";
   import { stepEnemies } from "$lib/game/enemy-stepper";
-  import { setOutsideChunkSeed } from "$lib/game/outside-chunk-context";
   import {
     applyMeleeDeflects,
     applyMeleeHitsToBombs,
     applyMeleeHitsToEnemies,
     handleMeleeFrame,
   } from "$lib/game/melee-resolver";
+  import { setOutsideChunkSeed } from "$lib/game/outside-chunk-context";
   import { spawnPlayerProjectile } from "$lib/game/projectile-spawner";
   import {
     handlePlayerPositionChange,
@@ -65,6 +65,7 @@
     meleeTrailSettings,
     onAdvanceFloor,
     onCollectArtifact,
+    onEndDemo,
     onGearCountChange,
     onOpenSettings,
     onOpenWeaponLab,
@@ -96,6 +97,7 @@
   let perspectiveCamera = $state<PerspectiveCamera>();
   let sunLight = $state<DirectionalLight>();
   let enemySpawnPending = $state(false);
+  let endDemoTriggered = $state(false);
   const sceneCamera = $derived(
     scene.settings.cameraOrthographic ? orthographicCamera : perspectiveCamera
   );
@@ -159,6 +161,7 @@
       combat.resetForFloor();
       pickups.clear();
       room.resetForFloor(startRoomId);
+      endDemoTriggered = false;
       if (startRoom.templateId === "outside-start") {
         pickups.seedRoom(startRoomId, createOutsidePickups(performance.now()));
       }
@@ -284,6 +287,11 @@
 
     if (pickupResult.healthDelta > 0) {
       player.health = pickupResult.nextHealth;
+      combat.popHeal(pickupResult.healthDelta, [
+        position[0],
+        position[1] + 1.05,
+        position[2],
+      ]);
     }
 
     if (pickupResult.gearDelta > 0) {
@@ -305,13 +313,23 @@
 
     if (
       scene.floorExitReady &&
-      scene.dungeon.floor === 1 &&
+      scene.dungeon.floor < 0 &&
       scene.currentRoom.kind === "boss" &&
       !scene.currentArtifactType &&
       Math.abs(position[0]) < floorExitTriggerHalfWidth &&
       position[2] < floorExitTriggerZ
     ) {
       onAdvanceFloor?.();
+    }
+
+    if (
+      !endDemoTriggered &&
+      scene.currentRoomTemplate.layout === "outside-yard" &&
+      Math.abs(position[0]) < 5 &&
+      position[2] < -scene.roomBounds.transitionInsetZ
+    ) {
+      endDemoTriggered = true;
+      onEndDemo?.();
     }
   };
 
@@ -484,7 +502,9 @@
         outside ? 0.95 : scene.settings.hemisphereLightIntensity,
       ]}
     />
-    <T.AmbientLight intensity={outside ? 0.42 : scene.settings.ambientLightIntensity} />
+    <T.AmbientLight
+      intensity={outside ? 0.42 : scene.settings.ambientLightIntensity}
+    />
     <T.DirectionalLight
       bind:ref={sunLight}
       castShadow

@@ -20,62 +20,62 @@ export type BiomeId =
   | "road";
 
 export interface ChunkSize {
-  width: number; // world units along X
-  depth: number; // world units along Z
   cols: number; // grid columns (cell = width / cols units)
+  depth: number; // world units along Z
   rows: number; // grid rows
+  width: number; // world units along X
 }
 
 export interface ChunkGrids {
+  biome: Uint8Array; // indices into BIOME_ORDER
+  flow: Float32Array; // water accumulation
   // Per-cell (row-major) arrays
   height: Float32Array;
-  slope: Float32Array;
-  flow: Float32Array; // water accumulation
-  biome: Uint8Array; // indices into BIOME_ORDER
-  // Mask of cells that have been carved by a river (1) or flooded (2)
-  water: Uint8Array;
   // 1 where the player can actually be (flat zone), 0 on mountains.
   playable: Uint8Array;
   // Road cost grid used by A* (higher = worse to traverse)
   roadCost: Float32Array;
+  slope: Float32Array;
+  // Mask of cells that have been carved by a river (1) or flooded (2)
+  water: Uint8Array;
 }
 
 export interface PolyPath {
   // World-space (x, z) points along the path
-  points: Array<[number, number]>;
+  points: [number, number][];
   widthHalf: number;
 }
 
 export interface ChunkFeature {
   id: string;
   kind: "camp" | "shrine" | "landmark" | "lookout";
-  x: number;
-  z: number;
-  y: number;
-  rotationY: number;
   reason: string; // why this landmark exists (debug)
+  rotationY: number;
+  x: number;
+  y: number;
+  z: number;
 }
 
 export interface ChunkDecoration {
   id: string;
-  x: number;
-  z: number;
-  y: number;
-  scale: number;
   rotationY: number;
+  scale: number;
   variant: number;
+  x: number;
+  y: number;
+  z: number;
 }
 
 export interface EnemySpawn {
   id: string;
+  patrolRadius: number;
+  // If this is a guard attached to a POI, this is the POI's id
+  poiId?: string;
+  // How aggressive a guard is vs. a casual wanderer
+  role: "guard" | "wanderer";
   x: number;
   y: number;
   z: number;
-  // How aggressive a guard is vs. a casual wanderer
-  role: "guard" | "wanderer";
-  // If this is a guard attached to a POI, this is the POI's id
-  poiId?: string;
-  patrolRadius: number;
 }
 
 export type VegetationKindId =
@@ -90,45 +90,45 @@ export type VegetationKindId =
   | "rock-lg";
 
 export interface VegetationColliderSpec {
-  shape: "cylinder" | "ball";
-  radius: number;
   height?: number;
+  radius: number;
+  shape: "cylinder" | "ball";
   yOffset?: number;
 }
 
 export interface VegetationInstance {
+  biome: BiomeId;
+  collider?: VegetationColliderSpec;
   id: string;
   kind: VegetationKindId;
-  x: number;
-  y: number;
-  z: number;
   rotationY: number;
   scale: number;
   variant: number;
-  biome: BiomeId;
-  collider?: VegetationColliderSpec;
+  x: number;
+  y: number;
+  z: number;
 }
 
 export interface OutsideChunkPlan {
-  seed: string;
-  size: ChunkSize;
+  enemySpawns: EnemySpawn[];
   grids: ChunkGrids;
+  isUnderwater(x: number, z: number): boolean;
+  pois: ChunkFeature[];
   rivers: PolyPath[];
   roads: PolyPath[];
+  sampleBiome(x: number, z: number): BiomeId;
+  // Sampling helpers bound to this plan's heightmap — reading a
+  // continuous height anywhere in world space via bilinear lerp.
+  sampleHeight(x: number, z: number): number;
+  seed: string;
+  size: ChunkSize;
   spawn: [number, number, number];
-  pois: ChunkFeature[];
-  enemySpawns: EnemySpawn[];
   // Vegetation is grouped by kind so the renderer can make one
   // InstancedMesh per kind and spawn colliders for the heavy stuff.
   vegetation: {
     instances: VegetationInstance[];
     perKind: Record<VegetationKindId, VegetationInstance[]>;
   };
-  // Sampling helpers bound to this plan's heightmap — reading a
-  // continuous height anywhere in world space via bilinear lerp.
-  sampleHeight(x: number, z: number): number;
-  sampleBiome(x: number, z: number): BiomeId;
-  isUnderwater(x: number, z: number): boolean;
 }
 
 export const BIOME_ORDER: BiomeId[] = [

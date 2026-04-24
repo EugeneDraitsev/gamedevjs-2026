@@ -1,12 +1,12 @@
-import { Color, DoubleSide, MeshStandardMaterial, type IUniform } from "three";
+import { Color, DoubleSide, type IUniform, MeshStandardMaterial } from "three";
 import { glslHash, glslSimplex2D } from "./shader-noise";
 
 export interface GrassMaterialUniforms {
+  uBaseColor: IUniform<Color>;
   uTime: IUniform<number>;
+  uTipColor: IUniform<Color>;
   uWindDir: IUniform<[number, number]>;
   uWindStrength: IUniform<number>;
-  uTipColor: IUniform<Color>;
-  uBaseColor: IUniform<Color>;
 }
 
 export const createGrassMaterial = (opts?: {
@@ -26,7 +26,7 @@ export const createGrassMaterial = (opts?: {
   };
 
   const material = new MeshStandardMaterial({
-    color: 0xffffff,
+    color: 0xff_ff_ff,
     roughness: 0.92,
     metalness: 0.0,
     side: DoubleSide,

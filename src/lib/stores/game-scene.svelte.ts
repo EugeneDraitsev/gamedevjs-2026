@@ -27,6 +27,7 @@ import {
   getMinimapBounds,
   projectDamagePopups,
   renderDeflectBursts,
+  renderHealBursts,
 } from "$lib/game/scene-ui";
 import { CombatStore } from "$lib/stores/combat.svelte";
 import { CrosshairStore } from "$lib/stores/crosshair.svelte";
@@ -197,6 +198,9 @@ export class GameSceneStore {
   readonly deflectBurstsRendered = $derived(
     renderDeflectBursts(this.combat.deflectBursts, this.timing.now)
   );
+  readonly healBurstsRendered = $derived(
+    renderHealBursts(this.combat.healBursts, this.timing.now)
+  );
   readonly overlays = $derived.by<SceneOverlayProps>(() => ({
     animationNow: this.timing.now,
     artifactPickupAt: this.timing.pickedArtifactAt,
@@ -245,7 +249,7 @@ export class GameSceneStore {
   );
   readonly floorExitOpenAmount = $derived.by(() => {
     if (
-      this.dungeon.floor !== 1 ||
+      this.dungeon.floor >= 0 ||
       this.currentRoom.kind !== "boss" ||
       !this.room.clearedSet.has(this.currentRoom.id)
     ) {
@@ -269,7 +273,7 @@ export class GameSceneStore {
     );
   });
   readonly floorExitActive = $derived(
-    this.dungeon.floor === 1 && this.currentRoom.kind === "boss"
+    this.dungeon.floor < 0 && this.currentRoom.kind === "boss"
   );
   readonly floorExitReady = $derived(this.floorExitOpenAmount >= 0.98);
   readonly activeEnemyTargets = $derived(

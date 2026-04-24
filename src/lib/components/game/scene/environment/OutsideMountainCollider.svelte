@@ -29,18 +29,12 @@
 {#each bricks as brick (brick.id)}
   <T.Group position={[wallX, wallHeight / 2, brick.z]}>
     <RigidBody type="fixed">
-      <Collider
-        shape="cuboid"
-        args={[0.6, wallHeight / 2, brickLen * 0.6]}
-      />
+      <Collider shape="cuboid" args={[0.6, wallHeight / 2, brickLen * 0.6]} />
     </RigidBody>
   </T.Group>
   <T.Group position={[-wallX, wallHeight / 2, brick.z]}>
     <RigidBody type="fixed">
-      <Collider
-        shape="cuboid"
-        args={[0.6, wallHeight / 2, brickLen * 0.6]}
-      />
+      <Collider shape="cuboid" args={[0.6, wallHeight / 2, brickLen * 0.6]} />
     </RigidBody>
   </T.Group>
 {/each}

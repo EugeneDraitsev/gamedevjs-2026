@@ -1,21 +1,21 @@
 <script lang="ts">
   import { T } from "@threlte/core";
+  import {
+    OVERWORLD_SEA_INNER_RADIUS,
+    OVERWORLD_SEA_OUTER_RADIUS,
+    type OverworldLayout,
+  } from "$lib/config/overworld-layout";
   import OverworldCanyon from "./OverworldCanyon.svelte";
   import OverworldFlora from "./OverworldFlora.svelte";
   import OverworldRuins from "./OverworldRuins.svelte";
   import OverworldSky from "./OverworldSky.svelte";
   import OverworldTerrain from "./OverworldTerrain.svelte";
   import OverworldWater from "./OverworldWater.svelte";
-  import {
-    OVERWORLD_SEA_INNER_RADIUS,
-    OVERWORLD_SEA_OUTER_RADIUS,
-    type OverworldLayout,
-  } from "$lib/config/overworld-layout";
 
   interface Props {
+    avoidList?: [number, number, number][];
     layout: OverworldLayout;
     playerPosition?: [number, number, number];
-    avoidList?: Array<[number, number, number]>;
     withColliders?: boolean;
   }
 

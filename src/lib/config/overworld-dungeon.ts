@@ -1,5 +1,4 @@
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
-import { OVERWORLD_PLAYABLE_RADIUS } from "$lib/config/overworld-layout";
 
 export const OVERWORLD_ROOM_ID = "overworld";
 export const OVERWORLD_TEMPLATE_ID = "overworld-arena";

@@ -10,6 +10,9 @@
   } = $props();
 
   const active = $derived(phase !== "idle");
+  const nextFloorLabel = $derived(
+    nextFloor === 0 ? "OUTSIDE" : `FLOOR ${nextFloor}`
+  );
 </script>
 
 <div
@@ -29,8 +32,8 @@
     <div class="aperture-core"></div>
   </div>
   <div class="readout">
-    <span>DESCENT</span>
-    <strong>FLOOR {nextFloor}</strong>
+    <span>ASCENT</span>
+    <strong>{nextFloorLabel}</strong>
   </div>
   <div class="scan"></div>
 </div>

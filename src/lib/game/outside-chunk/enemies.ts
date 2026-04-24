@@ -14,49 +14,57 @@ import {
 } from "./types";
 
 export interface EnemyParams {
-  size: ChunkSize;
-  seedHash: number;
-  pois: ChunkFeature[];
-  height: Float32Array;
   biome: Uint8Array;
-  water: Uint8Array;
-  playable: Uint8Array;
-  sampleHeight: (x: number, z: number) => number;
-  spawn: [number, number, number];
   guardsPerCamp: number;
-  guardsPerShrine: number;
   guardsPerLandmark: number;
-  wandererCount: number;
+  guardsPerShrine: number;
+  height: Float32Array;
   minWandererDistFromSpawn: number;
+  playable: Uint8Array;
+  pois: ChunkFeature[];
+  sampleHeight: (x: number, z: number) => number;
+  seedHash: number;
+  size: ChunkSize;
+  spawn: [number, number, number];
+  wandererCount: number;
+  water: Uint8Array;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: spawn placement combines guard rings and wanderer constraints in one pass.
 export const buildEnemySpawns = (p: EnemyParams): EnemySpawn[] => {
   const { size, pois, biome, water, playable, spawn, sampleHeight } = p;
   const cols = size.cols + 1;
   const rows = size.rows + 1;
   const out: EnemySpawn[] = [];
-  const rng = createRng(p.seedHash ^ 0xee0f0f0e);
+  // biome-ignore lint/suspicious/noBitwiseOperators: deterministic seed mixing for enemy placement.
+  const rng = createRng(p.seedHash ^ 0xee_0f_0f_0e);
 
   const cellAt = (x: number, z: number) => {
     const col = Math.max(
       0,
-      Math.min(cols - 1, Math.round(((x + size.width * 0.5) / size.width) * size.cols))
+      Math.min(
+        cols - 1,
+        Math.round(((x + size.width * 0.5) / size.width) * size.cols)
+      )
     );
     const row = Math.max(
       0,
-      Math.min(rows - 1, Math.round(((z + size.depth * 0.5) / size.depth) * size.rows))
+      Math.min(
+        rows - 1,
+        Math.round(((z + size.depth * 0.5) / size.depth) * size.rows)
+      )
     );
     return { col, row, idx: row * cols + col };
   };
 
   // 1) Guard rings around POIs
   for (const poi of pois) {
-    const guardsForKind =
-      poi.kind === "camp"
-        ? p.guardsPerCamp
-        : poi.kind === "shrine"
-          ? p.guardsPerShrine
-          : p.guardsPerLandmark;
+    let guardsForKind = p.guardsPerLandmark;
+    if (poi.kind === "camp") {
+      guardsForKind = p.guardsPerCamp;
+    } else if (poi.kind === "shrine") {
+      guardsForKind = p.guardsPerShrine;
+    }
     const ringR = 3.6 + rng() * 1.2;
     for (let i = 0; i < guardsForKind; i++) {
       const angle = (i / guardsForKind) * Math.PI * 2 + rng() * 0.3;
@@ -64,9 +72,18 @@ export const buildEnemySpawns = (p: EnemyParams): EnemySpawn[] => {
       const x = poi.x + Math.cos(angle) * r;
       const z = poi.z + Math.sin(angle) * r;
       const { idx } = cellAt(x, z);
-      if (!playable[idx]) continue;
-      if (water[idx]) continue;
-      if (biome[idx] === biomeIndex("cliff") || biome[idx] === biomeIndex("snow")) continue;
+      if (!playable[idx]) {
+        continue;
+      }
+      if (water[idx]) {
+        continue;
+      }
+      if (
+        biome[idx] === biomeIndex("cliff") ||
+        biome[idx] === biomeIndex("snow")
+      ) {
+        continue;
+      }
       out.push({
         id: `enemy-guard-${poi.id}-${i}`,
         x,
@@ -88,17 +105,24 @@ export const buildEnemySpawns = (p: EnemyParams): EnemySpawn[] => {
     attempts++;
     const x = -size.width * 0.5 + rng() * size.width;
     const z = -size.depth * 0.5 + rng() * size.depth;
-    if ((x - spawn[0]) ** 2 + (z - spawn[2]) ** 2 < minDistSq) continue;
+    if ((x - spawn[0]) ** 2 + (z - spawn[2]) ** 2 < minDistSq) {
+      continue;
+    }
     const { idx } = cellAt(x, z);
-    if (!playable[idx]) continue;
-    if (water[idx]) continue;
+    if (!playable[idx]) {
+      continue;
+    }
+    if (water[idx]) {
+      continue;
+    }
     const b = biome[idx];
     if (
       b === biomeIndex("cliff") ||
       b === biomeIndex("snow") ||
       b === biomeIndex("scree")
-    )
+    ) {
       continue;
+    }
     out.push({
       id: `enemy-wander-${placed}`,
       x,

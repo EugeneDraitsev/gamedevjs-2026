@@ -22,6 +22,12 @@
     moduleFitsSlot,
   } from "$lib/config/machine-modules";
   import {
+    getNextRunFloor,
+    initialDungeonFloor,
+    normalizeRunFloorIndex,
+    outsideFloor,
+  } from "$lib/config/run-floor";
+  import {
     createSceneSettings,
     loadSceneSettings,
     type SceneSettings,
@@ -53,9 +59,11 @@
   let { seed }: GameAppProps = $props();
 
   let DebugPane = $state<Component<{
+    currentFloor: number;
     onResetDefaults: () => void;
     onResetLevel: () => void;
     onResetScene: () => void;
+    onSelectFloor: (floor: number) => void;
     settings: SceneSettings;
   }> | null>(null);
   let paneLoadFailed = $state(false);
@@ -63,8 +71,10 @@
   let settingsOpen = $state(false);
   let sceneResetKey = $state(0);
   let machineBayOpen = $state(false);
+  let demoCompleteOpen = $state(false);
   let collectedArtifactRooms = $state<string[]>([]);
-  let floorIndex = $state(1);
+  let floorIndex = $state(initialDungeonFloor);
+  let floorAdvanceTarget = $state(getNextRunFloor(initialDungeonFloor));
   let floorAdvancePending = $state(false);
   let floorAdvancePhase = $state<FloorAdvancePhase>("idle");
   let floorAdvanceTimers: number[] = [];
@@ -81,7 +91,10 @@
   );
   const machineStats = $derived(computeMachineStats(machineLoadout));
   const controlsLocked = $derived(
-    settingsOpen || machineBayOpen || floorAdvancePhase !== "idle"
+    settingsOpen ||
+      machineBayOpen ||
+      demoCompleteOpen ||
+      floorAdvancePhase !== "idle"
   );
   const debugEnabled = $derived(page.url.searchParams.get("debug") === "true");
 
@@ -144,7 +157,9 @@
 
   const applyRunState = (state: SavedRunState) => {
     collectedArtifactRooms = [...state.collectedArtifactRooms];
+    demoCompleteOpen = false;
     floorIndex = state.floorIndex;
+    floorAdvanceTarget = getNextRunFloor(state.floorIndex);
     gearCount = state.gearCount ?? 0;
     machineLoadout = { ...state.machineLoadout };
     moduleInventory = [...state.moduleInventory];
@@ -157,6 +172,19 @@
     resetScene();
   };
 
+  const selectDebugFloor = (floor: number) => {
+    const nextFloor = normalizeRunFloorIndex(floor);
+
+    resetFloorAdvanceTransition();
+    settingsOpen = false;
+    machineBayOpen = false;
+    demoCompleteOpen = false;
+    collectedArtifactRooms = [];
+    floorIndex = nextFloor;
+    floorAdvanceTarget = getNextRunFloor(nextFloor);
+    resetScene();
+  };
+
   const resetDefaults = () => {
     Object.assign(settings, createSceneSettings());
     resetScene();
@@ -166,13 +194,24 @@
     settingsOpen = false;
   };
 
+  const closeDemoComplete = () => {
+    demoCompleteOpen = false;
+  };
+
+  const openDemoComplete = () => {
+    settingsOpen = false;
+    machineBayOpen = false;
+    demoCompleteOpen = true;
+  };
+
   const openSettings = () => {
+    demoCompleteOpen = false;
     machineBayOpen = false;
     settingsOpen = true;
   };
 
   const openMachineBay = () => {
-    if (settingsOpen) {
+    if (settingsOpen || demoCompleteOpen) {
       return;
     }
 
@@ -194,6 +233,7 @@
   };
 
   const openMainMenu = async () => {
+    demoCompleteOpen = false;
     await goto(withDebugParam("/"));
   };
 
@@ -282,20 +322,24 @@
   };
 
   const advanceFloor = () => {
-    if (floorAdvancePending || floorIndex !== 1) {
+    if (floorAdvancePending || floorIndex >= outsideFloor) {
       return;
     }
+
+    const nextFloor = getNextRunFloor(floorIndex);
 
     clearFloorAdvanceTimers();
     floorAdvancePending = true;
     settingsOpen = false;
     machineBayOpen = false;
+    demoCompleteOpen = false;
+    floorAdvanceTarget = nextFloor;
     floorAdvancePhase = "closing";
 
     scheduleFloorAdvanceStep(() => {
       floorAdvancePhase = "covered";
       collectedArtifactRooms = [];
-      floorIndex = 2;
+      floorIndex = nextFloor;
 
       scheduleFloorAdvanceStep(() => {
         floorAdvancePhase = "opening";
@@ -354,7 +398,9 @@
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === "Escape") {
-        if (machineBayOpen) {
+        if (demoCompleteOpen) {
+          demoCompleteOpen = false;
+        } else if (machineBayOpen) {
           machineBayOpen = false;
         } else {
           settingsOpen = !settingsOpen;
@@ -424,6 +470,7 @@
         meleeTrailSettings={trailSettings}
         onAdvanceFloor={advanceFloor}
         onCollectArtifact={collectArtifact}
+        onEndDemo={openDemoComplete}
         onGearCountChange={(value) => (gearCount = value)}
         onOpenSettings={openSettings}
         onOpenWeaponLab={openMachineBay}
@@ -436,14 +483,19 @@
 
   <MobileControls visible={touchControls && !controlsLocked} />
 
-  <FloorAdvanceTransition nextFloor={2} phase={floorAdvancePhase} />
+  <FloorAdvanceTransition
+    nextFloor={floorAdvanceTarget}
+    phase={floorAdvancePhase}
+  />
 
   {#if debugEnabled && DebugPane}
     <DebugPane
       bind:settings
+      currentFloor={floorIndex}
       onResetDefaults={resetDefaults}
       onResetLevel={resetLevel}
       onResetScene={resetScene}
+      onSelectFloor={selectDebugFloor}
     />
   {:else if debugEnabled && paneLoadFailed}
     <div class="pane-fallback">Debug pane failed to load.</div>
@@ -467,6 +519,28 @@
         onOpenMainMenu={openMainMenu}
         onResetDefaults={resetDefaults}
       />
+    </dialog>
+  {/if}
+
+  {#if demoCompleteOpen}
+    <dialog
+      class="demo-dialog"
+      open
+      onclick={(event) => {
+        if (event.target === event.currentTarget) {
+          closeDemoComplete();
+        }
+      }}
+    >
+      <div class="demo-panel">
+        <strong>End of the demo</strong>
+        <div class="demo-actions">
+          <button type="button" onclick={closeDemoComplete}>Close</button>
+          <button type="button" class="primary" onclick={openMainMenu}>
+            Main Menu
+          </button>
+        </div>
+      </div>
     </dialog>
   {/if}
 
@@ -516,6 +590,62 @@
     background: rgba(4, 8, 22, 0.35);
     border-radius: 999px;
     backdrop-filter: blur(8px);
+  }
+
+  .demo-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: grid;
+    place-items: center;
+    inline-size: 100%;
+    block-size: 100%;
+    padding: 1.5rem;
+    color: #f6fbff;
+    background: rgba(2, 5, 9, 0.68);
+    border: 0;
+    backdrop-filter: blur(10px);
+  }
+
+  .demo-panel {
+    display: grid;
+    gap: 1.2rem;
+    inline-size: min(28rem, 100%);
+    padding: 1.4rem;
+    background: rgba(10, 16, 20, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    box-shadow: 0 24px 72px rgba(0, 0, 0, 0.42);
+  }
+
+  .demo-panel strong {
+    font-size: 1.35rem;
+    line-height: 1.15;
+  }
+
+  .demo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    justify-content: flex-end;
+  }
+
+  .demo-actions button {
+    min-inline-size: 7.5rem;
+    padding: 0.68rem 0.9rem;
+    font: inherit;
+    font-weight: 800;
+    color: rgba(246, 251, 255, 0.88);
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+  }
+
+  .demo-actions button.primary {
+    color: #061018;
+    background: #f7c66b;
+    border-color: rgba(247, 198, 107, 0.72);
   }
 
   .pane-fallback {

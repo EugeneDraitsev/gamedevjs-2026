@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { DungeonRoom } from "../config/dungeon-layout";
+import type { DungeonLayout, DungeonRoom } from "../config/dungeon-layout";
 import {
   clampToRoom,
+  createDoorMarkers,
   getConveyorVelocity,
   getRoomPlatforms,
   getTransition,
@@ -73,5 +74,59 @@ describe("getTransition", () => {
     const position = clampToRoom([0, 1, -99], playerRadius);
 
     expect(getTransition(roomWithDoors, position)?.roomId).toBe("north-room");
+  });
+});
+
+describe("createDoorMarkers", () => {
+  it("renders exit markers for normal and special destination rooms", () => {
+    const layout: DungeonLayout = {
+      floor: -1,
+      initialModules: [],
+      rooms: {
+        boss: {
+          exits: {},
+          grid: [0, -1],
+          id: "boss",
+          kind: "boss",
+          label: "Boss",
+          templateId: "boss-bomber",
+        },
+        center: {
+          exits: {
+            east: "treasure",
+            north: "boss",
+            south: "normal",
+          },
+          grid: [0, 0],
+          id: "center",
+          kind: "normal",
+          label: "Center",
+          templateId: "normal-line",
+        },
+        normal: {
+          exits: {},
+          grid: [0, 1],
+          id: "normal",
+          kind: "normal",
+          label: "Normal",
+          templateId: "normal-line",
+        },
+        treasure: {
+          artifactType: "rivet-press-core",
+          exits: {},
+          grid: [1, 0],
+          id: "treasure",
+          kind: "treasure",
+          label: "Treasure",
+          templateId: "treasure-artifact",
+        },
+      },
+      seed: "door-marker-test",
+      startRoomId: "center",
+    };
+
+    expect(
+      createDoorMarkers(layout.rooms.center, layout).map((door) => door.id)
+    ).toEqual(["east-door", "north-door", "south-door"]);
   });
 });
