@@ -40,41 +40,41 @@
   const maxAge = 2.6;
   const maxSegments = 30;
   const vertexShader = /* glsl */ `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `;
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `;
   const fragmentShader = /* glsl */ `
-      ${glslHash}
-      ${glslValueNoise}
-      uniform float uAge;
-      uniform float uOpacity;
-      uniform float uTime;
-      varying vec2 vUv;
+        ${glslHash}
+        ${glslValueNoise}
+        uniform float uAge;
+        uniform float uOpacity;
+        uniform float uTime;
+        varying vec2 vUv;
 
-      void main() {
-        vec2 p = vec2((vUv.x - 0.5) * 2.0, vUv.y);
-        float life = 1.0 - smoothstep(0.5, 1.0, uAge);
-        float grow = smoothstep(0.02, 0.22, uAge);
-        float yMask = 1.0 - smoothstep(grow * 0.86, max(grow, 0.02), p.y);
-        float y = p.y / max(grow, 0.08);
-        float fade = smoothstep(0.0, 0.08, p.y) * (1.0 - smoothstep(0.82, 1.0, y));
-        float noise = fbm2(vec2(p.x * 8.0, p.y * 12.0 - uTime * 1.8));
-        float spread = 0.06 + y * 0.28 + uAge * 0.38 + (noise - 0.5) * 0.08;
-        float arm = 1.0 - smoothstep(0.02, 0.105, abs(abs(p.x) - spread));
-        float inside = 1.0 - smoothstep(spread * 0.72, spread * 1.06, abs(p.x));
-        float wash = inside * smoothstep(0.05, 0.34, p.y) * (1.0 - smoothstep(0.72, 1.0, p.y));
-        float center = (1.0 - smoothstep(0.03, 0.15, abs(p.x))) * exp(-p.y * 1.2);
-        float foam = smoothstep(0.45, 0.9, fbm2(vec2(p.x * 18.0, p.y * 24.0 - uTime * 3.0)));
-        float wake = fade * yMask * life * (arm * (0.46 + noise * 0.38) + wash * foam * 0.2 + center * 0.1);
-        vec3 col = vec3(wake * 0.68, wake * 0.9, wake);
-        float alpha = wake * uOpacity;
-        if (alpha < 0.008) discard;
-        gl_FragColor = vec4(col, alpha);
-      }
-    `;
+        void main() {
+          vec2 p = vec2((vUv.x - 0.5) * 2.0, vUv.y);
+          float life = 1.0 - smoothstep(0.5, 1.0, uAge);
+          float grow = smoothstep(0.02, 0.22, uAge);
+          float yMask = 1.0 - smoothstep(grow * 0.86, max(grow, 0.02), p.y);
+          float y = p.y / max(grow, 0.08);
+          float fade = smoothstep(0.0, 0.08, p.y) * (1.0 - smoothstep(0.82, 1.0, y));
+          float noise = fbm2(vec2(p.x * 8.0, p.y * 12.0 - uTime * 1.8));
+          float spread = 0.06 + y * 0.28 + uAge * 0.38 + (noise - 0.5) * 0.08;
+          float arm = 1.0 - smoothstep(0.02, 0.105, abs(abs(p.x) - spread));
+          float inside = 1.0 - smoothstep(spread * 0.72, spread * 1.06, abs(p.x));
+          float wash = inside * smoothstep(0.05, 0.34, p.y) * (1.0 - smoothstep(0.72, 1.0, p.y));
+          float center = (1.0 - smoothstep(0.03, 0.15, abs(p.x))) * exp(-p.y * 1.2);
+          float foam = smoothstep(0.45, 0.9, fbm2(vec2(p.x * 18.0, p.y * 24.0 - uTime * 3.0)));
+          float wake = fade * yMask * life * (arm * (0.46 + noise * 0.38) + wash * foam * 0.2 + center * 0.1);
+          vec3 col = vec3(wake * 0.68, wake * 0.9, wake);
+          float alpha = wake * uOpacity;
+          if (alpha < 0.008) discard;
+          gl_FragColor = vec4(col, alpha);
+        }
+      `;
 
   const makeMaterial = () =>
     new ShaderMaterial({
@@ -94,20 +94,18 @@
   const sampledInWater = $derived.by(() => {
     const plan = outsidePlan();
     return (
-      Math.min(
-        plan.sampleHeight(position[0], position[2]),
-        plan.sampleHeight(position[0] + radius, position[2]),
-        plan.sampleHeight(position[0] - radius, position[2]),
-        plan.sampleHeight(position[0], position[2] + radius),
-        plan.sampleHeight(position[0], position[2] - radius)
-      ) < -0.04
+      plan.isUnderwater(position[0], position[2]) ||
+      plan.isUnderwater(position[0] + radius, position[2]) ||
+      plan.isUnderwater(position[0] - radius, position[2]) ||
+      plan.isUnderwater(position[0], position[2] + radius) ||
+      plan.isUnderwater(position[0], position[2] - radius)
     );
   });
   const inWater = $derived(active ?? sampledInWater);
 
   let lastX = $state<number | null>(null);
   let lastZ = $state<number | null>(null);
-  let emitDistance = 0;
+  let distanceSinceLastEmit = 0;
   let wakeTime = 0;
   let nextId = 0;
   let segments = $state<WakeSegment[]>([]);
@@ -132,9 +130,11 @@
 
   useTask((delta) => {
     wakeTime += delta;
-    const dx = lastX === null ? 0 : position[0] - lastX;
-    const dz = lastZ === null ? 0 : position[2] - lastZ;
-    const moved = lastX !== null && lastZ !== null;
+    const previousX = lastX;
+    const previousZ = lastZ;
+    const dx = previousX === null ? 0 : position[0] - previousX;
+    const dz = previousZ === null ? 0 : position[2] - previousZ;
+    const moved = previousX !== null && previousZ !== null;
     const distance = moved ? Math.hypot(dx, dz) : 0;
     const speed = distance / Math.max(delta, 0.001);
 
@@ -156,19 +156,29 @@
       segments = live;
     }
 
-    if (inWater && distance > 0.015 && speed > 0.45) {
-      emitDistance += distance;
-      if (emitDistance > radius * 0.32) {
-        emitDistance = 0;
-        emit(
-          position[0],
-          position[2],
-          Math.atan2(-dx, -dz),
-          Math.min(1, speed / 3.8)
-        );
+    if (
+      inWater &&
+      previousX !== null &&
+      previousZ !== null &&
+      distance > 0.0001 &&
+      speed > 0.45
+    ) {
+      const emitSpacing = radius * 0.32;
+      const yaw = Math.atan2(-dx, -dz);
+      const strength = Math.min(1, speed / 3.8);
+      let nextEmitDistance = emitSpacing - distanceSinceLastEmit;
+
+      while (nextEmitDistance <= distance + 0.000_001) {
+        const t = Math.min(1, Math.max(0, nextEmitDistance / distance));
+
+        emit(previousX + dx * t, previousZ + dz * t, yaw, strength);
+
+        nextEmitDistance += emitSpacing;
       }
+
+      distanceSinceLastEmit = (distanceSinceLastEmit + distance) % emitSpacing;
     } else {
-      emitDistance = 0;
+      distanceSinceLastEmit = 0;
     }
 
     lastX = position[0];
