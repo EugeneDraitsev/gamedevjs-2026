@@ -1,7 +1,13 @@
+import type { SwingParams } from "$lib/combat/melee-swing";
 import type { RoomTemplate } from "$lib/config/room-templates";
 import { collectPickups, createRoomPickups } from "$lib/game/pickups";
 import { getRoomHazards, getRoomPlatforms } from "$lib/game/scene-layout";
-import type { ActivePickup, Vec3 } from "$lib/types/game";
+import type {
+  ActivePickup,
+  MeleeFrame,
+  RoomPlatform,
+  Vec3,
+} from "$lib/types/game";
 
 export class PickupStore {
   currentRoomId = $state("");
@@ -68,7 +74,15 @@ export class PickupStore {
     }
   }
 
-  collectAt(position: Vec3, health: number, maxHealth: number) {
+  collectAt(
+    position: Vec3,
+    health: number,
+    maxHealth: number,
+    obstacles: RoomPlatform[] = [],
+    pickupRadiusBonus = 0,
+    meleeFrame?: MeleeFrame,
+    meleeParams?: SwingParams
+  ) {
     if (this.items.length === 0) {
       return {
         gearDelta: 0,
@@ -78,9 +92,19 @@ export class PickupStore {
       };
     }
 
-    const result = collectPickups(this.items, position, health, maxHealth);
+    const result = collectPickups(
+      this.items,
+      position,
+      health,
+      maxHealth,
+      performance.now(),
+      { meleeFrame, meleeParams, obstacles, pickupRadiusBonus }
+    );
 
-    if (result.pickups.length !== this.items.length) {
+    if (
+      result.pickups.length !== this.items.length ||
+      result.pickups.some((pickup, index) => pickup !== this.items[index])
+    ) {
       this.itemsByRoomId = {
         ...this.itemsByRoomId,
         [this.currentRoomId]: result.pickups,

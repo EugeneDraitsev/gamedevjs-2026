@@ -265,7 +265,7 @@
         format={formatFloat}
         label="Ambient"
         min={0}
-        max={2}
+        max={3}
         step={0.05}
       />
       <Slider
@@ -273,7 +273,7 @@
         format={formatFloat}
         label="Exposure"
         min={0.4}
-        max={1.4}
+        max={2}
         step={0.02}
       />
       <Slider

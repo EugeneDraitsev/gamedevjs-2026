@@ -2,13 +2,14 @@ import type { BufferGeometry, ShaderMaterial, Texture } from "three";
 import type { OrbitControls as OrbitControlsInstance } from "three/examples/jsm/controls/OrbitControls.js";
 import type { SwingParams } from "$lib/combat/melee-swing";
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
+import type {
+  MachineModuleId,
+  MachineModuleTemplate,
+  MachineStats,
+} from "$lib/config/machine-modules";
 import type { RoomTemplate } from "$lib/config/room-templates";
 import type { SceneSettings } from "$lib/config/scene-settings";
-import type {
-  WeaponBuild,
-  WeaponNodeTemplate,
-  WeaponNodeType,
-} from "$lib/config/weapon-graph";
+import type { WeaponBuild } from "$lib/config/weapon-graph";
 import type {
   ActiveBeam,
   ActiveEnemy,
@@ -30,10 +31,14 @@ export interface GameSceneProps {
   collectedArtifactRoomIds?: string[];
   controlsLocked?: boolean;
   dungeon: DungeonLayout;
+  floorReliefMaps?: boolean;
+  floorReliefStrength?: number;
   gearCount?: number;
+  machineStats: MachineStats;
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;
-  onCollectArtifact?: (roomId: string, type: WeaponNodeType) => void;
+  onAdvanceFloor?: () => void;
+  onCollectArtifact?: (roomId: string, type: MachineModuleId) => void;
   onGearCountChange?: (gearCount: number) => void;
   onOpenSettings?: () => void;
   onOpenWeaponLab?: () => void;
@@ -44,8 +49,10 @@ export interface GameSceneProps {
 export interface GameSceneEnvironmentProps {
   animationNow: number;
   bossDoorTexture: Texture | null;
+  bossFloorHeightTexture: Texture | null;
+  bossFloorNormalTexture: Texture | null;
   bossFloorTexture: Texture | null;
-  currentArtifactTemplate: WeaponNodeTemplate | null;
+  currentArtifactTemplate: MachineModuleTemplate | null;
   currentRoom: DungeonRoom;
   currentRoomTemplate: RoomTemplate;
   doorOpenAmount: number;
@@ -58,6 +65,8 @@ export interface GameSceneEnvironmentProps {
   roomHazards: RoomHazard[];
   roomPlatforms: RoomPlatform[];
   roomWalls: StaticWall[];
+  treasureFloorHeightTexture: Texture | null;
+  treasureFloorNormalTexture: Texture | null;
   treasureFloorTexture: Texture | null;
 }
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import ArtifactPickupOverlay from "$lib/components/game/overlays/ArtifactPickupOverlay.svelte";
+  import BossDeathOverlay from "$lib/components/game/overlays/BossDeathOverlay.svelte";
   import BossIntroOverlay from "$lib/components/game/overlays/BossIntroOverlay.svelte";
   import FloorIntroOverlay from "$lib/components/game/overlays/FloorIntroOverlay.svelte";
   import RoomTransitionOverlay from "$lib/components/game/overlays/RoomTransitionOverlay.svelte";
@@ -36,6 +37,10 @@
     projectedDamagePopups={overlays.projectedDamagePopups}
   />
 
+  {#key overlays.bossDeathStartedAt ?? 0}
+    <BossDeathOverlay bossDeathProgress={overlays.bossDeathProgress} />
+  {/key}
+
   {#key `${overlays.bossIntroStartedAt ?? 0}:${overlays.bossIntroTitle}`}
     <BossIntroOverlay
       bossIntroProgress={overlays.bossIntroProgress}
@@ -51,7 +56,7 @@
     />
   {/key}
 
-  {#key `${overlays.artifactPickupAt ?? 0}:${overlays.pickedArtifactTemplate?.type ?? ""}`}
+  {#key `${overlays.artifactPickupAt ?? 0}:${overlays.pickedArtifactTemplate?.id ?? ""}`}
     <ArtifactPickupOverlay
       artifactPickupProgress={overlays.artifactPickupProgress}
       pickedArtifactTemplate={overlays.pickedArtifactTemplate}

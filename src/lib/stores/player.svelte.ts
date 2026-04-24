@@ -2,8 +2,8 @@ import { playerMaxHealth } from "$lib/game/scene-layout";
 import type { Vec3 } from "$lib/types/game";
 
 export class PlayerStore {
-  readonly maxHealth = playerMaxHealth;
-  readonly magazineSize = 8;
+  maxHealth = $state(playerMaxHealth);
+  magazineSize = $state(8);
   health = $state(playerMaxHealth);
   ammo = $state(this.magazineSize);
   facingYaw = $state(0);
@@ -21,6 +21,28 @@ export class PlayerStore {
   lastTouchHitAt = 0;
 
   readonly healthRatio = $derived(this.health / this.maxHealth);
+
+  applyMachineStats({
+    magazineSize,
+    maxHealth,
+  }: {
+    magazineSize: number;
+    maxHealth: number;
+  }) {
+    if (this.maxHealth !== maxHealth) {
+      const bonusHealth = Math.max(0, maxHealth - this.maxHealth);
+
+      this.maxHealth = maxHealth;
+      this.health = Math.min(maxHealth, this.health + bonusHealth);
+    }
+
+    if (this.magazineSize !== magazineSize) {
+      const bonusAmmo = Math.max(0, magazineSize - this.magazineSize);
+
+      this.magazineSize = magazineSize;
+      this.ammo = Math.min(magazineSize, this.ammo + bonusAmmo);
+    }
+  }
 
   triggerRecover(duration: number) {
     this.recoverDuration = duration;
@@ -73,7 +95,7 @@ export class PlayerStore {
   }
 
   resetForRespawn() {
-    this.health = playerMaxHealth;
+    this.health = this.maxHealth;
     this.ammo = this.magazineSize;
     this.facingYaw = 0;
     this.reloading = false;
@@ -87,7 +109,7 @@ export class PlayerStore {
   }
 
   resetForFloor() {
-    this.health = playerMaxHealth;
+    this.health = this.maxHealth;
     this.ammo = this.magazineSize;
     this.facingYaw = 0;
     this.reloading = false;

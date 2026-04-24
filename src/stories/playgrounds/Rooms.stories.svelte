@@ -11,7 +11,7 @@
   );
 
   const { Story } = defineMeta({
-    title: "Rooms/Preview",
+    title: "Playgrounds/Rooms",
     component: RoomPlayground,
     parameters: {
       layout: "fullscreen",

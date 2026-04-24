@@ -1,6 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Button, Folder, List, Pane } from "svelte-tweakpane-ui";
+  import {
+    Button,
+    Checkbox,
+    Folder,
+    List,
+    Pane,
+    Slider,
+  } from "svelte-tweakpane-ui";
   import GameScene from "$lib/components/game/GameScene.svelte";
   import { type RoomTemplate, roomTemplates } from "$lib/config/room-templates";
   import {
@@ -12,6 +19,7 @@
     buildPlaygroundMeleeParams,
     buildPlaygroundTrailSettings,
     noop,
+    playgroundMachineStats,
     playgroundWeaponBuild,
   } from "./playground-scene";
 
@@ -36,6 +44,8 @@
     cameraFov: 80,
     cameraMode: "orbit",
   });
+  let floorReliefMaps = $state(true);
+  let floorReliefStrength = $state(1.4);
   let templateId = $state("normal-furnace");
   let restartTick = $state(0);
   let DebugPane = $state<
@@ -61,6 +71,7 @@
       cameraFov: 80,
       cameraMode: "orbit",
     });
+    floorReliefStrength = 1.4;
     restart();
   };
 
@@ -83,8 +94,11 @@
       collectedArtifactRoomIds={[]}
       controlsLocked
       {dungeon}
+      {floorReliefMaps}
+      {floorReliefStrength}
       {meleeParams}
       meleeTrailSettings={trailSettings}
+      machineStats={playgroundMachineStats}
       onCollectArtifact={noop}
       onOpenSettings={noop}
       onOpenWeaponLab={noop}
@@ -97,6 +111,14 @@
     <Pane position="inline" title="Room Preview" width={300}>
       <Folder title="Room">
         <List bind:value={templateId} label="Template" options={roomOptions} />
+        <Checkbox bind:value={floorReliefMaps} label="Relief maps" />
+        <Slider
+          bind:value={floorReliefStrength}
+          label="Relief strength"
+          min={0}
+          max={2.5}
+          step={0.05}
+        />
         <Button on:click={restart} title="Restart preview" />
       </Folder>
       <p class="hint">

@@ -1,16 +1,16 @@
 import {
+  type MachineModuleId,
+  machineRewardModuleIds,
+} from "$lib/config/machine-modules";
+import {
   type DungeonRoomKind,
   roomTemplateById,
 } from "$lib/config/room-templates";
-import {
-  type WeaponNodeType,
-  weaponNodeTemplates,
-} from "$lib/config/weapon-graph";
 
 export type DungeonRoomDirection = "east" | "north" | "south" | "west";
 
 export interface DungeonRoom {
-  artifactType?: WeaponNodeType;
+  artifactType?: MachineModuleId;
   exits: Partial<Record<DungeonRoomDirection, string>>;
   grid: [number, number];
   id: string;
@@ -21,7 +21,7 @@ export interface DungeonRoom {
 
 export interface DungeonLayout {
   floor: number;
-  initialModules: WeaponNodeType[];
+  initialModules: MachineModuleId[];
   rooms: Record<string, DungeonRoom>;
   seed: string;
   startRoomId: string;
@@ -45,13 +45,6 @@ const oppositeDirection: Record<DungeonRoomDirection, DungeonRoomDirection> = {
   west: "east",
 };
 
-const commonModules = weaponNodeTemplates
-  .filter((template) => template.rarity === "common")
-  .map((template) => template.type);
-
-const premiumModules = weaponNodeTemplates
-  .filter((template) => template.rarity !== "common")
-  .map((template) => template.type);
 const floor1NormalTemplateIds = [
   "normal-line",
   "normal-pincer",
@@ -76,6 +69,7 @@ const floor2NormalTemplateIds = [
 ] as const;
 
 const getCellKey = ([x, y]: [number, number]) => `${x}:${y}`;
+const dungeonFloorSeedSuffixPattern = /-f\d+$/;
 
 const createSeededRandom = (seed: string) => {
   let state =
@@ -105,6 +99,15 @@ const sampleUnique = <T>(items: T[], count: number, random: () => number) => {
 
 export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
   const random = createSeededRandom(seed);
+  const rewardRandom = createSeededRandom(
+    seed.replace(dungeonFloorSeedSuffixPattern, "")
+  );
+  const rewardModules = sampleUnique(
+    machineRewardModuleIds,
+    machineRewardModuleIds.length,
+    rewardRandom
+  );
+  const rewardOffset = (floor - 1) * 2;
   const rooms: Record<string, DungeonRoom> = {};
   const occupied = new Map<string, string>();
   let roomIndex = 0;
@@ -113,7 +116,7 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
     kind: DungeonRoomKind,
     grid: [number, number],
     templateId: string,
-    artifactType?: WeaponNodeType
+    artifactType?: MachineModuleId
   ) => {
     if (kind !== "polygon") {
       roomIndex += 1;
@@ -223,7 +226,7 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
       bossAnchor.grid[1] + bossDirection.dy,
     ],
     floor === 1 ? "boss-warden" : "boss-bomber",
-    premiumModules[Math.floor(random() * premiumModules.length)]
+    rewardModules[rewardOffset % rewardModules.length]
   );
 
   connectRooms(bossAnchor, boss, bossDirection.key);
@@ -246,14 +249,14 @@ export const createDungeonLayout = (seed: string, floor = 1): DungeonLayout => {
       treasureAnchor.grid[1] + treasureDirection.dy,
     ],
     "treasure-artifact",
-    premiumModules[Math.floor(random() * premiumModules.length)]
+    rewardModules[(rewardOffset + 1) % rewardModules.length]
   );
 
   connectRooms(treasureAnchor, treasure, treasureDirection.key);
 
   return {
     floor,
-    initialModules: [...commonModules],
+    initialModules: [],
     rooms,
     seed,
     startRoomId: outside.id,

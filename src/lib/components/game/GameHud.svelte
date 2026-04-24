@@ -12,6 +12,13 @@
 
   const scene = getGameSceneContext();
   const { pickups, player } = scene;
+  const healthSlotCount = $derived(Math.max(1, player.maxHealth));
+  const healthSlots = $derived(
+    Array.from({ length: healthSlotCount }, (_, index) => index)
+  );
+  const displayedHealth = $derived(
+    Math.max(0, Math.min(player.maxHealth, Math.ceil(player.health)))
+  );
   const ammoSlots = $derived(
     Array.from({ length: player.magazineSize }, (_, index) => index)
   );
@@ -38,7 +45,7 @@
     <button
       type="button"
       class="hud-icon-button"
-      aria-label="Open weapon lab"
+      aria-label="Open Warden Chassis"
       onclick={onOpenWeaponLab}
     >
       <img class="hud-icon" src={orbKnightIconUrl} alt="" aria-hidden="true">
@@ -48,15 +55,18 @@
       <div
         class="hud-bar"
         aria-label={`Health ${player.health}/${player.maxHealth}`}
+        style:grid-template-columns={`repeat(${healthSlotCount}, minmax(0, 1fr))`}
       >
         <div
           class="hud-recover"
           style:width={`${scene.playerRecoverRatio * 100}%`}
         ></div>
-        <div
-          class="hud-fill"
-          style:width={`${player.healthRatio * 100}%`}
-        ></div>
+        {#each healthSlots as slot}
+          <div
+            class:empty={slot >= displayedHealth}
+            class="hud-health-slot"
+          ></div>
+        {/each}
       </div>
       <div
         class="hud-ammo"
@@ -203,8 +213,11 @@
 
   .hud-bar {
     position: relative;
+    display: grid;
     flex: 1 1 auto;
-    block-size: 0.5rem;
+    gap: 0.11rem;
+    block-size: 0.54rem;
+    padding: 0.05rem;
     overflow: hidden;
     background: rgba(18, 5, 4, 0.28);
     border-radius: 999px;
@@ -217,8 +230,7 @@
     margin-bottom: 6px;
   }
 
-  .hud-recover,
-  .hud-fill {
+  .hud-recover {
     position: absolute;
     inset: 0;
     border-radius: inherit;
@@ -233,7 +245,10 @@
     opacity: 0.66;
   }
 
-  .hud-fill {
+  .hud-health-slot {
+    position: relative;
+    z-index: 1;
+    min-inline-size: 0;
     background:
       linear-gradient(
         90deg,
@@ -243,9 +258,20 @@
         #b3211dff 100%
       ),
       linear-gradient(180deg, rgba(255, 214, 214, 0.14), transparent);
+    border-radius: 999px;
     box-shadow:
       0 0 0.7rem rgba(179, 33, 29, 0.2),
       inset 0 1px 0 rgba(255, 214, 214, 0.16);
+    transition:
+      opacity 0.14s ease,
+      transform 0.14s ease,
+      filter 0.14s ease;
+  }
+
+  .hud-health-slot.empty {
+    opacity: 0.18;
+    filter: saturate(0.42);
+    transform: scaleY(0.5);
   }
 
   .hud-ammo {

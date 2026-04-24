@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="green-enamel" cx="34%" cy="22%" r="78%">
+      <stop offset="0" stop-color="#d8ffe6"/>
+      <stop offset=".34" stop-color="#45e089"/>
+      <stop offset=".78" stop-color="#0b7b50"/>
+      <stop offset="1" stop-color="#052519"/>
+    </radialGradient>
+    <linearGradient id="dark-well" x1="34" x2="96" y1="28" y2="102">
+      <stop offset="0" stop-color="#0c3626"/>
+      <stop offset="1" stop-color="#03100d"/>
+    </linearGradient>
+    <linearGradient id="silver" x1="42" x2="87" y1="34" y2="94">
+      <stop offset="0" stop-color="#fff6dc"/>
+      <stop offset=".44" stop-color="#b8c7bd"/>
+      <stop offset="1" stop-color="#4d675e"/>
+    </linearGradient>
+    <filter id="glow" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000814" flood-opacity=".55"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#40e78c" flood-opacity=".58"/>
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <rect x="16" y="16" width="96" height="96" rx="24" fill="url(#green-enamel)" stroke="#caffe0" stroke-width="3"/>
+    <rect x="31" y="31" width="66" height="66" rx="17" fill="url(#dark-well)" stroke="#68f1a2" stroke-width="4"/>
+    <path d="M31 36a42 42 0 0 1 59-7" fill="none" stroke="#f2ffe7" stroke-linecap="round" stroke-width="6" opacity=".34"/>
+    <path d="M55 41h18v22h22v18H73v22H55V81H33V63h22z" fill="url(#silver)" stroke="#f6ffe7" stroke-linejoin="round" stroke-width="3"/>
+    <path d="M45 72h38" stroke="#ffffff" stroke-linecap="round" stroke-width="5" opacity=".46"/>
+    <path d="M64 50v44" stroke="#e4fff0" stroke-linecap="round" stroke-width="4" opacity=".38"/>
+  </g>
+</svg>

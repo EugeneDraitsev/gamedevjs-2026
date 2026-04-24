@@ -1,8 +1,8 @@
 import type {
-  WeaponBuild,
-  WeaponNodeTemplate,
-  WeaponNodeType,
-} from "$lib/config/weapon-graph";
+  MachineModuleId,
+  MachineModuleTemplate,
+} from "$lib/config/machine-modules";
+import type { WeaponBuild } from "$lib/config/weapon-graph";
 
 export type Vec3 = [number, number, number];
 export type CameraMode = "follow" | "orbit";
@@ -113,6 +113,8 @@ export interface ActiveBomb {
 export type PickupKind = "gear" | "heal";
 
 export interface ActivePickup {
+  collectedAt?: number;
+  collectedTo?: Vec3;
   createdAt: number;
   id: string;
   kind: PickupKind;
@@ -123,6 +125,13 @@ export interface ActivePickup {
 
 export interface DeflectBurst {
   color: string;
+  createdAt: number;
+  id: string;
+  position: Vec3;
+  radius: number;
+}
+
+export interface HealBurst {
   createdAt: number;
   id: string;
   position: Vec3;
@@ -140,6 +149,19 @@ export interface RenderedDeflectBurst extends DeflectBurst {
   age: number;
   fade: number;
   shards: DeflectBurstShard[];
+}
+
+export interface HealBurstParticle {
+  color: string;
+  opacity: number;
+  position: Vec3;
+  scale: number;
+}
+
+export interface RenderedHealBurst extends HealBurst {
+  age: number;
+  fade: number;
+  particles: HealBurstParticle[];
 }
 
 export interface DoorMarker {
@@ -168,7 +190,7 @@ export interface DamagePopup {
   createdAt: number;
   id: string;
   position: Vec3;
-  variant: "enemy" | "player";
+  variant: "enemy" | "heal" | "player";
 }
 
 export interface ProjectedDamagePopup extends DamagePopup {
@@ -248,6 +270,8 @@ export interface SceneOverlayProps {
   animationNow: number;
   artifactPickupAt?: number;
   artifactPickupProgress: number;
+  bossDeathProgress: number;
+  bossDeathStartedAt?: number;
   bossIntroProgress: number;
   bossIntroStartedAt?: number;
   bossIntroTitle: string;
@@ -260,7 +284,7 @@ export interface SceneOverlayProps {
   floorIntroStartedAt?: number;
   floorIntroSubtitle: string | null;
   floorIntroTitle: string;
-  pickedArtifactTemplate: WeaponNodeTemplate | null;
+  pickedArtifactTemplate: MachineModuleTemplate | null;
   playerHitFlash: number;
   playerReloading: boolean;
   playerReloadRatio: number;
@@ -277,5 +301,5 @@ export interface RoomEnemyContext {
 
 export interface ArtifactCollection {
   roomId: string;
-  type: WeaponNodeType;
+  type: MachineModuleId;
 }

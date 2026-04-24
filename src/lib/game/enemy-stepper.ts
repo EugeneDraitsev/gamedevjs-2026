@@ -7,6 +7,7 @@ import {
 } from "$lib/components/game/scene/utils";
 import type { RoomTemplate } from "$lib/config/room-templates";
 import {
+  clampToRoom,
   getConveyorVelocity,
   getRoomBounds,
   hazardTickMs,
@@ -286,6 +287,58 @@ const getEnemyTarget = (ctx: StepContext, enemy: ActiveEnemy, now: number) => {
   };
 };
 
+const pushEnemyDeathBurst = (
+  combat: CombatStore,
+  enemy: ActiveEnemy,
+  position: Vec3,
+  now: number
+) => {
+  combat.deflectBursts.push({
+    color: enemy.color,
+    createdAt: now,
+    id: crypto.randomUUID(),
+    position: [position[0], position[1] + enemy.radius * 0.28, position[2]],
+    radius: enemy.radius > 1 ? enemy.radius * 2.2 : enemy.radius * 1.4,
+  });
+};
+
+const pushEnemyFromPlatforms = (
+  position: Vec3,
+  radius: number,
+  platforms: RoomPlatform[],
+  bounds: ReturnType<typeof getRoomBounds>
+): Vec3 => {
+  let next = position;
+
+  for (const platform of platforms) {
+    const dx = next[0] - platform.position[0];
+    const dz = next[2] - platform.position[2];
+    const xOverlap = platform.args[0] + radius - Math.abs(dx);
+    const zOverlap = platform.args[2] + radius - Math.abs(dz);
+
+    if (xOverlap <= 0 || zOverlap <= 0) {
+      continue;
+    }
+
+    next =
+      xOverlap < zOverlap
+        ? [
+            platform.position[0] +
+              Math.sign(dx || 1) * (platform.args[0] + radius),
+            next[1],
+            next[2],
+          ]
+        : [
+            next[0],
+            next[1],
+            platform.position[2] +
+              Math.sign(dz || 1) * (platform.args[2] + radius),
+          ];
+  }
+
+  return clampToRoom(next, radius, bounds);
+};
+
 const stepEnemy = (
   ctx: StepContext,
   enemy: ActiveEnemy,
@@ -350,16 +403,18 @@ const stepEnemy = (
   ];
 
   if (hp <= 0) {
+    pushEnemyDeathBurst(combat, enemy, position, now);
     return { enemy: null, playerDamage, shots, bombs };
   }
 
+  const bounds = getRoomBounds(ctx.currentRoomTemplate.layout);
   const wallImpact = resolveEnemyWallImpact(
     enemy,
     position,
     knockbackVelocity,
     hp,
     now,
-    getRoomBounds(ctx.currentRoomTemplate.layout)
+    bounds
   );
   hp = wallImpact.hp;
   knockbackVelocity = wallImpact.knockbackVelocity;
@@ -390,8 +445,16 @@ const stepEnemy = (
   }
 
   if (hp <= 0) {
+    pushEnemyDeathBurst(combat, enemy, position, now);
     return { enemy: null, playerDamage, shots, bombs };
   }
+
+  position = pushEnemyFromPlatforms(
+    position,
+    enemy.radius,
+    ctx.roomPlatforms,
+    bounds
+  );
 
   if (
     Math.hypot(playerPos[0] - position[0], playerPos[2] - position[2]) <=

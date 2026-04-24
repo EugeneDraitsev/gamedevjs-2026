@@ -111,7 +111,7 @@ export const createSceneSettings = (): SceneSettings => ({
   sunPositionX: -5.4,
   sunPositionY: 13.2,
   sunPositionZ: 4.4,
-  toneMappingExposure: 0.94,
+  toneMappingExposure: 1.3,
   vignetteIntensity: 0.24,
   wallTheme: "foundry",
 });

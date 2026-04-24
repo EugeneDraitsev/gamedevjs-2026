@@ -1,4 +1,8 @@
 <script lang="ts">
+  import {
+    getMachineModuleKindAccent,
+    getMachineModuleRarityAccent,
+  } from "$lib/config/machine-modules";
   import type { SceneOverlayProps } from "$lib/types/game";
 
   let {
@@ -9,8 +13,22 @@
     "artifactPickupProgress" | "pickedArtifactTemplate"
   > = $props();
 
+  const artifactPickupAge = $derived(1 - artifactPickupProgress);
   const artifactPickupStrength = $derived(
-    Math.sin((1 - artifactPickupProgress) * Math.PI)
+    Math.max(
+      0,
+      Math.min(1, artifactPickupAge / 0.12, artifactPickupProgress / 0.2)
+    )
+  );
+  const moduleAccent = $derived(
+    pickedArtifactTemplate
+      ? getMachineModuleKindAccent(pickedArtifactTemplate.kind)
+      : "#ef4444"
+  );
+  const rarityAccent = $derived(
+    pickedArtifactTemplate
+      ? getMachineModuleRarityAccent(pickedArtifactTemplate.rarity)
+      : "#cbd5e1"
   );
 </script>
 
@@ -18,10 +36,11 @@
   <div class="artifact-pickup" style:opacity={artifactPickupStrength}>
     <div
       class="artifact-pickup-card"
-      style:--accent={pickedArtifactTemplate.accent}
+      style:--accent={moduleAccent}
+      style:--rarity={rarityAccent}
       style:transform={`translateY(${(1 - artifactPickupStrength) * 18}px) scale(${0.97 + artifactPickupStrength * 0.03})`}
     >
-      <span>Artifact Acquired</span>
+      <span>Machine Module Recovered</span>
       <strong>{pickedArtifactTemplate.label}</strong>
       <small>{pickedArtifactTemplate.rarity}</small>
     </div>
@@ -113,7 +132,7 @@
 
   .artifact-pickup-card small {
     margin-bottom: 0.08rem;
-    color: rgba(198, 214, 232, 0.8);
+    color: color-mix(in srgb, var(--rarity) 84%, white);
     letter-spacing: 0.16em;
   }
 </style>

@@ -1,9 +1,9 @@
 <script module lang="ts">
   import { defineMeta } from "@storybook/addon-svelte-csf";
-  import PlayerModelShowcase from "../_helpers/PlayerModelShowcase.svelte";
+  import PlayerModelShowcase from "../../_helpers/PlayerModelShowcase.svelte";
 
   const { Story } = defineMeta({
-    title: "Models/Player",
+    title: "Models/Characters/Player",
     component: PlayerModelShowcase,
     parameters: {
       layout: "padded",

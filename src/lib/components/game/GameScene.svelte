@@ -39,9 +39,14 @@
     damagePopupDurationMs,
     doorOpenDelayMs,
     doorOpenDurationMs,
+    floorExitTriggerHalfWidth,
+    floorExitTriggerZ,
     getRoomBounds,
   } from "$lib/game/scene-layout";
-  import { deflectBurstDurationMs } from "$lib/game/scene-ui";
+  import {
+    deflectBurstDurationMs,
+    healBurstDurationMs,
+  } from "$lib/game/scene-ui";
   import { cheats } from "$lib/stores/cheats.svelte";
   import { GameSceneStore } from "$lib/stores/game-scene.svelte";
   import { setGameSceneContext } from "$lib/stores/scene-context";
@@ -52,9 +57,13 @@
     collectedArtifactRoomIds = [],
     controlsLocked = false,
     dungeon,
+    floorReliefMaps = true,
+    floorReliefStrength = 1.4,
     gearCount = 0,
+    machineStats,
     meleeParams,
     meleeTrailSettings,
+    onAdvanceFloor,
     onCollectArtifact,
     onGearCountChange,
     onOpenSettings,
@@ -64,11 +73,15 @@
   }: GameSceneProps = $props();
 
   const scene = new GameSceneStore();
+  let sceneReady = $state(false);
   const syncSceneInputs = () =>
     scene.syncInputs({
       collectedArtifactRoomIds,
-      controlsLocked,
+      controlsLocked: controlsLocked || !sceneReady,
       dungeon,
+      floorReliefMaps,
+      floorReliefStrength,
+      machineStats,
       meleeParams,
       meleeTrailSettings,
       settings,
@@ -87,6 +100,29 @@
     scene.settings.cameraOrthographic ? orthographicCamera : perspectiveCamera
   );
   const outside = $derived(scene.currentRoomTemplate.layout === "outside-yard");
+  const preloadTextures = $derived([
+    textures.bossBanner,
+    textures.bossDoor,
+    textures.bossFloor,
+    textures.bossFloorHeight,
+    textures.bossFloorNormal,
+    textures.foundryFloor,
+    textures.foundryFloorDecals,
+    textures.foundryWall,
+    textures.lavaSurface,
+    textures.outsideEarth,
+    textures.outsideEarthDecals,
+    textures.outsideRockDecals,
+    textures.outsideRocks,
+    textures.outsideWater,
+    textures.outsideWaterDecals,
+    textures.treasureFloor,
+    textures.treasureFloorHeight,
+    textures.treasureFloorNormal,
+  ]);
+  const markSceneReady = () => {
+    sceneReady = true;
+  };
 
   setGameSceneContext(scene);
 
@@ -230,10 +266,20 @@
   };
 
   const handlePositionChange = (position: Vec3) => {
+    const meleeFrame = combat.currentMeleeFrame;
     const pickupResult = pickups.collectAt(
       position,
       player.health,
-      player.maxHealth
+      player.maxHealth,
+      scene.roomPlatforms,
+      scene.machineStats.pickupRadiusBonus,
+      meleeFrame ?? undefined,
+      meleeFrame
+        ? {
+            ...scene.meleeParams,
+            reach: scene.meleeParams.reach + settings.meleeHitboxPadding,
+          }
+        : undefined
     );
 
     if (pickupResult.healthDelta > 0) {
@@ -256,6 +302,17 @@
       room,
       timing,
     });
+
+    if (
+      scene.floorExitReady &&
+      scene.dungeon.floor === 1 &&
+      scene.currentRoom.kind === "boss" &&
+      !scene.currentArtifactType &&
+      Math.abs(position[0]) < floorExitTriggerHalfWidth &&
+      position[2] < floorExitTriggerZ
+    ) {
+      onAdvanceFloor?.();
+    }
   };
 
   const handleMelee = (frame: MeleeFrame) => {
@@ -268,7 +325,8 @@
       time,
       beamDurationMs,
       damagePopupDurationMs,
-      deflectBurstDurationMs
+      deflectBurstDurationMs,
+      healBurstDurationMs
     );
     textures.advanceLava(delta);
 
@@ -319,6 +377,10 @@
       timing,
     });
 
+    if (result.roomCleared && scene.currentRoom.kind === "boss") {
+      timing.beginBossDeath(time);
+    }
+
     if (cheats.infiniteHealth) {
       player.health = player.maxHealth;
       return;
@@ -346,13 +408,14 @@
     let previousTime = performance.now();
 
     const frame = (time: number) => {
-      if (scene.controlsLocked) {
-        previousTime = time;
-        timing.now = time;
-      } else {
-        const delta = Math.min(0.05, (time - previousTime) / 1000);
+      const delta = Math.min(0.05, (time - previousTime) / 1000);
 
-        previousTime = time;
+      previousTime = time;
+
+      if (scene.controlsLocked) {
+        timing.now = time;
+        textures.advanceLava(delta);
+      } else {
         tick(time, delta);
       }
 
@@ -371,7 +434,11 @@
   <Canvas shadows={PCFSoftShadowMap} dpr={2}>
     <SceneRendererConfig
       backgroundColor={outside ? "#c7d0c0" : "#050403"}
+      environmentMap={textures.environmentMap}
       exposure={outside ? 0.82 : scene.settings.toneMappingExposure}
+      onReady={markSceneReady}
+      {preloadTextures}
+      showEnvironmentMap={!outside && scene.settings.showEnvironmentMap}
     />
     <T.Fog
       attach="fog"
@@ -464,6 +531,13 @@
 
     <GameHud {onOpenSettings} {onOpenWeaponLab} />
   {/if}
+
+  {#if !sceneReady}
+    <div class="scene-loader">
+      <div class="scene-loader-ring"></div>
+      <span>Loading Foundry</span>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -471,5 +545,36 @@
     position: relative;
     inline-size: 100%;
     block-size: 100%;
+  }
+
+  .scene-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    gap: 0.8rem;
+    place-content: center;
+    justify-items: center;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: rgba(239, 247, 255, 0.9);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    background: #050403;
+  }
+
+  .scene-loader-ring {
+    inline-size: 3.2rem;
+    block-size: 3.2rem;
+    border: 0.18rem solid rgba(255, 191, 118, 0.18);
+    border-top-color: #ffbd76;
+    border-radius: 999px;
+    animation: scene-loader-spin 0.8s linear infinite;
+  }
+
+  @keyframes scene-loader-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

@@ -2,8 +2,8 @@
   import { defineMeta } from "@storybook/addon-svelte-csf";
   import enemyTemplateData from "$lib/config/enemy-templates.json";
   import type { EnemyTemplate } from "$lib/config/room-templates";
-  import EnemyGallery from "../_helpers/EnemyGallery.svelte";
-  import EnemyModelShowcase from "../_helpers/EnemyModelShowcase.svelte";
+  import EnemyGallery from "../../_helpers/EnemyGallery.svelte";
+  import EnemyModelShowcase from "../../_helpers/EnemyModelShowcase.svelte";
 
   const allTemplates = enemyTemplateData as EnemyTemplate[];
   const bossIds = new Set(["iron-warden", "mine-herald"]);
@@ -19,7 +19,7 @@
   };
 
   const { Story } = defineMeta({
-    title: "Models/Bosses",
+    title: "Models/Characters/Bosses",
     component: EnemyModelShowcase,
     parameters: {
       layout: "fullscreen",

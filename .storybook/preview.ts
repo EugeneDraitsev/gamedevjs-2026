@@ -13,14 +13,8 @@ const preview: Preview = {
     layout: "fullscreen",
     options: {
       storySort: {
-        order: [
-          "Playgrounds",
-          ["Player", "Combat", "Water"],
-          "Rooms",
-          ["Preview"],
-          "Models",
-          ["Player", "Enemies", "Bosses", "Pickups"],
-        ],
+        method: "alphabetical",
+        order: ["Playgrounds", "Models"],
       },
     },
   },

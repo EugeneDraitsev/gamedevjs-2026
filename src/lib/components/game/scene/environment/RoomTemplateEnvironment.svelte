@@ -1,7 +1,7 @@
 <script lang="ts">
   import { T } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
-  import { Color, type Texture } from "three";
+  import { Color, DoubleSide, type Texture } from "three";
   import ShootingTarget from "$lib/components/game/ShootingTarget.svelte";
   import OutsideAtmosphere from "$lib/components/game/scene/environment/OutsideAtmosphere.svelte";
   import OutsideDecal from "$lib/components/game/scene/environment/OutsideDecal.svelte";
@@ -13,10 +13,10 @@
   import OutsideSurface from "$lib/components/game/scene/environment/OutsideSurface.svelte";
   import OutsideTerrain from "$lib/components/game/scene/environment/OutsideTerrain.svelte";
   import OutsideProceduralWater from "$lib/components/game/scene/environment/OutsideProceduralWater.svelte";
+  import FoundryGearSet from "$lib/components/game/scene/environment/walls/FoundryGearSet.svelte";
   import type { RoomEnvironmentId } from "$lib/config/room-templates";
   import { outsideGroundY } from "$lib/game/outside-chunk-context";
   import {
-    bossGearMounts,
     gearTeeth,
     treasureGearMounts,
   } from "$lib/game/scene-layout";
@@ -413,8 +413,11 @@
         `;
 
   let {
+    animationNow = 0,
+    bossBannerTexture = null,
     currentFloorPalette,
     environment = null,
+    floorExitOpenAmount = 0,
     outsideEarthDecalTexture = null,
     outsideEarthTexture = null,
     outsideRockDecalTexture = null,
@@ -422,8 +425,11 @@
     outsideWaterDecalTexture = null,
     outsideWaterTexture = null,
   }: {
+    animationNow?: number;
+    bossBannerTexture?: Texture | null;
     currentFloorPalette: SceneFloorPalette;
     environment?: RoomEnvironmentId | null;
+    floorExitOpenAmount?: number;
     outsideEarthDecalTexture?: Texture | null;
     outsideEarthTexture?: Texture | null;
     outsideRockDecalTexture?: Texture | null;
@@ -433,6 +439,8 @@
   } = $props();
 
   const outside = $derived(environment === "outside-start");
+  const exitReveal = $derived(Math.max(0, Math.min(1, floorExitOpenAmount)));
+  const bannerLift = $derived(exitReveal * exitReveal);
 
   // Snap a hardcoded Codex prop position onto the procedural heightmap
   // so nothing floats above or sinks into the new terrain. The original
@@ -1035,51 +1043,108 @@
 {/if}
 
 {#if environment === "boss-gears"}
-  {#each bossGearMounts as gear, index}
-    <T.Group position={gear.position}>
-      <T.Mesh receiveShadow>
-        <T.BoxGeometry args={[gear.size * 2.4, gear.size * 2.4, 0.22]} />
-        <T.MeshStandardMaterial
-          color="#152737"
-          metalness={0.48}
-          roughness={0.72}
-        />
-      </T.Mesh>
+  <T.Group position={[0, 2.25, -7.28]}>
+    <T.Mesh castShadow receiveShadow position={[0, 1.62, 0.12]}>
+      <T.BoxGeometry args={[15.2, 0.18, 0.18]} />
+      <T.MeshStandardMaterial
+        color="#7b5430"
+        metalness={0.72}
+        roughness={0.32}
+      />
+    </T.Mesh>
 
-      <T.Mesh castShadow position={[0, 0, 0.18]}>
-        <T.TorusGeometry args={[gear.size, 0.18, 14, 34]} />
-        <T.MeshStandardMaterial
-          color={gear.color}
-          emissive={gear.color}
-          emissiveIntensity={0.14}
-          metalness={0.76}
-          roughness={0.28}
-        />
-      </T.Mesh>
-
-      {#each gearTeeth as tooth, toothIndex}
-        <T.Mesh
-          castShadow
-          position={[tooth.x * gear.size, tooth.y * gear.size, 0.18]}
-          rotation={[0, 0, tooth.rotation + (index + toothIndex) * 0.05]}
-        >
-          <T.BoxGeometry args={[0.28, 0.5, 0.16]} />
+    {#each [-5.2, 0, 5.2] as x}
+      <T.Group
+        position={[
+          x,
+          x === 0 ? bannerLift * 3.65 : 0,
+          x === 0 ? 0.15 - bannerLift * 0.16 : 0.15,
+        ]}
+        scale={[1, x === 0 ? Math.max(0.08, 1 - bannerLift * 0.72) : 1, 1]}
+      >
+        <T.Mesh castShadow receiveShadow position={[0, 0.04, 0]}>
+          <T.PlaneGeometry args={[2.7, 3.25]} />
           <T.MeshStandardMaterial
-            color={gear.color}
-            metalness={0.74}
-            roughness={0.3}
+            color={bossBannerTexture ? "#ffffff" : "#5b1718"}
+            emissive="#210708"
+            emissiveIntensity={0.12}
+            map={bossBannerTexture}
+            metalness={0.02}
+            opacity={x === 0 ? Math.max(0, 1 - bannerLift * 1.24) : 1}
+            roughness={0.92}
+            side={DoubleSide}
+            transparent={x === 0}
           />
         </T.Mesh>
-      {/each}
+        {#each [-1, 1] as side}
+          <T.Mesh castShadow receiveShadow position={[side * 0.98, 0.03, 0.03]}>
+            <T.BoxGeometry args={[0.08, 2.92, 0.08]} />
+            <T.MeshStandardMaterial
+              color="#9b6938"
+              metalness={0.68}
+              opacity={x === 0 ? Math.max(0, 1 - bannerLift * 1.18) : 1}
+              roughness={0.38}
+              transparent={x === 0}
+            />
+          </T.Mesh>
+        {/each}
+        <T.Mesh castShadow receiveShadow position={[0, -1.33, 0.04]}>
+          <T.BoxGeometry args={[1.75, 0.08, 0.08]} />
+          <T.MeshStandardMaterial
+            color="#c08545"
+            metalness={0.7}
+            opacity={x === 0 ? Math.max(0, 1 - bannerLift * 1.18) : 1}
+            roughness={0.34}
+            transparent={x === 0}
+          />
+        </T.Mesh>
+      </T.Group>
+    {/each}
+  </T.Group>
+
+  {#each [-1, 1] as side}
+    <T.Group
+      position={[side * 9.54, 2.78, -4.65]}
+      rotation={[0, (-side * Math.PI) / 2, 0]}
+    >
+      <FoundryGearSet
+        {animationNow}
+        paired={false}
+        scale={0.58}
+        speed={side}
+        trimColor="#9b6938"
+      />
     </T.Group>
   {/each}
 
-  <T.Mesh
-    position={[0, 0.04, -5.4]}
-    receiveShadow
-    rotation={[-Math.PI / 2, 0, 0]}
-  >
-    <T.RingGeometry args={[2.2, 3.25, 44]} />
-    <T.MeshBasicMaterial color="#ffd166" opacity={0.8} transparent />
-  </T.Mesh>
+  {#each [-1, 1] as side}
+    <T.Group position={[side * 6.4, 0.46, -4.95]}>
+      <T.Mesh castShadow receiveShadow>
+        <T.CylinderGeometry args={[0.46, 0.62, 0.38, 6]} />
+        <T.MeshStandardMaterial
+          color="#22160f"
+          metalness={0.5}
+          roughness={0.62}
+        />
+      </T.Mesh>
+      <T.Mesh castShadow receiveShadow position={[0, 0.62, 0]}>
+        <T.BoxGeometry args={[0.72, 0.9, 0.72]} />
+        <T.MeshStandardMaterial
+          color="#382516"
+          metalness={0.42}
+          roughness={0.58}
+        />
+      </T.Mesh>
+      <T.Mesh castShadow receiveShadow position={[0, 1.18, 0]}>
+        <T.ConeGeometry args={[0.38, 0.58, 6]} />
+        <T.MeshStandardMaterial
+          color="#af6b32"
+          emissive="#5d190c"
+          emissiveIntensity={0.16}
+          metalness={0.54}
+          roughness={0.42}
+        />
+      </T.Mesh>
+    </T.Group>
+  {/each}
 {/if}

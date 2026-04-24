@@ -1,9 +1,9 @@
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
+import type { MachineModuleId } from "$lib/config/machine-modules";
 import {
   enemyTemplateById,
   roomTemplateById,
 } from "$lib/config/room-templates";
-import type { WeaponNodeType } from "$lib/config/weapon-graph";
 import {
   getEntryDirectionFromTarget,
   getRoomBounds,
@@ -19,11 +19,11 @@ import type { Vec3 } from "$lib/types/game";
 
 interface TransitionArgs {
   combat: CombatStore;
-  currentArtifactType: WeaponNodeType | null;
+  currentArtifactType: MachineModuleId | null;
   currentRoom: DungeonRoom;
   currentRoomUnlocked: boolean;
   dungeon: DungeonLayout;
-  onCollectArtifact?: (roomId: string, type: WeaponNodeType) => void;
+  onCollectArtifact?: (roomId: string, type: MachineModuleId) => void;
   player: PlayerStore;
   position: Vec3;
   room: RoomStore;

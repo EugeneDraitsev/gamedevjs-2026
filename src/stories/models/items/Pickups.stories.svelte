@@ -1,9 +1,9 @@
 <script module lang="ts">
   import { defineMeta } from "@storybook/addon-svelte-csf";
-  import PickupShowcase from "../_helpers/PickupShowcase.svelte";
+  import PickupShowcase from "../../_helpers/PickupShowcase.svelte";
 
   const { Story } = defineMeta({
-    title: "Models/Pickups",
+    title: "Models/Items/Pickups",
     component: PickupShowcase,
     parameters: {
       layout: "fullscreen",
