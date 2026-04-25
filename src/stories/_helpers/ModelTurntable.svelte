@@ -6,6 +6,7 @@
   interface Props {
     autoRotate?: boolean;
     background?: string;
+    cameraPosition?: [number, number, number];
     cameraTargetY?: number;
     children: Snippet;
     groundY?: number;
@@ -17,6 +18,7 @@
   let {
     autoRotate = false,
     background = "#040816",
+    cameraPosition = [3.4, 2.4, 4.6],
     cameraTargetY = 0.2,
     children,
     groundY = -1,
@@ -33,13 +35,13 @@
 
   <div class="canvas">
     <Canvas dpr={2} shadows>
-      <T.PerspectiveCamera fov={42} makeDefault position={[3.4, 2.4, 4.6]}>
+      <T.PerspectiveCamera fov={42} makeDefault position={cameraPosition}>
         <OrbitControls
           {autoRotate}
           autoRotateSpeed={rotateSpeed * 10}
           enableDamping
           enableZoom
-          maxDistance={9}
+          maxDistance={12}
           minDistance={1.4}
           target={[0, cameraTargetY, 0]}
         />

@@ -6,7 +6,7 @@
   import EnemyModelShowcase from "../../_helpers/EnemyModelShowcase.svelte";
 
   const allTemplates = enemyTemplateData as EnemyTemplate[];
-  const bossIds = new Set(["iron-warden", "mine-herald"]);
+  const bossIds = new Set(["iron-warden", "mine-herald", "gate-keeper"]);
   const grunts = allTemplates.filter((template) => !bossIds.has(template.id));
   const rushTemplates = grunts.filter(
     (template) => template.behavior === "rush"

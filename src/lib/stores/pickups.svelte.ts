@@ -16,22 +16,26 @@ export class PickupStore {
 
   readonly items = $derived(this.itemsByRoomId[this.currentRoomId] ?? []);
   readonly countsByRoomId = $derived.by(() => {
-    const counts: Record<string, { gear: number; heal: number }> = {};
+    const counts: Record<string, { gear: number; heal: number; key: number }> =
+      {};
 
     for (const [roomId, items] of Object.entries(this.itemsByRoomId)) {
       let gear = 0;
       let heal = 0;
+      let key = 0;
 
       for (const item of items) {
         if (item.kind === "gear") {
           gear += 1;
-        } else {
+        } else if (item.kind === "heal") {
           heal += 1;
+        } else {
+          key += 1;
         }
       }
 
-      if (gear > 0 || heal > 0) {
-        counts[roomId] = { gear, heal };
+      if (gear > 0 || heal > 0 || key > 0) {
+        counts[roomId] = { gear, heal, key };
       }
     }
 
@@ -89,6 +93,7 @@ export class PickupStore {
       return {
         gearDelta: 0,
         healthDelta: 0,
+        keyDelta: 0,
         nextHealth: health,
         pickups: this.items,
       };

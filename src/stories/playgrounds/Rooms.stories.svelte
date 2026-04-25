@@ -27,6 +27,8 @@
 
 <Story args={{ initialTemplateId: "normal-furnace" }} name="Room Selector" />
 
+<Story args={{ initialTemplateId: "outside-start" }} name="Outside Finale" />
+
 <Story args={{ initialTemplateId: "polygon-training" }} name="Polygon" />
 
 <Story args={{ initialTemplateId: "normal-line" }} name="Chamber" />

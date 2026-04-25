@@ -25,3 +25,5 @@
   args={{ height: "420px", kind: "heal", label: "Heal Pickup" }}
   name="Heal"
 />
+
+<Story args={{ height: "420px", kind: "key", label: "Gate Key" }} name="Key" />

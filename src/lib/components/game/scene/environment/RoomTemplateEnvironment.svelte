@@ -6,6 +6,7 @@
   import OutsideAtmosphere from "$lib/components/game/scene/environment/OutsideAtmosphere.svelte";
   import OutsideDecal from "$lib/components/game/scene/environment/OutsideDecal.svelte";
   import OutsideFoliage from "$lib/components/game/scene/environment/OutsideFoliage.svelte";
+  import OutsideMechanicalCastleEntrance from "$lib/components/game/scene/environment/OutsideMechanicalCastleEntrance.svelte";
   import OutsideMountainCollider from "$lib/components/game/scene/environment/OutsideMountainCollider.svelte";
   import OutsidePoIs from "$lib/components/game/scene/environment/OutsidePoIs.svelte";
   import OutsideProceduralWater from "$lib/components/game/scene/environment/OutsideProceduralWater.svelte";
@@ -408,6 +409,7 @@
     currentFloorPalette,
     environment = null,
     floorExitOpenAmount = 0,
+    outsideGateUnlocked = false,
     outsideEarthDecalTexture = null,
     outsideEarthTexture = null,
     outsideRockDecalTexture = null,
@@ -425,6 +427,7 @@
     currentFloorPalette: SceneFloorPalette;
     environment?: RoomEnvironmentId | null;
     floorExitOpenAmount?: number;
+    outsideGateUnlocked?: boolean;
     outsideEarthDecalTexture?: Texture | null;
     outsideEarthTexture?: Texture | null;
     outsideRockDecalTexture?: Texture | null;
@@ -728,36 +731,10 @@
        landmark selection. -->
   <OutsidePoIs />
 
-  <T.Mesh position={[0, 4.8, -82.4]}>
-    <T.PlaneGeometry args={[86, 12]} />
-    <T.MeshBasicMaterial
-      color="#26341d"
-      opacity={0.82}
-      side={DoubleSide}
-      transparent
-      depthWrite={false}
-    />
-  </T.Mesh>
-
-  {#each [-34, -27, -20, -13, -6, 1, 8, 15, 22, 29, 36] as x, index}
-    <T.Group
-      position={onGround([x, 0, -79.5 - (index % 2) * 2.4], 0)}
-      rotation={[0, (index % 3) * 0.28, 0]}
-    >
-      <T.Mesh castShadow position={[0, 1.2, 0]}>
-        <T.CylinderGeometry args={[0.42, 0.58, 2.4, 6]} />
-        <T.MeshStandardMaterial color="#3b2b1d" roughness={0.9} />
-      </T.Mesh>
-      <T.Mesh castShadow position={[0, 3.2, 0]}>
-        <T.SphereGeometry args={[2.1 + (index % 3) * 0.35, 7, 5]} />
-        <T.MeshStandardMaterial color="#334d23" roughness={0.94} />
-      </T.Mesh>
-      <T.Mesh castShadow position={[0.8, 4.2, -0.5]}>
-        <T.SphereGeometry args={[1.45 + (index % 2) * 0.32, 7, 5]} />
-        <T.MeshStandardMaterial color="#425d2b" roughness={0.94} />
-      </T.Mesh>
-    </T.Group>
-  {/each}
+  <OutsideMechanicalCastleEntrance
+    {animationNow}
+    unlocked={outsideGateUnlocked}
+  />
 {/if}
 
 {#if environment === "core-prison"}

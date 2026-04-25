@@ -97,6 +97,22 @@
     "shotSpeed": 9.24
   },
   {
+    "id": "gate-keeper",
+    "label": "Gate Keeper",
+    "behavior": "shooter",
+    "hp": 560,
+    "moveSpeed": 0.9,
+    "radius": 1.68,
+    "color": "#c27b35",
+    "touchDamage": 2,
+    "touchIntervalMs": 360,
+    "preferredRange": 12.4,
+    "shotColor": "#ffbd62",
+    "shotDamage": 1,
+    "shotIntervalMs": 1360,
+    "shotSpeed": 8.6
+  },
+  {
     "id": "mine-herald",
     "label": "Mine Herald",
     "behavior": "bomber",

@@ -4,6 +4,7 @@
   import type { ActivePickup } from "$lib/types/game";
   import GearPickupActor from "./pickups/GearPickupActor.svelte";
   import HealPickupActor from "./pickups/HealPickupActor.svelte";
+  import KeyPickupActor from "./pickups/KeyPickupActor.svelte";
 
   let {
     animationNow,
@@ -57,8 +58,15 @@
       spawnEase={actorOpacity}
       spawnScale={actorScale}
     />
-  {:else}
+  {:else if pickup.kind === "heal"}
     <HealPickupActor
+      {animationNow}
+      {pickup}
+      spawnEase={actorOpacity}
+      spawnScale={actorScale}
+    />
+  {:else}
+    <KeyPickupActor
       {animationNow}
       {pickup}
       spawnEase={actorOpacity}

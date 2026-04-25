@@ -4,6 +4,7 @@ import type {
   DungeonRoomDirection,
 } from "$lib/config/dungeon-layout";
 import {
+  type EnemyTemplate,
   enemyTemplateById,
   type RoomSkinId,
   type RoomTemplate,
@@ -1066,58 +1067,57 @@ export const getTransition = (room: DungeonRoom, position: Vec3) => {
 export const getRevealedDoors = (room: DungeonRoom) =>
   Object.keys(room.exits) as DungeonRoomDirection[];
 
-export const createOutsidePickups = (
-  now = performance.now()
-): ActivePickup[] => [
-  {
-    createdAt: now,
-    id: "outside-gear-south",
-    kind: "gear",
-    position: [-19, 0.54, 33],
-    radius: 0.38,
-    value: 2,
-  },
-  {
-    createdAt: now,
-    id: "outside-heal-south",
-    kind: "heal",
-    position: [-13, 0.54, 39],
-    radius: 0.46,
-    value: 1,
-  },
-  {
-    createdAt: now,
-    id: "outside-gear-mid",
-    kind: "gear",
-    position: [20, 0.54, -16],
-    radius: 0.38,
-    value: 2,
-  },
-  {
-    createdAt: now,
-    id: "outside-heal-mid",
-    kind: "heal",
-    position: [14, 0.54, -10],
-    radius: 0.46,
-    value: 1,
-  },
-  {
-    createdAt: now,
-    id: "outside-gear-north",
-    kind: "gear",
-    position: [-18, 0.54, -58],
-    radius: 0.38,
-    value: 3,
-  },
-  {
-    createdAt: now,
-    id: "outside-heal-north",
-    kind: "heal",
-    position: [-11, 0.54, -64],
-    radius: 0.46,
-    value: 1,
-  },
-];
+export const createOutsidePickups = (now = performance.now()): ActivePickup[] =>
+  [
+    {
+      createdAt: now,
+      id: "outside-gear-south",
+      kind: "gear",
+      position: [-19, 0.54, 33],
+      radius: 0.38,
+      value: 2,
+    },
+    {
+      createdAt: now,
+      id: "outside-heal-south",
+      kind: "heal",
+      position: [-13, 0.54, 39],
+      radius: 0.46,
+      value: 1,
+    },
+    {
+      createdAt: now,
+      id: "outside-gear-mid",
+      kind: "gear",
+      position: [20, 0.54, -16],
+      radius: 0.38,
+      value: 2,
+    },
+    {
+      createdAt: now,
+      id: "outside-heal-mid",
+      kind: "heal",
+      position: [14, 0.54, -10],
+      radius: 0.46,
+      value: 1,
+    },
+    {
+      createdAt: now,
+      id: "outside-gear-north",
+      kind: "gear",
+      position: [-18, 0.54, -58],
+      radius: 0.38,
+      value: 3,
+    },
+    {
+      createdAt: now,
+      id: "outside-heal-north",
+      kind: "heal",
+      position: [-11, 0.54, -64],
+      radius: 0.46,
+      value: 1,
+    },
+  ] satisfies ActivePickup[];
 
 export const getEntryDirectionFromTarget = (
   target: Vec3
@@ -1154,44 +1154,75 @@ export const createRoomEnemies = (
       ? basePositions
       : pushSpawnsFromEntry(basePositions, currentEntryDirection);
 
-  return positions.map((position, index) => ({
-    behavior: enemyTemplate.behavior,
-    bombArmMs: enemyTemplate.bombArmMs,
-    bombColor: enemyTemplate.bombColor,
-    bombCooldownMs: enemyTemplate.bombCooldownMs,
-    bombCount: enemyTemplate.bombCount,
-    bombDamage: enemyTemplate.bombDamage,
-    bombExplosionRadius: enemyTemplate.bombExplosionRadius,
-    bombHp: enemyTemplate.bombHp,
-    bombMaxActive: enemyTemplate.bombMaxActive,
-    bombRadius: enemyTemplate.bombRadius,
-    bombSpeed: enemyTemplate.bombSpeed,
-    bombTtlMs: enemyTemplate.bombTtlMs,
-    color: enemyTemplate.color,
-    hp: enemyTemplate.hp,
-    id: `${room.id}-${template.id}-${index}`,
-    knockbackVelocity: [0, 0, 0],
-    lastBombAt: now - index * 180,
-    lastHitAt: 0,
-    lastShotAt: now - index * 180,
-    maxHp: enemyTemplate.hp,
-    moveSpeed: enemyTemplate.moveSpeed,
-    patrolCenter: template.spawnPattern === "outside" ? position : undefined,
-    patrolRadius:
-      template.spawnPattern === "outside" ? 2.7 + (index % 3) * 0.9 : undefined,
-    patrolSpeed:
-      template.spawnPattern === "outside"
-        ? 0.000_36 + index * 0.000_035
-        : undefined,
-    position,
-    preferredRange: enemyTemplate.preferredRange,
-    radius: enemyTemplate.radius,
-    shotColor: enemyTemplate.shotColor,
-    shotDamage: enemyTemplate.shotDamage,
-    shotIntervalMs: enemyTemplate.shotIntervalMs,
-    shotSpeed: enemyTemplate.shotSpeed,
-    templateId: enemyTemplate.id,
-    touchDamage: enemyTemplate.touchDamage,
-    touchIntervalMs: enemyTemplate.touchIntervalMs,
-  }));
+  const makeEnemy = (
+    nextEnemyTemplate: EnemyTemplate,
+    position: Vec3,
+    index: number,
+    idSuffix = String(index)
+  ): ActiveEnemy => {
+    const outsidePatrol = template.spawnPattern === "outside";
+    const gateKeeper = nextEnemyTemplate.id === "gate-keeper";
+    const patrolRadius = gateKeeper ? 1.25 : 2.7 + (index % 3) * 0.9;
+    const patrolSpeed = gateKeeper ? 0.000_22 : 0.000_36 + index * 0.000_035;
+
+    return {
+      behavior: nextEnemyTemplate.behavior,
+      bombArmMs: nextEnemyTemplate.bombArmMs,
+      bombColor: nextEnemyTemplate.bombColor,
+      bombCooldownMs: nextEnemyTemplate.bombCooldownMs,
+      bombCount: nextEnemyTemplate.bombCount,
+      bombDamage: nextEnemyTemplate.bombDamage,
+      bombExplosionRadius: nextEnemyTemplate.bombExplosionRadius,
+      bombHp: nextEnemyTemplate.bombHp,
+      bombMaxActive: nextEnemyTemplate.bombMaxActive,
+      bombRadius: nextEnemyTemplate.bombRadius,
+      bombSpeed: nextEnemyTemplate.bombSpeed,
+      bombTtlMs: nextEnemyTemplate.bombTtlMs,
+      color: nextEnemyTemplate.color,
+      hp: nextEnemyTemplate.hp,
+      id: `${room.id}-${template.id}-${idSuffix}`,
+      knockbackVelocity: [0, 0, 0],
+      lastBombAt: gateKeeper ? now - 3200 : now - index * 180,
+      lastHitAt: 0,
+      lastShotAt: now - index * 180,
+      maxHp: nextEnemyTemplate.hp,
+      moveSpeed: nextEnemyTemplate.moveSpeed,
+      patrolCenter: outsidePatrol ? position : undefined,
+      patrolRadius: outsidePatrol ? patrolRadius : undefined,
+      patrolSpeed: outsidePatrol ? patrolSpeed : undefined,
+      position,
+      preferredRange: nextEnemyTemplate.preferredRange,
+      radius: nextEnemyTemplate.radius,
+      shotColor: nextEnemyTemplate.shotColor,
+      shotDamage: nextEnemyTemplate.shotDamage,
+      shotIntervalMs: nextEnemyTemplate.shotIntervalMs,
+      shotSpeed: nextEnemyTemplate.shotSpeed,
+      templateId: nextEnemyTemplate.id,
+      touchDamage: nextEnemyTemplate.touchDamage,
+      touchIntervalMs: nextEnemyTemplate.touchIntervalMs,
+    };
+  };
+  const enemies = positions.map((position, index) =>
+    makeEnemy(enemyTemplate, position, index)
+  );
+
+  if (template.id === "outside-start") {
+    const gateKeeperTemplate = enemyTemplateById["gate-keeper"];
+    const gateKeeperPosition: Vec3 = [
+      0,
+      outsidePlan().sampleHeight(0, -68.5) + enemyFloorY,
+      -68.5,
+    ];
+
+    enemies.push(
+      makeEnemy(
+        gateKeeperTemplate,
+        gateKeeperPosition,
+        enemies.length,
+        "gate-keeper"
+      )
+    );
+  }
+
+  return enemies;
 };

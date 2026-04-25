@@ -12,11 +12,20 @@
   let { autoRotate = false, height = "260px", template }: Props = $props();
 
   const groundY = -1;
-  const cameraTargetY = $derived(groundY + template.radius);
+  const tallBoss = $derived(template.id === "gate-keeper");
+  const cameraPosition = $derived(
+    tallBoss
+      ? ([5.8, 4.6, 7.8] as [number, number, number])
+      : ([3.4, 2.4, 4.6] as [number, number, number])
+  );
+  const cameraTargetY = $derived(
+    groundY + template.radius * (tallBoss ? 1.9 : 1)
+  );
 </script>
 
 <ModelTurntable
   {autoRotate}
+  {cameraPosition}
   {cameraTargetY}
   {groundY}
   {height}

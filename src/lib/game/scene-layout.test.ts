@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { DungeonLayout, DungeonRoom } from "../config/dungeon-layout";
+import { roomTemplateById } from "../config/room-templates";
 import {
   clampToRoom,
   createDoorMarkers,
+  createOutsidePickups,
+  createRoomEnemies,
   getConveyorVelocity,
   getRoomPlatforms,
   getTransition,
@@ -128,5 +131,37 @@ describe("createDoorMarkers", () => {
     expect(
       createDoorMarkers(layout.rooms.center, layout).map((door) => door.id)
     ).toEqual(["east-door", "north-door", "south-door"]);
+  });
+});
+
+describe("createOutsidePickups", () => {
+  it("keeps outside pickups focused on gear and healing", () => {
+    expect(
+      createOutsidePickups(100).every((pickup) => pickup.kind !== "key")
+    ).toBe(true);
+  });
+});
+
+describe("createRoomEnemies", () => {
+  it("adds the Gate Keeper to the outside entrance", () => {
+    const outsideRoom: DungeonRoom = {
+      exits: {},
+      grid: [0, 0],
+      id: "outside",
+      kind: "normal",
+      label: "Outside",
+      templateId: "outside-start",
+    };
+    const enemies = createRoomEnemies(
+      outsideRoom,
+      roomTemplateById["outside-start"],
+      "south",
+      new Set(),
+      100
+    );
+
+    expect(enemies.some((enemy) => enemy.templateId === "gate-keeper")).toBe(
+      true
+    );
   });
 });

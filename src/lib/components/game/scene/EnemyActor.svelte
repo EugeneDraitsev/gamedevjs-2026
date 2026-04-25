@@ -46,12 +46,19 @@
   } = $props();
 
   const isMineHerald = $derived(enemy.templateId === "mine-herald");
+  const isGateKeeper = $derived(enemy.templateId === "gate-keeper");
   const hitFlash = $derived(animationNow - enemy.lastHitAt < 130);
   const lampBob = $derived(
     Math.sin(animationNow * 0.0022 + enemy.radius) * enemy.radius * 0.05
   );
   const lampPulse = $derived(0.9 + Math.sin(animationNow * 0.0052) * 0.1);
   const lampYaw = $derived(Math.sin(animationNow * 0.000_45) * 0.14);
+  const gateKeeperCorePulse = $derived(
+    0.9 + Math.sin(animationNow * 0.0064) * 0.1
+  );
+  const healthBarY = $derived(
+    isGateKeeper ? enemy.radius * 3 : enemy.radius + 0.38
+  );
 
   const heraldBands = [
     { color: "#ff7348", height: 0.14, index: 0, radius: 0.28, y: -0.58 },
@@ -60,6 +67,12 @@
     { color: "#ff4f35", height: 0.24, index: 3, radius: 0.76, y: 0.18 },
     { color: "#ff5b39", height: 0.22, index: 4, radius: 0.62, y: 0.42 },
     { color: "#ff6942", height: 0.16, index: 5, radius: 0.42, y: 0.64 },
+  ] as const;
+  const gateKeeperBars = [-0.44, -0.18, 0.08, 0.34] as const;
+  const gateKeeperArmSides = [-1, 1] as const;
+  const gateKeeperPipes = [
+    { height: 0.78, side: -0.46, y: 1.42 },
+    { height: 0.94, side: 0.46, y: 1.5 },
   ] as const;
 
   const bomberSatellites = $derived.by(() => {
@@ -264,6 +277,196 @@
         />
       </T.Mesh>
     </T.Group>
+  {:else if isGateKeeper}
+    <T.Group
+      position={[0, enemy.radius * 0.8 + lampBob * 0.35, 0]}
+      scale={[1.16, 1.16, 1.16]}
+    >
+      <T.Mesh
+        geometry={enemyGunGeometry}
+        castShadow
+        receiveShadow
+        position={[0, enemy.radius * 0.16, 0]}
+        scale={[enemy.radius * 1.08, enemy.radius * 1.42, enemy.radius * 0.52]}
+      >
+        <T.MeshStandardMaterial
+          color={hitFlash ? "#fff0c2" : "#2c2d28"}
+          emissive={hitFlash ? "#f7a64d" : "#1c0d05"}
+          emissiveIntensity={hitFlash ? 0.58 : 0.22}
+          flatShading
+          metalness={0.74}
+          roughness={0.36}
+        />
+      </T.Mesh>
+
+      <T.Mesh
+        geometry={enemyGunGeometry}
+        castShadow
+        position={[0, enemy.radius * 0.18, enemy.radius * 0.34]}
+        scale={[enemy.radius * 0.84, enemy.radius * 1.14, enemy.radius * 0.12]}
+      >
+        <T.MeshStandardMaterial
+          color="#151613"
+          emissive="#090704"
+          emissiveIntensity={0.18}
+          flatShading
+          metalness={0.66}
+          roughness={0.46}
+        />
+      </T.Mesh>
+
+      {#each gateKeeperBars as x}
+        <T.Mesh
+          geometry={enemyGunGeometry}
+          castShadow
+          position={[x * enemy.radius, enemy.radius * 0.18, enemy.radius * 0.48]}
+          scale={[enemy.radius * 0.08, enemy.radius * 1.08, enemy.radius * 0.12]}
+        >
+          <T.MeshStandardMaterial
+            color="#8e6935"
+            emissive="#351905"
+            emissiveIntensity={0.18}
+            flatShading
+            metalness={0.86}
+            roughness={0.3}
+          />
+        </T.Mesh>
+      {/each}
+
+      <T.Mesh
+        geometry={enemyLampBandGeometry}
+        castShadow
+        position={[0, enemy.radius * 0.1, enemy.radius * 0.62]}
+        rotation={[Math.PI / 2, 0, 0]}
+        scale={[enemy.radius * 0.36, enemy.radius * 0.1, enemy.radius * 0.36]}
+      >
+        <T.MeshStandardMaterial
+          color="#a97537"
+          emissive="#4f2105"
+          emissiveIntensity={0.34}
+          flatShading
+          metalness={0.88}
+          roughness={0.24}
+        />
+      </T.Mesh>
+
+      <T.Mesh
+        geometry={enemyEyeGeometry}
+        castShadow
+        position={[0, enemy.radius * 0.82, enemy.radius * 0.64]}
+        scale={[
+          enemy.radius * 0.26 * gateKeeperCorePulse,
+          enemy.radius * 0.26 * gateKeeperCorePulse,
+          enemy.radius * 0.26 * gateKeeperCorePulse,
+        ]}
+      >
+        <T.MeshStandardMaterial
+          color="#ffd56d"
+          emissive="#ff8c24"
+          emissiveIntensity={1.35}
+          metalness={0.18}
+          roughness={0.16}
+        />
+      </T.Mesh>
+
+      <T.PointLight
+        color="#ff9c38"
+        distance={5.4}
+        intensity={gateKeeperCorePulse * 1.4}
+        position={[0, enemy.radius * 0.86, enemy.radius * 0.82]}
+      />
+
+      {#each gateKeeperArmSides as side}
+        <T.Mesh
+          geometry={enemyGunGeometry}
+          castShadow
+          receiveShadow
+          position={[side * enemy.radius * 0.98, enemy.radius * 0.68, 0]}
+          rotation={[0, 0, side * 0.16]}
+          scale={[enemy.radius * 0.42, enemy.radius * 0.36, enemy.radius * 0.46]}
+        >
+          <T.MeshStandardMaterial
+            color="#3a332b"
+            emissive="#180b04"
+            emissiveIntensity={0.2}
+            flatShading
+            metalness={0.78}
+            roughness={0.34}
+          />
+        </T.Mesh>
+
+        <T.Mesh
+          geometry={enemyGunGeometry}
+          castShadow
+          receiveShadow
+          position={[side * enemy.radius * 1.28, enemy.radius * 0.02, 0.08]}
+          rotation={[0, 0, side * -0.18]}
+          scale={[enemy.radius * 0.32, enemy.radius * 0.78, enemy.radius * 0.34]}
+        >
+          <T.MeshStandardMaterial
+            color="#5a4630"
+            emissive="#1f0e04"
+            emissiveIntensity={0.16}
+            flatShading
+            metalness={0.78}
+            roughness={0.32}
+          />
+        </T.Mesh>
+
+        <T.Mesh
+          geometry={enemyGunGeometry}
+          castShadow
+          receiveShadow
+          position={[side * enemy.radius * 1.24, -enemy.radius * 0.76, 0.18]}
+          scale={[enemy.radius * 0.42, enemy.radius * 0.24, enemy.radius * 0.36]}
+        >
+          <T.MeshStandardMaterial
+            color="#28241f"
+            flatShading
+            metalness={0.78}
+            roughness={0.38}
+          />
+        </T.Mesh>
+
+        <T.Mesh
+          geometry={enemyGunGeometry}
+          castShadow
+          receiveShadow
+          position={[side * enemy.radius * 0.42, -enemy.radius * 1, 0.08]}
+          scale={[enemy.radius * 0.38, enemy.radius * 0.3, enemy.radius * 0.48]}
+        >
+          <T.MeshStandardMaterial
+            color="#34312c"
+            flatShading
+            metalness={0.72}
+            roughness={0.38}
+          />
+        </T.Mesh>
+      {/each}
+
+      {#each gateKeeperPipes as pipe}
+        <T.Mesh
+          castShadow
+          position={[pipe.side * enemy.radius, pipe.y * enemy.radius, -enemy.radius * 0.08]}
+        >
+          <T.CylinderGeometry
+            args={[
+              enemy.radius * 0.06,
+              enemy.radius * 0.07,
+              enemy.radius * pipe.height,
+              10,
+            ]}
+          />
+          <T.MeshStandardMaterial
+            color="#6f512d"
+            emissive="#241105"
+            emissiveIntensity={0.14}
+            metalness={0.86}
+            roughness={0.28}
+          />
+        </T.Mesh>
+      {/each}
+    </T.Group>
   {:else}
     <T.Mesh
       geometry={enemyBodyGeometry}
@@ -340,7 +543,7 @@
     </T.Mesh>
   {/each}
 
-  <T.Group position={[0, enemy.radius + 0.38, 0]}>
+  <T.Group position={[0, healthBarY, 0]}>
     <T.Mesh
       geometry={enemyHealthBarGeometry}
       material={enemyHealthBackMaterial}

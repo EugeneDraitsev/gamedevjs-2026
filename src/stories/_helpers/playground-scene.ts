@@ -204,4 +204,12 @@ export const combatPresets: CombatPreset[] = [
     label: "Boss — Mine Herald",
     templateId: "boss-bomber",
   },
+  {
+    description: "Boss fight: Gate Keeper triple shots and jumpable arc laser.",
+    enemyCount: 1,
+    enemyTemplateId: "gate-keeper",
+    id: "gate-keeper",
+    label: "Boss - Gate Keeper",
+    templateId: "boss-gate-keeper",
+  },
 ];

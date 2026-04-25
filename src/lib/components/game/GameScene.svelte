@@ -99,7 +99,7 @@
   let perspectiveCamera = $state<PerspectiveCamera>();
   let sunLight = $state<DirectionalLight>();
   let enemySpawnPending = $state(false);
-  let endDemoTriggered = $state(false);
+  let outsideGateTriggerArmed = $state(true);
   let corePrisonSealHits = $state(0);
   let corePrisonLastSealSwingId = 0;
   let corePrisonSealBrokenAt = $state(0);
@@ -172,7 +172,7 @@
       combat.resetForFloor();
       pickups.clear();
       room.resetForFloor(startRoomId);
-      endDemoTriggered = false;
+      outsideGateTriggerArmed = true;
       corePrisonSealHits = 0;
       corePrisonLastSealSwingId = 0;
       corePrisonSealBrokenAt = 0;
@@ -229,6 +229,7 @@
       combat.beams = [];
       combat.bombs = [];
       combat.enemyShots = [];
+      combat.gateLasers = [];
       timing.lastHazardAt = performance.now();
       room.doorOpenAmount =
         currentRoomTemplate.spawnPattern === "none" ||
@@ -349,13 +350,18 @@
       onAdvanceFloor?.();
     }
 
-    if (
-      !endDemoTriggered &&
+    const inOutsideGateTrigger =
       scene.currentRoomTemplate.layout === "outside-yard" &&
       Math.abs(position[0]) < 5 &&
-      position[2] < -scene.roomBounds.transitionInsetZ
-    ) {
-      endDemoTriggered = true;
+      position[2] < -scene.roomBounds.transitionInsetZ;
+    const outsideGateUnlocked =
+      scene.currentRoomTemplate.layout === "outside-yard" &&
+      scene.room.clearedSet.has(scene.currentRoom.id);
+
+    if (!inOutsideGateTrigger) {
+      outsideGateTriggerArmed = true;
+    } else if (outsideGateUnlocked && outsideGateTriggerArmed) {
+      outsideGateTriggerArmed = false;
       onEndDemo?.();
     }
   };
@@ -473,6 +479,13 @@
     if (result.roomCleared && scene.currentRoom.kind === "boss") {
       timing.beginBossDeath(time);
       onMusicCue?.("silence", { fadeOutMs: 2400 });
+    }
+
+    if (
+      result.roomCleared &&
+      scene.currentRoomTemplate.layout === "outside-yard"
+    ) {
+      gameSfx.playDoorOpen();
     }
 
     if (cheats.infiniteHealth) {

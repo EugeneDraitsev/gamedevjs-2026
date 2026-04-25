@@ -134,6 +134,7 @@ export const resetPlayerAfterDeath = ({
   combat.enemies = [];
   combat.beams = [];
   combat.enemyShots = [];
+  combat.gateLasers = [];
   combat.damagePopups = [];
   combat.projectiles = [];
   combat.projectilePositions.clear();

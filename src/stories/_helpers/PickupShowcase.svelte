@@ -24,9 +24,17 @@
     },
     {
       createdAt: startedAt + 90,
+      id: "key",
+      kind: "key",
+      position: [0.72, 0.54, 0],
+      radius: 0.52,
+      value: 1,
+    },
+    {
+      createdAt: startedAt + 180,
       id: "heal",
       kind: "heal",
-      position: [0.72, 0.54, 0],
+      position: [1.62, 0.54, 0],
       radius: 0.46,
       value: 1,
     },

@@ -3,6 +3,7 @@ import type {
   ActiveBomb,
   ActiveEnemy,
   ActiveEnemyShot,
+  ActiveGateLaser,
   ActiveProjectile,
   DamagePopup,
   DeflectBurst,
@@ -16,6 +17,7 @@ export class CombatStore {
   beams = $state<ActiveBeam[]>([]);
   bombs = $state<ActiveBomb[]>([]);
   enemyShots = $state<ActiveEnemyShot[]>([]);
+  gateLasers = $state<ActiveGateLaser[]>([]);
   projectiles = $state<ActiveProjectile[]>([]);
   deflectBursts = $state<DeflectBurst[]>([]);
   healBursts = $state<HealBurst[]>([]);
@@ -100,6 +102,10 @@ export class CombatStore {
     this.beams = this.beams.filter(
       (beam) => now - beam.createdAt < beamDurationMs
     );
+    this.gateLasers = this.gateLasers.filter(
+      (laser) =>
+        now - laser.createdAt < laser.telegraphMs + laser.sweepMs + laser.fadeMs
+    );
     this.damagePopups = this.damagePopups.filter(
       (popup) => now - popup.createdAt < popupDurationMs
     );
@@ -116,6 +122,7 @@ export class CombatStore {
     this.beams = [];
     this.bombs = [];
     this.enemyShots = [];
+    this.gateLasers = [];
     this.projectiles = [];
     this.damagePopups = [];
     this.deflectBursts = [];
@@ -130,6 +137,7 @@ export class CombatStore {
     this.beams = [];
     this.bombs = [];
     this.enemyShots = [];
+    this.gateLasers = [];
     this.projectiles = [];
     this.damagePopups = [];
     this.healBursts = [];

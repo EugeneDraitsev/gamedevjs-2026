@@ -35,6 +35,7 @@ interface PickupCollectContext {
 export const pickupConfigs = {
   gear: { radius: 0.38 },
   heal: { radius: 0.46 },
+  key: { radius: 0.52 },
 } satisfies Record<PickupKind, PickupConfig>;
 
 export const pickupCollectDurationMs = 360;
@@ -177,6 +178,7 @@ export const collectPickups = (
 ) => {
   const remaining: ActivePickup[] = [];
   let gearDelta = 0;
+  let keyDelta = 0;
   let nextHealth = health;
 
   for (const pickup of pickups) {
@@ -230,6 +232,16 @@ export const collectPickups = (
       continue;
     }
 
+    if (pickup.kind === "key") {
+      keyDelta += pickup.value;
+      remaining.push({
+        ...pickup,
+        collectedAt: now,
+        collectedTo: [playerPosition[0], playerPosition[1], playerPosition[2]],
+      });
+      continue;
+    }
+
     const heal = Math.min(pickup.value, maxHealth - nextHealth);
 
     if (heal <= 0) {
@@ -256,6 +268,7 @@ export const collectPickups = (
   return {
     gearDelta,
     healthDelta: nextHealth - health,
+    keyDelta,
     nextHealth,
     pickups: remaining,
   };

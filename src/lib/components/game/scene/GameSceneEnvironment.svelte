@@ -28,6 +28,9 @@
   const scene = getGameSceneContext();
   const { room, textures, timing } = scene;
   const outside = $derived(scene.currentRoomTemplate.layout === "outside-yard");
+  const outsideGateUnlocked = $derived(
+    outside && scene.room.clearedSet.has(scene.currentRoom.id)
+  );
   const bossDecoratedWallFacings: WallFacing[] = ["east", "south", "west"];
   const bossGearlessWallFacings: WallFacing[] = ["south"];
   const lampLightSlots = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -130,6 +133,7 @@
   currentFloorPalette={scene.currentFloorPalette}
   environment={scene.roomEnvironment}
   floorExitOpenAmount={scene.floorExitOpenAmount}
+  {outsideGateUnlocked}
   startAnimationAt={timing.floorIntroStartedAt}
   outsideEarthDecalTexture={textures.outsideEarthDecals}
   outsideEarthTexture={textures.outsideEarth}

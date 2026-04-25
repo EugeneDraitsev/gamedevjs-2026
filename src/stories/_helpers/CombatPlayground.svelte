@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { Button, Folder, List, Pane } from "svelte-tweakpane-ui";
   import GameScene from "$lib/components/game/GameScene.svelte";
   import {
     createSceneSettings,
     type SceneSettings,
   } from "$lib/config/scene-settings";
+  import { cheats } from "$lib/stores/cheats.svelte";
   import {
     buildPlaygroundDungeon,
     buildPlaygroundMeleeParams,
@@ -54,6 +55,10 @@
     restart();
   };
 
+  $effect(() => {
+    cheats.infiniteHealth = currentPreset.id === "gate-keeper";
+  });
+
   onMount(() => {
     if (initialPresetId && presetById[initialPresetId]) {
       presetId = initialPresetId;
@@ -62,6 +67,10 @@
     import("$lib/components/debug/DebugPane.svelte").then((module) => {
       DebugPane = module.default;
     });
+  });
+
+  onDestroy(() => {
+    cheats.infiniteHealth = false;
   });
 </script>
 

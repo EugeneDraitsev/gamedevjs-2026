@@ -89,6 +89,7 @@ describe("collectPickups", () => {
 
     expect(result.gearDelta).toBe(3);
     expect(result.healthDelta).toBe(0);
+    expect(result.keyDelta).toBe(0);
     expect(result.pickups[0].collectedAt).toBe(100);
     expect(
       collectPickups(result.pickups, [0, 1, 0], 4, 6, 500).pickups
@@ -122,6 +123,15 @@ describe("collectPickups", () => {
     );
 
     expect(result.gearDelta).toBe(3);
+    expect(result.pickups[0].collectedAt).toBe(100);
+  });
+
+  it("collects gate keys without changing gear or health", () => {
+    const result = collectPickups([pickup("key")], [0, 1, 0], 4, 6, 100);
+
+    expect(result.gearDelta).toBe(0);
+    expect(result.healthDelta).toBe(0);
+    expect(result.keyDelta).toBe(1);
     expect(result.pickups[0].collectedAt).toBe(100);
   });
 

@@ -46,6 +46,23 @@ export interface ActiveBeam {
   width: number;
 }
 
+export interface ActiveGateLaser {
+  arcSpan: number;
+  center: Vec3;
+  color: string;
+  core: string;
+  createdAt: number;
+  damage: number;
+  fadeMs: number;
+  id: string;
+  originId: string;
+  radius: number;
+  startAngle: number;
+  sweepMs: number;
+  telegraphMs: number;
+  width: number;
+}
+
 export interface ActiveEnemy {
   behavior: "rush" | "shooter" | "bomber";
   bombArmMs?: number;
@@ -110,7 +127,7 @@ export interface ActiveBomb {
   velocity: Vec3;
 }
 
-export type PickupKind = "gear" | "heal";
+export type PickupKind = "gear" | "heal" | "key";
 
 export interface ActivePickup {
   collectedAt?: number;

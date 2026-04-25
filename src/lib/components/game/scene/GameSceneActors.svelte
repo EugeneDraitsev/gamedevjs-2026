@@ -4,6 +4,7 @@
   import { GreaterDepth } from "three";
   import BombActor from "$lib/components/game/scene/BombActor.svelte";
   import EnemyActor from "$lib/components/game/scene/EnemyActor.svelte";
+  import GateKeeperArcLaser from "$lib/components/game/scene/GateKeeperArcLaser.svelte";
   import PickupActor from "$lib/components/game/scene/PickupActor.svelte";
   import WaterWake from "$lib/components/game/scene/WaterWake.svelte";
   import { enemyTemplateById } from "$lib/config/room-templates";
@@ -12,6 +13,7 @@
     ActiveBomb,
     ActiveEnemy,
     ActiveEnemyShot,
+    ActiveGateLaser,
     ActivePickup,
   } from "$lib/types/game";
 
@@ -22,6 +24,7 @@
     "coil-sentry",
     "iron-warden",
     "mine-herald",
+    "gate-keeper",
   ].map((templateId, index) => {
     const template = enemyTemplateById[templateId];
 
@@ -47,7 +50,7 @@
       lastShotAt: 0,
       maxHp: template.hp,
       moveSpeed: template.moveSpeed,
-      position: [(index - 1.5) * 2, 0.62, 0],
+      position: [(index - 2) * 2, 0.62, 0],
       preferredRange: template.preferredRange,
       radius: template.radius,
       shotColor: template.shotColor,
@@ -88,6 +91,24 @@
       velocity: [0, 0, 1],
     },
   ];
+  const gateLaserWarmups: ActiveGateLaser[] = [
+    {
+      arcSpan: 1.96,
+      center: [0, -80, 0],
+      color: "#ff8f38",
+      core: "#ffe0a0",
+      createdAt: 0,
+      damage: 2,
+      fadeMs: 420,
+      id: "gate-laser-warmup",
+      originId: "enemy-warmup-gate-keeper",
+      radius: 8.5,
+      startAngle: -0.98,
+      sweepMs: 1320,
+      telegraphMs: 720,
+      width: 0.46,
+    },
+  ];
   const pickupWarmups: ActivePickup[] = [
     {
       createdAt: 0,
@@ -99,9 +120,17 @@
     },
     {
       createdAt: 0,
+      id: "pickup-warmup-key",
+      kind: "key",
+      position: [1.3, 0.54, 0],
+      radius: 0.52,
+      value: 1,
+    },
+    {
+      createdAt: 0,
       id: "pickup-warmup-heal",
       kind: "heal",
-      position: [0, 0.54, 0],
+      position: [-1.3, 0.54, 0],
       radius: 0.46,
       value: 1,
     },
@@ -168,6 +197,10 @@
       </T.Mesh>
     </T.Group>
   {/each}
+
+  {#each gateLaserWarmups as laser (laser.id)}
+    <GateKeeperArcLaser animationNow={900} {laser} />
+  {/each}
 </T.Group>
 
 {#each combat.enemies as enemy (enemy.id)}
@@ -214,6 +247,10 @@
       />
     </T.Mesh>
   </T.Group>
+{/each}
+
+{#each combat.gateLasers as laser (laser.id)}
+  <GateKeeperArcLaser animationNow={timing.now} {laser} />
 {/each}
 
 {#each scene.deflectBurstsRendered as burst (burst.id)}

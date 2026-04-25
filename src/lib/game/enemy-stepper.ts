@@ -23,6 +23,7 @@ import type {
   ActiveBomb,
   ActiveEnemy,
   ActiveEnemyShot,
+  ActiveGateLaser,
   RoomHazard,
   RoomPlatform,
   Vec3,
@@ -260,6 +261,176 @@ const countActiveBombs = (combat: CombatStore, originId: string) => {
   return count;
 };
 
+const gateKeeperLaserCooldownMs = 5400;
+const gateKeeperLaserTelegraphMs = 720;
+const gateKeeperLaserSweepMs = 1320;
+const gateKeeperLaserFadeMs = 420;
+const gateKeeperLaserArcSpan = 1.96;
+const gateKeeperLaserWidth = 0.46;
+const gateKeeperLaserMaxRange = 22;
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
+
+const normalizeAngle = (angle: number) =>
+  Math.atan2(Math.sin(angle), Math.cos(angle));
+
+const getDistanceToSegment2D = (
+  pointX: number,
+  pointZ: number,
+  startX: number,
+  startZ: number,
+  endX: number,
+  endZ: number
+) => {
+  const segmentX = endX - startX;
+  const segmentZ = endZ - startZ;
+  const segmentLengthSq = segmentX * segmentX + segmentZ * segmentZ;
+
+  if (segmentLengthSq <= 0.0001) {
+    return {
+      distance: Math.hypot(pointX - startX, pointZ - startZ),
+      nearestX: startX,
+      nearestZ: startZ,
+      t: 0,
+    };
+  }
+
+  const t = clamp(
+    ((pointX - startX) * segmentX + (pointZ - startZ) * segmentZ) /
+      segmentLengthSq,
+    0,
+    1
+  );
+  const nearestX = startX + segmentX * t;
+  const nearestZ = startZ + segmentZ * t;
+
+  return {
+    distance: Math.hypot(pointX - nearestX, pointZ - nearestZ),
+    nearestX,
+    nearestZ,
+    t,
+  };
+};
+
+const getGroundY = (layout: RoomTemplate["layout"], x: number, z: number) =>
+  layout === "outside-yard" ? outsidePlan().sampleHeight(x, z) : 0;
+
+const createGateKeeperLaser = (
+  ctx: StepContext,
+  enemy: ActiveEnemy,
+  position: Vec3,
+  playerPos: Vec3,
+  now: number
+): ActiveGateLaser => {
+  const dx = playerPos[0] - position[0];
+  const dz = playerPos[2] - position[2];
+  const distance = Math.hypot(dx, dz) || 1;
+  const targetYaw = Math.atan2(dx, dz);
+  const sweepDirection = Math.sin(now * 0.0017 + position[0]) >= 0 ? 1 : -1;
+  const arcSpan = gateKeeperLaserArcSpan * sweepDirection;
+
+  return {
+    arcSpan,
+    center: [
+      position[0],
+      getGroundY(ctx.currentRoomTemplate.layout, position[0], position[2]) +
+        0.1,
+      position[2],
+    ],
+    color: "#ff8f38",
+    core: "#ffe0a0",
+    createdAt: now,
+    damage: 2,
+    fadeMs: gateKeeperLaserFadeMs,
+    id: crypto.randomUUID(),
+    originId: enemy.id,
+    radius: clamp(distance + 1.8, 7.2, 16.5),
+    startAngle: targetYaw - arcSpan * 0.5,
+    sweepMs: gateKeeperLaserSweepMs,
+    telegraphMs: gateKeeperLaserTelegraphMs,
+    width: gateKeeperLaserWidth,
+  };
+};
+
+const createEnemyRangedAttacks = (
+  ctx: StepContext,
+  enemy: ActiveEnemy,
+  position: Vec3,
+  playerPos: Vec3,
+  playerDistance: number,
+  lastBombAt: number,
+  lastShotAt: number,
+  now: number
+) => {
+  const isGateKeeper = enemy.templateId === "gate-keeper";
+  let nextLastBombAt = lastBombAt;
+  let nextLastShotAt = lastShotAt;
+  let shots: ActiveEnemyShot[] = [];
+  let bombs: ActiveBomb[] = [];
+  let gateLasers: ActiveGateLaser[] = [];
+
+  if (
+    isGateKeeper &&
+    now - nextLastBombAt >= gateKeeperLaserCooldownMs &&
+    playerDistance <= gateKeeperLaserMaxRange
+  ) {
+    gateLasers = [createGateKeeperLaser(ctx, enemy, position, playerPos, now)];
+    nextLastBombAt = now;
+  }
+
+  const gateKeeperLaserRecovering =
+    isGateKeeper && now - nextLastBombAt < gateKeeperLaserTelegraphMs + 520;
+
+  if (
+    (enemy.behavior === "shooter" || enemy.behavior === "bomber") &&
+    enemy.shotIntervalMs &&
+    now - nextLastShotAt >= enemy.shotIntervalMs &&
+    playerDistance <= (enemy.preferredRange ?? 6.5) + 3.2 &&
+    !gateKeeperLaserRecovering
+  ) {
+    shots = createEnemyShots(
+      enemy,
+      position,
+      playerPos[0] - position[0],
+      playerPos[2] - position[2]
+    );
+
+    if (shots.length > 0) {
+      nextLastShotAt = now;
+    }
+  }
+
+  if (
+    enemy.behavior === "bomber" &&
+    enemy.bombCooldownMs &&
+    enemy.bombMaxActive &&
+    now - nextLastBombAt >= enemy.bombCooldownMs &&
+    countActiveBombs(ctx.combat, enemy.id) + (enemy.bombCount ?? 0) <=
+      enemy.bombMaxActive
+  ) {
+    bombs = createBombs(
+      enemy,
+      position,
+      playerPos[0] - position[0],
+      playerPos[2] - position[2],
+      now
+    );
+
+    if (bombs.length > 0) {
+      nextLastBombAt = now;
+    }
+  }
+
+  return {
+    bombs,
+    gateLasers,
+    lastBombAt: nextLastBombAt,
+    lastShotAt: nextLastShotAt,
+    shots,
+  };
+};
+
 const getEnemyTarget = (ctx: StepContext, enemy: ActiveEnemy, now: number) => {
   const playerPos = ctx.player.lastPosition;
   const playerDx = playerPos[0] - enemy.position[0];
@@ -397,6 +568,8 @@ const stepEnemy = (
   let playerDamage = 0;
   let shots: ActiveEnemyShot[] = [];
   let bombs: ActiveBomb[] = [];
+  let gateLasers: ActiveGateLaser[] = [];
+  let gateKeeperDefeated = false;
   ({ hp, lastHitAt, knockbackVelocity } = applyProjectileHits(
     combat,
     enemy,
@@ -415,8 +588,16 @@ const stepEnemy = (
   ];
 
   if (hp <= 0) {
+    gateKeeperDefeated = enemy.templateId === "gate-keeper";
     pushEnemyDeathBurst(combat, enemy, position, now);
-    return { enemy: null, playerDamage, shots, bombs };
+    return {
+      enemy: null,
+      gateKeeperDefeated,
+      playerDamage,
+      shots,
+      bombs,
+      gateLasers,
+    };
   }
 
   const bounds = getRoomBounds(ctx.currentRoomTemplate.layout);
@@ -457,8 +638,16 @@ const stepEnemy = (
   }
 
   if (hp <= 0) {
+    gateKeeperDefeated = enemy.templateId === "gate-keeper";
     pushEnemyDeathBurst(combat, enemy, position, now);
-    return { enemy: null, playerDamage, shots, bombs };
+    return {
+      enemy: null,
+      gateKeeperDefeated,
+      playerDamage,
+      shots,
+      bombs,
+      gateLasers,
+    };
   }
 
   position = pushEnemyFromPlatforms(
@@ -489,44 +678,17 @@ const stepEnemy = (
     );
   }
 
-  if (
-    (enemy.behavior === "shooter" || enemy.behavior === "bomber") &&
-    enemy.shotIntervalMs &&
-    now - lastShotAt >= enemy.shotIntervalMs &&
-    playerDistance <= (enemy.preferredRange ?? 6.5) + 3.2
-  ) {
-    shots = createEnemyShots(
+  ({ bombs, gateLasers, lastBombAt, lastShotAt, shots } =
+    createEnemyRangedAttacks(
+      ctx,
       enemy,
       position,
-      playerPos[0] - position[0],
-      playerPos[2] - position[2]
-    );
-
-    if (shots.length > 0) {
-      lastShotAt = now;
-    }
-  }
-
-  if (
-    enemy.behavior === "bomber" &&
-    enemy.bombCooldownMs &&
-    enemy.bombMaxActive &&
-    now - lastBombAt >= enemy.bombCooldownMs &&
-    countActiveBombs(combat, enemy.id) + (enemy.bombCount ?? 0) <=
-      enemy.bombMaxActive
-  ) {
-    bombs = createBombs(
-      enemy,
-      position,
-      playerPos[0] - position[0],
-      playerPos[2] - position[2],
+      playerPos,
+      playerDistance,
+      lastBombAt,
+      lastShotAt,
       now
-    );
-
-    if (bombs.length > 0) {
-      lastBombAt = now;
-    }
-  }
+    ));
 
   return {
     enemy: Object.assign(enemy, {
@@ -537,9 +699,11 @@ const stepEnemy = (
       lastShotAt,
       position,
     }),
+    gateKeeperDefeated,
     playerDamage,
     shots,
     bombs,
+    gateLasers,
   };
 };
 
@@ -574,6 +738,90 @@ const applyHazardDamage = (ctx: StepContext, now: number) => {
   );
 
   return hazard.damage;
+};
+
+const stepGateLasers = (ctx: StepContext, now: number) => {
+  const { combat, player, timing } = ctx;
+  const playerPos = player.lastPosition;
+  let playerDamage = 0;
+
+  combat.gateLasers = combat.gateLasers.filter((laser) => {
+    const age = now - laser.createdAt;
+    const duration = laser.telegraphMs + laser.sweepMs + laser.fadeMs;
+
+    if (age >= duration) {
+      return false;
+    }
+
+    if (
+      age < laser.telegraphMs ||
+      age > laser.telegraphMs + laser.sweepMs ||
+      now - timing.lastHazardAt < hazardTickMs
+    ) {
+      return true;
+    }
+
+    const sweepT = clamp((age - laser.telegraphMs) / laser.sweepMs, 0, 1);
+    const sweepAngle = laser.startAngle + laser.arcSpan * sweepT;
+    const dx = playerPos[0] - laser.center[0];
+    const dz = playerPos[2] - laser.center[2];
+    const distance = Math.hypot(dx, dz);
+    const beamPoint: Vec3 = [
+      laser.center[0] + Math.sin(sweepAngle) * laser.radius,
+      laser.center[1],
+      laser.center[2] + Math.cos(sweepAngle) * laser.radius,
+    ];
+    const radialHit =
+      Math.abs(distance - laser.radius) <= laser.width + playerRadius;
+    const angle = Math.atan2(dx, dz);
+    const angleHit =
+      Math.abs(normalizeAngle(angle - sweepAngle)) <=
+      Math.max(0.14, (laser.width + playerRadius) / Math.max(1, laser.radius));
+    const beamHit = getDistanceToSegment2D(
+      playerPos[0],
+      playerPos[2],
+      laser.center[0],
+      laser.center[2],
+      beamPoint[0],
+      beamPoint[2]
+    );
+    const lineHit =
+      beamHit.t >= 0.08 &&
+      beamHit.distance <= laser.width * 0.82 + playerRadius;
+    const playerGroundY = getGroundY(
+      ctx.currentRoomTemplate.layout,
+      playerPos[0],
+      playerPos[2]
+    );
+    const jumpedOverLaser = playerPos[1] - playerGroundY > 1.12;
+    const headHit = radialHit && angleHit;
+
+    if (!((headHit || lineHit) && !jumpedOverLaser)) {
+      return true;
+    }
+    const impactSource: Vec3 = headHit
+      ? beamPoint
+      : [beamHit.nearestX, laser.center[1], beamHit.nearestZ];
+
+    timing.lastHazardAt = now;
+    player.lastHitAt = now;
+    player.triggerRecover(hazardTickMs);
+    playerDamage += laser.damage;
+    combat.popDamage(
+      laser.damage,
+      [playerPos[0], playerPos[1] + 1.05, playerPos[2]],
+      "player"
+    );
+    player.pushImpact(
+      [playerPos[0] - impactSource[0], 0, playerPos[2] - impactSource[2]],
+      0.9,
+      0.34
+    );
+
+    return true;
+  });
+
+  return playerDamage;
 };
 
 const applyProjectileHitsToBomb = (
@@ -829,6 +1077,90 @@ interface StepEnemiesArgs extends Omit<StepContext, "obstacles"> {
   doorOpenDurationMs: number;
 }
 
+const stepActiveEnemies = (
+  ctx: StepContext,
+  enemiesSleeping: boolean,
+  delta: number,
+  now: number,
+  spentProjectiles: Set<string>
+) => {
+  const nextEnemies: ActiveEnemy[] = [];
+  const spawnedEnemyShots: ActiveEnemyShot[] = [];
+  const spawnedBombs: ActiveBomb[] = [];
+  const spawnedGateLasers: ActiveGateLaser[] = [];
+  let gateKeeperDefeated = false;
+  let playerDamage = 0;
+
+  for (const enemy of ctx.combat.enemies) {
+    const result = enemiesSleeping
+      ? {
+          enemy,
+          gateKeeperDefeated: false,
+          playerDamage: 0,
+          shots: [],
+          bombs: [],
+          gateLasers: [],
+        }
+      : stepEnemy(ctx, enemy, delta, now, spentProjectiles);
+
+    playerDamage += result.playerDamage;
+
+    if (result.shots.length > 0) {
+      spawnedEnemyShots.push(...result.shots);
+    }
+
+    if (result.bombs.length > 0) {
+      spawnedBombs.push(...result.bombs);
+    }
+
+    if (result.gateLasers.length > 0) {
+      spawnedGateLasers.push(...result.gateLasers);
+    }
+
+    gateKeeperDefeated = gateKeeperDefeated || result.gateKeeperDefeated;
+
+    if (result.enemy) {
+      nextEnemies.push(result.enemy);
+    }
+  }
+
+  return {
+    gateKeeperDefeated,
+    nextEnemies,
+    playerDamage,
+    spawnedBombs,
+    spawnedEnemyShots,
+    spawnedGateLasers,
+  };
+};
+
+const keepOriginBoundActorsAlive = (
+  combat: CombatStore,
+  nextEnemies: ActiveEnemy[]
+) => {
+  const livingIds = new Set(nextEnemies.map((entry) => entry.id));
+
+  if (combat.bombs.length > 0) {
+    const survivingBombs = combat.bombs.filter((bomb) =>
+      livingIds.has(bomb.originId)
+    );
+
+    if (survivingBombs.length !== combat.bombs.length) {
+      combat.bombs = survivingBombs;
+    }
+  }
+
+  if (combat.gateLasers.length > 0) {
+    const survivingGateLasers = combat.gateLasers.filter((laser) =>
+      livingIds.has(laser.originId)
+    );
+
+    if (survivingGateLasers.length !== combat.gateLasers.length) {
+      combat.gateLasers = survivingGateLasers;
+    }
+  }
+};
+
 export interface StepEnemiesResult {
   doorStartedOpening: boolean;
   lootSpawned: boolean;
@@ -851,8 +1183,6 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
   const now = performance.now();
   const enemiesSleeping = now < timing.enemyWakeUntil;
   const spentProjectiles = new Set<string>();
-  const spawnedEnemyShots: ActiveEnemyShot[] = [];
-  const spawnedBombs: ActiveBomb[] = [];
   let lootSpawned = false;
   let nextHealth = player.health;
   const ctx: StepContext = {
@@ -869,63 +1199,54 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
     room.doorOpenAmount > 0.001;
 
   nextHealth = Math.max(0, nextHealth - applyHazardDamage(ctx, now));
+  nextHealth = Math.max(0, nextHealth - stepGateLasers(ctx, now));
   nextHealth = Math.max(0, nextHealth - stepEnemyShots(ctx, delta, now));
   nextHealth = Math.max(
     0,
     nextHealth - stepBombs(ctx, delta, now, spentProjectiles)
   );
 
-  const nextEnemies: ActiveEnemy[] = [];
+  const steppedEnemies = stepActiveEnemies(
+    ctx,
+    enemiesSleeping,
+    delta,
+    now,
+    spentProjectiles
+  );
+  nextHealth = Math.max(0, nextHealth - steppedEnemies.playerDamage);
 
-  for (const enemy of combat.enemies) {
-    const result = enemiesSleeping
-      ? { enemy, playerDamage: 0, shots: [], bombs: [] }
-      : stepEnemy(ctx, enemy, delta, now, spentProjectiles);
+  combat.enemies = steppedEnemies.nextEnemies;
+  keepOriginBoundActorsAlive(combat, steppedEnemies.nextEnemies);
 
-    nextHealth = Math.max(0, nextHealth - result.playerDamage);
-
-    if (result.shots.length > 0) {
-      spawnedEnemyShots.push(...result.shots);
-    }
-
-    if (result.bombs.length > 0) {
-      spawnedBombs.push(...result.bombs);
-    }
-
-    if (result.enemy) {
-      nextEnemies.push(result.enemy);
-    }
+  if (steppedEnemies.spawnedEnemyShots.length > 0) {
+    combat.enemyShots.push(...steppedEnemies.spawnedEnemyShots);
   }
 
-  combat.enemies = nextEnemies;
-
-  if (combat.bombs.length > 0) {
-    const livingIds = new Set(nextEnemies.map((entry) => entry.id));
-    const survivingBombs = combat.bombs.filter((bomb) =>
-      livingIds.has(bomb.originId)
-    );
-
-    if (survivingBombs.length !== combat.bombs.length) {
-      combat.bombs = survivingBombs;
-    }
+  if (steppedEnemies.spawnedBombs.length > 0) {
+    combat.bombs.push(...steppedEnemies.spawnedBombs);
   }
 
-  if (spawnedEnemyShots.length > 0) {
-    combat.enemyShots.push(...spawnedEnemyShots);
-  }
-
-  if (spawnedBombs.length > 0) {
-    combat.bombs.push(...spawnedBombs);
+  if (steppedEnemies.spawnedGateLasers.length > 0) {
+    combat.gateLasers.push(...steppedEnemies.spawnedGateLasers);
   }
 
   combat.removeProjectiles(spentProjectiles);
 
-  const roomCleared =
+  let roomCleared =
     combat.enemies.length === 0 &&
     isCurrentRoomCombat &&
     !room.clearedSet.has(currentRoomId) &&
-    !room.releasedSet.has(currentRoomId) &&
+    (currentRoomTemplate.layout === "outside-yard" ||
+      !room.releasedSet.has(currentRoomId)) &&
     room.unlockingRoomId !== currentRoomId;
+
+  if (
+    steppedEnemies.gateKeeperDefeated &&
+    currentRoomTemplate.layout === "outside-yard" &&
+    !room.clearedSet.has(currentRoomId)
+  ) {
+    roomCleared = true;
+  }
 
   if (roomCleared) {
     lootSpawned = pickups.dropRoom(currentRoomId, currentRoomTemplate, now) > 0;

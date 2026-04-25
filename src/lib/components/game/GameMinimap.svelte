@@ -120,6 +120,11 @@
           {/each}
         </svg>
         <span
+          class="outside-gate"
+          style:left={`${chunkX(0)}%`}
+          style:top={`${chunkY(-80.6)}%`}
+        ></span>
+        <span
           class="outside-player"
           style:left={`${chunkX(scene.player.lastPosition[0])}%`}
           style:top={`${chunkY(scene.player.lastPosition[2])}%`}
@@ -128,6 +133,7 @@
         {#each scene.combat.enemies as enemy (enemy.id)}
           <span
             class="outside-enemy"
+            class:boss={enemy.templateId === "gate-keeper"}
             style:left={`${chunkX(enemy.position[0])}%`}
             style:top={`${chunkY(enemy.position[2])}%`}
           ></span>
@@ -167,6 +173,12 @@
               <span
                 class="pickup-icon heal"
                 aria-label="Heal pickup in room"
+              ></span>
+            {/if}
+            {#if scene.pickups.countsByRoomId[room.id]?.key}
+              <span
+                class="pickup-icon key"
+                aria-label="Gate key in room"
               ></span>
             {/if}
           </div>
@@ -293,10 +305,23 @@
     fill: rgba(217, 179, 255, 0.95);
   }
 
+  .outside-gate,
   .outside-player,
   .outside-enemy {
     position: absolute;
     display: block;
+  }
+
+  .outside-gate {
+    inline-size: 0.76rem;
+    block-size: 0.44rem;
+    border: 1px solid rgba(255, 198, 96, 0.95);
+    border-block-end-width: 0.16rem;
+    border-radius: 0.45rem 0.45rem 0.08rem 0.08rem;
+    box-shadow:
+      0 0 0.28rem rgba(255, 155, 64, 0.7),
+      inset 0 -0.16rem 0 rgba(255, 155, 64, 0.62);
+    transform: translate(-50%, -50%);
   }
 
   .outside-player {
@@ -313,6 +338,18 @@
     border-radius: 999px;
     box-shadow: 0 0 0.28rem rgba(211, 92, 74, 0.58);
     transform: translate(-50%, -50%);
+  }
+
+  .outside-enemy.boss {
+    inline-size: 0.58rem;
+    block-size: 0.58rem;
+    background: rgba(255, 170, 72, 0.96);
+    border: 1px solid rgba(48, 18, 4, 0.86);
+    border-radius: 0.14rem;
+    box-shadow:
+      0 0 0 0.12rem rgba(120, 42, 14, 0.38),
+      0 0 0.46rem rgba(255, 135, 48, 0.76);
+    transform: translate(-50%, -50%) rotate(45deg);
   }
 
   .minimap-room {
@@ -437,6 +474,23 @@
   .pickup-icon.heal::after {
     inline-size: 0.06rem;
     block-size: 0.24rem;
+  }
+
+  .pickup-icon.key {
+    inset-block-start: 0.04rem;
+    inset-inline-start: 50%;
+    color: rgba(123, 255, 226, 0.94);
+    background: currentColor;
+    border: 1px solid rgba(10, 58, 51, 0.92);
+    transform: translateX(-50%);
+  }
+
+  .pickup-icon.key::after {
+    position: absolute;
+    inset: 0.14rem 0.05rem auto 0.17rem;
+    block-size: 0.08rem;
+    content: "";
+    background: rgba(4, 26, 23, 0.82);
   }
 
   .settings-button {

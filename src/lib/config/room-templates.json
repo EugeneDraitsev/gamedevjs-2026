@@ -207,6 +207,17 @@
     "enemyCount": 1
   },
   {
+    "id": "boss-gate-keeper",
+    "kind": "boss",
+    "label": "Gate Keeper",
+    "environment": "boss-gears",
+    "layout": "boss-foundry",
+    "skin": "boss",
+    "spawnPattern": "boss",
+    "enemyTemplateId": "gate-keeper",
+    "enemyCount": 1
+  },
+  {
     "id": "challenge-empty",
     "kind": "challenge",
     "label": "Challenge",
