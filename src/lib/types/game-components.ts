@@ -11,6 +11,7 @@ import type {
 } from "$lib/config/machine-modules";
 import type { RoomTemplate } from "$lib/config/room-templates";
 import type { SceneSettings } from "$lib/config/scene-settings";
+import type { ShopOffer } from "$lib/config/shop-offers";
 import type { WeaponBuild } from "$lib/config/weapon-graph";
 import type {
   ActiveBeam,
@@ -40,6 +41,7 @@ export interface GameSceneProps {
   floorReliefMaps?: boolean;
   floorReliefStrength?: number;
   gearCount?: number;
+  inventoryModuleIds?: MachineModuleId[];
   machineLoadout?: MachineLoadout;
   machineStats: MachineStats;
   meleeParams: SwingParams;
@@ -51,6 +53,10 @@ export interface GameSceneProps {
   onMusicCue?: (cue: MusicCue, options?: MusicTransitionOptions) => void;
   onOpenSettings?: () => void;
   onOpenWeaponLab?: () => void;
+  onPlayerDeath?: () => void;
+  onPurchaseShopOffer?: (offer: ShopOffer) => void;
+  purchasedShopOfferIds?: string[];
+  revivalNonce?: number;
   settings: SceneSettings;
   weaponBuild: WeaponBuild;
 }

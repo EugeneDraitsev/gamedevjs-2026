@@ -6,11 +6,13 @@ import {
   createDefaultMachineLoadout,
   getMachineModule,
   type MachineLoadout,
+  type MachineModuleId,
   type MachineModuleTemplate,
   type MachineStats,
 } from "$lib/config/machine-modules";
 import { roomTemplateById } from "$lib/config/room-templates";
 import type { SceneSettings } from "$lib/config/scene-settings";
+import { createShopOffers, type ShopOffer } from "$lib/config/shop-offers";
 import type { WeaponBuild } from "$lib/config/weapon-graph";
 import {
   createDoorMarkers,
@@ -46,10 +48,12 @@ interface GameSceneStoreInput {
   dungeon: DungeonLayout;
   floorReliefMaps: boolean;
   floorReliefStrength: number;
+  inventoryModuleIds: MachineModuleId[];
   machineLoadout: MachineLoadout;
   machineStats: MachineStats;
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;
+  purchasedShopOfferIds: string[];
   settings: SceneSettings;
   weaponBuild: WeaponBuild;
 }
@@ -68,10 +72,12 @@ export class GameSceneStore {
   dungeon = $state.raw<DungeonLayout>(null as never);
   floorReliefMaps = $state(true);
   floorReliefStrength = $state(1.4);
+  inventoryModuleIds = $state<MachineModuleId[]>([]);
   machineLoadout = $state.raw<MachineLoadout>(createDefaultMachineLoadout());
   meleeParams = $state.raw<SwingParams>(null as never);
   meleeTrailSettings = $state.raw<MeleeTrailSettings>(null as never);
   machineStats = $state.raw<MachineStats>(null as never);
+  purchasedShopOfferIds = $state<string[]>([]);
   settings = $state.raw<SceneSettings>(null as never);
   weaponBuild = $state.raw<WeaponBuild>(null as never);
   camera = $state<Camera>();
@@ -141,6 +147,31 @@ export class GameSceneStore {
   readonly collectedArtifactRoomSet = $derived(
     new Set(this.collectedArtifactRoomIds)
   );
+  readonly purchasedShopOfferIdSet = $derived(
+    new Set(this.purchasedShopOfferIds)
+  );
+  readonly inventoryModuleIdSet = $derived.by(() => {
+    const set = new Set<MachineModuleId>(this.inventoryModuleIds);
+    for (const id of this.machineStats.installedModuleIds) {
+      set.add(id);
+    }
+    return set;
+  });
+  readonly currentShopOffers = $derived.by<ShopOffer[]>(() => {
+    if (this.currentRoom.kind !== "shop") {
+      return [];
+    }
+    return createShopOffers(
+      this.dungeon.seed,
+      this.currentRoom.id,
+      Array.from(this.inventoryModuleIdSet)
+    );
+  });
+  readonly availableShopOffers = $derived(
+    this.currentShopOffers.filter(
+      (offer) => !this.purchasedShopOfferIdSet.has(offer.id)
+    )
+  );
   readonly currentArtifactType = $derived.by(() => {
     const available =
       this.currentRoom.artifactType &&
@@ -185,7 +216,9 @@ export class GameSceneStore {
       : 0
   );
   readonly sceneControlsLocked = $derived(
-    this.controlsLocked || this.timing.bossIntroActive
+    this.controlsLocked ||
+      this.timing.bossIntroActive ||
+      this.timing.playerDeathActive
   );
   readonly projectedDamagePopups = $derived.by(() => {
     if (!(this.camera && typeof window !== "undefined")) {
@@ -230,6 +263,8 @@ export class GameSceneStore {
         ? "Outside"
         : this.currentRoom.label,
     pickedArtifactTemplate: this.pickedArtifactTemplate,
+    playerDeathOverlayProgress: this.timing.playerDeathOverlayProgress,
+    playerDeathStartedAt: this.timing.playerDeathStartedAt,
     playerHitFlash: this.playerHitFlash,
     playerReloadRatio: this.playerReloadRatio,
     playerReloading: this.player.reloading,
@@ -293,10 +328,12 @@ export class GameSceneStore {
     this.dungeon = input.dungeon;
     this.floorReliefMaps = input.floorReliefMaps;
     this.floorReliefStrength = input.floorReliefStrength;
+    this.inventoryModuleIds = input.inventoryModuleIds;
     this.machineLoadout = input.machineLoadout;
     this.machineStats = input.machineStats;
     this.meleeParams = input.meleeParams;
     this.meleeTrailSettings = input.meleeTrailSettings;
+    this.purchasedShopOfferIds = input.purchasedShopOfferIds;
     this.settings = input.settings;
     this.weaponBuild = input.weaponBuild;
     this.player.applyMachineStats(input.machineStats);

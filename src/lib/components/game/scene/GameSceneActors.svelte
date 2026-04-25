@@ -6,8 +6,11 @@
   import EnemyActor from "$lib/components/game/scene/EnemyActor.svelte";
   import GateKeeperArcLaser from "$lib/components/game/scene/GateKeeperArcLaser.svelte";
   import PickupActor from "$lib/components/game/scene/PickupActor.svelte";
+  import ShopkeeperActor from "$lib/components/game/scene/ShopkeeperActor.svelte";
+  import ShopOfferActor from "$lib/components/game/scene/ShopOfferActor.svelte";
   import WaterWake from "$lib/components/game/scene/WaterWake.svelte";
   import { enemyTemplateById } from "$lib/config/room-templates";
+  import { outsidePlan } from "$lib/game/outside-chunk-context";
   import { getGameSceneContext } from "$lib/stores/scene-context";
   import type {
     ActiveBomb,
@@ -162,6 +165,13 @@
     player.lastPosition[1],
     player.lastPosition[2],
   ] as [number, number, number]);
+
+  const outsideShopkeeper = $derived.by(() => {
+    if (scene.currentRoomTemplate.layout !== "outside-yard") {
+      return null;
+    }
+    return outsidePlan().shopkeeper;
+  });
 </script>
 
 <T.Group
@@ -214,6 +224,22 @@
 
 {#each pickups.items as pickup (pickup.id)}
   <PickupActor animationNow={timing.now} {pickup} />
+{/each}
+
+{#if scene.currentRoom.kind === "shop"}
+  <ShopkeeperActor animationNow={timing.now} />
+{/if}
+
+{#if outsideShopkeeper}
+  <ShopkeeperActor
+    animationNow={timing.now}
+    position={[outsideShopkeeper.x, outsideShopkeeper.y, outsideShopkeeper.z]}
+    rotationY={outsideShopkeeper.rotationY}
+  />
+{/if}
+
+{#each scene.availableShopOffers as offer (offer.id)}
+  <ShopOfferActor animationNow={timing.now} {offer} />
 {/each}
 
 <T.Group visible={combatActorsVisible}>

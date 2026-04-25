@@ -302,6 +302,8 @@ export interface SceneOverlayProps {
   floorIntroSubtitle: string | null;
   floorIntroTitle: string;
   pickedArtifactTemplate: MachineModuleTemplate | null;
+  playerDeathOverlayProgress: number;
+  playerDeathStartedAt?: number;
   playerHitFlash: number;
   playerReloading: boolean;
   playerReloadRatio: number;

@@ -16,6 +16,8 @@
 
   interface Props {
     autoRotate?: boolean;
+    deathProgress?: number;
+    dying?: boolean;
     highlightedSlotId?: MachineSlotId | null;
     hitFlash?: number;
     machineLoadout?: MachineLoadout;
@@ -38,6 +40,8 @@
     scale = 1,
     autoRotate = true,
     hitFlash = 0,
+    dying = false,
+    deathProgress = 0,
     highlightedSlotId = null,
     machineLoadout = defaultLoadout,
     showAttachments = true,
@@ -46,6 +50,7 @@
 
   let root = $state.raw<Group>();
   let time = 0;
+  let dyingTime = $state(0);
 
   const visual = $derived(getMachineVisualState(machineLoadout));
   const attackHighlighted = $derived(highlightedSlotId === "attack");
@@ -55,14 +60,34 @@
   );
   const swordHighlighted = $derived(highlightedSlotId === "utility-c");
 
-  const bodyColor = $derived(hitFlash > 0.05 ? "#ff8b6b" : visual.body.color);
-  const bodyEmissive = $derived(
-    hitFlash > 0.05 ? "#ff4020" : visual.body.emissive
-  );
-  const bodyEmissiveIntensity = $derived(
-    hitFlash > 0.05
-      ? 0.6 + hitFlash * 0.8
-      : visual.body.emissiveIntensity + (bodyHighlighted ? 0.22 : 0)
+  const eased = $derived(deathProgress * deathProgress);
+  const bodyColor = $derived.by(() => {
+    if (dying) {
+      return eased > 0.5 ? "#1a0805" : "#c4321a";
+    }
+    return hitFlash > 0.05 ? "#ff8b6b" : visual.body.color;
+  });
+  const bodyEmissive = $derived.by(() => {
+    if (dying) {
+      return "#ff4020";
+    }
+    return hitFlash > 0.05 ? "#ff4020" : visual.body.emissive;
+  });
+  const bodyEmissiveIntensity = $derived.by(() => {
+    if (dying) {
+      const flicker = 0.85 + Math.sin(dyingTime * 22) * 0.18;
+      return Math.max(0.05, flicker * (1 - eased * 0.85));
+    }
+    if (hitFlash > 0.05) {
+      return 0.6 + hitFlash * 0.8;
+    }
+    return visual.body.emissiveIntensity + (bodyHighlighted ? 0.22 : 0);
+  });
+  const dyingScale = $derived(dying ? Math.max(0.18, 1 - eased * 0.62) : 1);
+  const dyingTilt = $derived(dying ? eased * 0.85 : 0);
+  const dyingDrop = $derived(dying ? -eased * 0.55 : 0);
+  const dyingSpin = $derived(
+    dying ? Math.sin(dyingTime * 12) * (1 - eased) * 0.4 : 0
   );
   const bodyGlowOpacity = $derived(
     Math.min(0.34, visual.body.glowOpacity + (bodyHighlighted ? 0.16 : 0))
@@ -80,7 +105,11 @@
   useTask((delta) => {
     time += delta;
 
-    if (autoRotate && root) {
+    if (dying) {
+      dyingTime += delta;
+    }
+
+    if (autoRotate && root && !dying) {
       root.rotation.y += delta * 0.25;
       root.position.y = Math.sin(time * 1.8) * 0.045;
     }
@@ -89,8 +118,9 @@
 
 <T.Group
   bind:ref={root}
-  rotation={[0, autoRotate ? -0.28 : 0, 0]}
-  scale={[scale, scale, scale]}
+  rotation={[dyingTilt, autoRotate ? -0.28 : dyingSpin, dyingTilt * 0.6]}
+  scale={[scale * dyingScale, scale * dyingScale, scale * dyingScale]}
+  position={[0, dyingDrop, 0]}
 >
   <T.Mesh renderOrder={30} scale={[1.09, 1.09, 1.09]}>
     <T.SphereGeometry args={[1, 32, 16]} />

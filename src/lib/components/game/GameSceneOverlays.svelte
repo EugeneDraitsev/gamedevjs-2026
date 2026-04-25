@@ -3,6 +3,7 @@
   import BossDeathOverlay from "$lib/components/game/overlays/BossDeathOverlay.svelte";
   import BossIntroOverlay from "$lib/components/game/overlays/BossIntroOverlay.svelte";
   import FloorIntroOverlay from "$lib/components/game/overlays/FloorIntroOverlay.svelte";
+  import PlayerDeathOverlay from "$lib/components/game/overlays/PlayerDeathOverlay.svelte";
   import RoomTransitionOverlay from "$lib/components/game/overlays/RoomTransitionOverlay.svelte";
   import SceneCrosshair from "$lib/components/game/overlays/SceneCrosshair.svelte";
   import SceneDamagePopups from "$lib/components/game/overlays/SceneDamagePopups.svelte";
@@ -39,6 +40,12 @@
 
   {#key overlays.bossDeathStartedAt ?? 0}
     <BossDeathOverlay bossDeathProgress={overlays.bossDeathProgress} />
+  {/key}
+
+  {#key overlays.playerDeathStartedAt ?? 0}
+    <PlayerDeathOverlay
+      playerDeathOverlayProgress={overlays.playerDeathOverlayProgress}
+    />
   {/key}
 
   {#key `${overlays.bossIntroStartedAt ?? 0}:${overlays.bossIntroTitle}`}

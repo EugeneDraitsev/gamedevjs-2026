@@ -3,7 +3,7 @@
 
 import { buildBiome } from "./biome";
 import { buildEnemySpawns } from "./enemies";
-import { buildHeightmap, heightSampler } from "./heightmap";
+import { buildHeightmap, cellToWorld, heightSampler } from "./heightmap";
 import { buildHydrology } from "./hydrology";
 import { buildPois } from "./pois";
 import { createRng, hashSeed } from "./rng";
@@ -11,10 +11,114 @@ import { buildRoads } from "./roads";
 import {
   BIOME_ORDER,
   type BiomeId,
+  biomeIndex,
+  type ChunkFeature,
   type ChunkSize,
   type OutsideChunkPlan,
+  type ShopkeeperLocation,
 } from "./types";
 import { buildVegetation } from "./vegetation";
+
+interface ShopkeeperSearchParams {
+  biome: Uint8Array;
+  height: Float32Array;
+  playable: Uint8Array;
+  pois: ChunkFeature[];
+  roadCost: Float32Array;
+  seedHash: number;
+  size: ChunkSize;
+  water: Uint8Array;
+  waterLevel: number;
+}
+
+const SHOPKEEPER_MIN_POI_DISTANCE = 16;
+const SHOPKEEPER_MIDDLE_HALF_DEPTH = 22;
+const SHOPKEEPER_MIDDLE_HALF_WIDTH = 24;
+
+const isShopkeeperCellEligible = (
+  params: ShopkeeperSearchParams,
+  index: number,
+  worldX: number,
+  worldZ: number,
+  forestId: number,
+  grassId: number
+): boolean => {
+  const { biome, height, pois, playable, roadCost, water, waterLevel } = params;
+  if (!playable[index]) {
+    return false;
+  }
+  if (water[index] !== 0) {
+    return false;
+  }
+  if (height[index] < waterLevel + 0.05) {
+    return false;
+  }
+  const b = biome[index];
+  if (b !== forestId && b !== grassId) {
+    return false;
+  }
+  if (roadCost[index] > 60) {
+    return false;
+  }
+  if (Math.abs(worldX) > SHOPKEEPER_MIDDLE_HALF_WIDTH) {
+    return false;
+  }
+  if (Math.abs(worldZ) > SHOPKEEPER_MIDDLE_HALF_DEPTH) {
+    return false;
+  }
+  return !pois.some(
+    (poi) =>
+      (poi.x - worldX) ** 2 + (poi.z - worldZ) ** 2 <
+      SHOPKEEPER_MIN_POI_DISTANCE ** 2
+  );
+};
+
+const pickShopkeeperLocation = (
+  params: ShopkeeperSearchParams
+): ShopkeeperLocation | null => {
+  const { biome, height, size, seedHash } = params;
+  const stride = size.cols + 1;
+  const forest = biomeIndex("forest");
+  const grass = biomeIndex("grassland");
+  const candidates: { i: number; score: number }[] = [];
+
+  const jitter = (i: number) => {
+    const h = Math.sin((i + seedHash + 0x11_22_33) * 12.9898) * 43_758.5453;
+    return h - Math.floor(h);
+  };
+
+  for (let row = 1; row < size.rows; row += 1) {
+    for (let col = 1; col < size.cols; col += 1) {
+      const i = row * stride + col;
+      const { x, z } = cellToWorld(size, col, row);
+      if (!isShopkeeperCellEligible(params, i, x, z, forest, grass)) {
+        continue;
+      }
+      const distFromCenter = Math.hypot(x, z);
+      const forestBonus = biome[i] === forest ? 1.4 : 0.6;
+      const score = forestBonus * (1 - distFromCenter / 60) + jitter(i) * 0.4;
+      candidates.push({ i, score });
+    }
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  const best = candidates[0];
+  const bestCol = best.i % stride;
+  const bestRow = (best.i - bestCol) / stride;
+  const { x, z } = cellToWorld(size, bestCol, bestRow);
+  const rng = createRng(seedHash + 0xb0_0c_e1_55);
+
+  return {
+    rotationY: rng() * Math.PI * 2,
+    x,
+    y: height[best.i],
+    z,
+  };
+};
 
 export interface BuildChunkConfig {
   cliffSlope: number;
@@ -287,6 +391,18 @@ export const buildOutsideChunkPlan = (
     minWandererDistFromSpawn: config.minWandererDistFromSpawn,
   });
 
+  const shopkeeper = pickShopkeeperLocation({
+    biome,
+    height,
+    pois,
+    playable,
+    roadCost: roads.cost,
+    seedHash,
+    size,
+    water: hydro.water,
+    waterLevel: config.waterLevel,
+  });
+
   return {
     seed: config.seed,
     size,
@@ -300,6 +416,7 @@ export const buildOutsideChunkPlan = (
     sampleHeight,
     sampleBiome,
     isUnderwater,
+    shopkeeper,
   };
 };
 

@@ -11,6 +11,7 @@
   import { gameSfx } from "$lib/audio/sfx";
   import { DEFAULT_SWING, type SwingParams } from "$lib/combat/melee-swing";
   import AppModalShell from "$lib/components/app/AppModalShell.svelte";
+  import DeathModal from "$lib/components/app/DeathModal.svelte";
   import EndDemoModal from "$lib/components/app/EndDemoModal.svelte";
   import FloorAdvanceTransition from "$lib/components/app/FloorAdvanceTransition.svelte";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
@@ -42,6 +43,7 @@
     type SceneSettings,
     saveSceneSettings,
   } from "$lib/config/scene-settings";
+  import type { ShopOffer } from "$lib/config/shop-offers";
   import { isEditableTarget } from "$lib/game/dom";
   import { isTouchDevice } from "$lib/game/mobile";
   import { setOutsideChunkSeed } from "$lib/game/outside-chunk-context";
@@ -52,6 +54,7 @@
     type SavedRunState,
     saveRunSave,
   } from "$lib/game/run-save";
+  import { playerDeathAnimationMs } from "$lib/game/scene-layout";
   import { cheats } from "$lib/stores/cheats.svelte";
   import { mobileInput } from "$lib/stores/mobile-input.svelte";
   import type { MeleeTrailSettings } from "$lib/types/game";
@@ -95,8 +98,13 @@
   let moduleInventory = $state<MachineModuleId[]>(
     createDefaultModuleInventory()
   );
+  let purchasedShopOfferIds = $state<string[]>([]);
+  let playerDeathPending = $state(false);
+  let deathModalOpen = $state(false);
+  let revivalNonce = $state(0);
   let musicFloorIndex: number | null = null;
   let lastGiveAllModulesNonce = 0;
+  let deathModalTimer = 0;
 
   const dungeon = $derived(
     createDungeonLayout(`${seed}-f${floorIndex}`, floorIndex)
@@ -106,6 +114,8 @@
     settingsOpen ||
       machineBayOpen ||
       demoCompleteOpen ||
+      deathModalOpen ||
+      playerDeathPending ||
       floorAdvancePhase !== "idle"
   );
   const debugEnabled = $derived(page.url.searchParams.get("debug") === "true");
@@ -175,6 +185,13 @@
     gearCount = state.gearCount ?? 0;
     machineLoadout = { ...state.machineLoadout };
     moduleInventory = [...state.moduleInventory];
+    purchasedShopOfferIds = [...(state.purchasedShopOfferIds ?? [])];
+    playerDeathPending = false;
+    deathModalOpen = false;
+    if (deathModalTimer) {
+      window.clearTimeout(deathModalTimer);
+      deathModalTimer = 0;
+    }
   };
 
   const resetLevel = () => {
@@ -362,6 +379,60 @@
     }
   };
 
+  const purchaseShopOffer = (offer: ShopOffer) => {
+    if (purchasedShopOfferIds.includes(offer.id)) {
+      return;
+    }
+
+    purchasedShopOfferIds = [...purchasedShopOfferIds, offer.id];
+
+    if (offer.kind === "module" && offer.moduleId) {
+      moduleInventory = [...moduleInventory, offer.moduleId];
+    }
+  };
+
+  const handlePlayerDeath = () => {
+    if (playerDeathPending) {
+      return;
+    }
+
+    playerDeathPending = true;
+    deathModalOpen = false;
+
+    if (deathModalTimer) {
+      window.clearTimeout(deathModalTimer);
+    }
+
+    deathModalTimer = window.setTimeout(() => {
+      deathModalOpen = true;
+      deathModalTimer = 0;
+    }, playerDeathAnimationMs + 80);
+  };
+
+  const restartRun = () => {
+    if (deathModalTimer) {
+      window.clearTimeout(deathModalTimer);
+      deathModalTimer = 0;
+    }
+
+    deathModalOpen = false;
+    playerDeathPending = false;
+    clearRunSave(seed);
+    applyRunState(createDefaultRunState());
+    resetScene();
+  };
+
+  const continueAfterDeath = () => {
+    if (deathModalTimer) {
+      window.clearTimeout(deathModalTimer);
+      deathModalTimer = 0;
+    }
+
+    deathModalOpen = false;
+    playerDeathPending = false;
+    revivalNonce += 1;
+  };
+
   const advanceFloor = () => {
     if (floorAdvancePending || floorIndex >= outsideFloor) {
       return;
@@ -421,6 +492,7 @@
       gearCount,
       machineLoadout,
       moduleInventory,
+      purchasedShopOfferIds,
       version: 2,
     });
   });
@@ -484,6 +556,10 @@
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === "Escape") {
+        if (deathModalOpen || playerDeathPending) {
+          event.preventDefault();
+          return;
+        }
         if (demoCompleteOpen) {
           demoCompleteOpen = false;
         } else if (machineBayOpen) {
@@ -500,7 +576,13 @@
         return;
       }
 
-      if (event.code === "KeyE" && !event.repeat && !settingsOpen) {
+      if (
+        event.code === "KeyE" &&
+        !event.repeat &&
+        !settingsOpen &&
+        !deathModalOpen &&
+        !playerDeathPending
+      ) {
         machineBayOpen = !machineBayOpen;
         event.preventDefault();
       }
@@ -525,6 +607,10 @@
       clearFloorAdvanceTimers();
       window.removeEventListener("keydown", handleKeyDown);
       coarseQuery.removeEventListener("change", onCoarseChange);
+      if (deathModalTimer) {
+        window.clearTimeout(deathModalTimer);
+        deathModalTimer = 0;
+      }
       mobileInput.reset();
     };
   });
@@ -552,6 +638,7 @@
         {controlsLocked}
         {dungeon}
         {gearCount}
+        inventoryModuleIds={moduleInventory}
         {machineLoadout}
         meleeParams={swingParams}
         meleeTrailSettings={trailSettings}
@@ -562,6 +649,10 @@
         onMusicCue={handleMusicCue}
         onOpenSettings={openSettings}
         onOpenWeaponLab={openMachineBay}
+        onPlayerDeath={handlePlayerDeath}
+        onPurchaseShopOffer={purchaseShopOffer}
+        {purchasedShopOfferIds}
+        {revivalNonce}
         {settings}
         {machineStats}
         weaponBuild={machineStats.weaponBuild}
@@ -627,6 +718,10 @@
     onInstallModule={installModule}
     open={machineBayOpen}
   />
+
+  {#if deathModalOpen}
+    <DeathModal onContinue={continueAfterDeath} onRestart={restartRun} />
+  {/if}
 </main>
 
 <style>

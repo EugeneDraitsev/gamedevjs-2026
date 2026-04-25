@@ -30,10 +30,7 @@
   } from "$lib/game/melee-resolver";
   import { setOutsideChunkSeed } from "$lib/game/outside-chunk-context";
   import { spawnPlayerProjectile } from "$lib/game/projectile-spawner";
-  import {
-    handlePlayerPositionChange,
-    resetPlayerAfterDeath,
-  } from "$lib/game/room-transitions";
+  import { handlePlayerPositionChange } from "$lib/game/room-transitions";
   import {
     beamDurationMs,
     createOutsidePickups,
@@ -66,6 +63,7 @@
     floorReliefMaps = true,
     floorReliefStrength = 1.4,
     gearCount = 0,
+    inventoryModuleIds = [],
     machineLoadout = createDefaultMachineLoadout(),
     machineStats,
     meleeParams,
@@ -77,6 +75,10 @@
     onMusicCue,
     onOpenSettings,
     onOpenWeaponLab,
+    onPlayerDeath,
+    onPurchaseShopOffer,
+    purchasedShopOfferIds = [],
+    revivalNonce = 0,
     settings,
     weaponBuild,
   }: GameSceneProps = $props();
@@ -90,10 +92,12 @@
       dungeon,
       floorReliefMaps,
       floorReliefStrength,
+      inventoryModuleIds,
       machineLoadout,
       machineStats,
       meleeParams,
       meleeTrailSettings,
+      purchasedShopOfferIds,
       settings,
       weaponBuild,
     });
@@ -152,6 +156,21 @@
 
   $effect(() => {
     scene.pickups.gears = gearCount;
+  });
+
+  $effect(() => {
+    revivalNonce;
+    untrack(() => {
+      if (revivalNonce <= 0 || timing.playerDeathStartedAt === 0) {
+        return;
+      }
+
+      const now = performance.now();
+      player.resetForRespawn();
+      timing.lastHazardAt = now;
+      timing.enemyWakeUntil = now + 800;
+      timing.clearPlayerDeath();
+    });
   });
 
   $effect(() => {
@@ -309,6 +328,51 @@
     });
   };
 
+  const tryPurchaseAtPosition = (position: Vec3) => {
+    const purchaseRadius = 0.95;
+
+    for (const offer of scene.availableShopOffers) {
+      const dx = position[0] - offer.position[0];
+      const dz = position[2] - offer.position[2];
+
+      if (Math.hypot(dx, dz) > purchaseRadius) {
+        continue;
+      }
+
+      if (pickups.gears < offer.price) {
+        continue;
+      }
+
+      const isHeal = offer.kind === "heal-small" || offer.kind === "heal-big";
+
+      if (
+        offer.kind === "module" &&
+        (!offer.moduleId || scene.inventoryModuleIdSet.has(offer.moduleId))
+      ) {
+        continue;
+      }
+
+      if (isHeal && player.health >= player.maxHealth) {
+        continue;
+      }
+
+      if (isHeal) {
+        const heal = Math.min(offer.value, player.maxHealth - player.health);
+
+        player.health += heal;
+        combat.popHeal(heal, [position[0], position[1] + 1.05, position[2]]);
+        gameSfx.playRepairPickup();
+      } else {
+        gameSfx.playGearPickup();
+      }
+
+      pickups.gears -= offer.price;
+      onGearCountChange?.(pickups.gears);
+      onPurchaseShopOffer?.(offer);
+      return;
+    }
+  };
+
   const handlePositionChange = (position: Vec3) => {
     const meleeFrame = combat.currentMeleeFrame;
     const pickupResult = pickups.collectAt(
@@ -339,6 +403,10 @@
     if (pickupResult.gearDelta > 0) {
       gameSfx.playGearPickup();
       onGearCountChange?.(pickups.gears);
+    }
+
+    if (scene.currentRoom.kind === "shop") {
+      tryPurchaseAtPosition(position);
     }
 
     handlePlayerPositionChange({
@@ -431,6 +499,10 @@
     );
     textures.advanceLava(delta);
 
+    if (timing.playerDeathActive) {
+      return;
+    }
+
     if (!timing.bossIntroActive && combat.currentMeleeFrame) {
       applyMeleeHitsToEnemies({
         combat,
@@ -513,19 +585,26 @@
       gameSfx.playPlayerDamage();
     }
 
-    if (result.nextHealth <= 0) {
-      resetPlayerAfterDeath({
-        combat,
-        dungeon: scene.dungeon,
-        now: performance.now(),
-        player,
-        room,
-        timing,
-      });
+    const nextHealth = result.nextHealth;
+
+    if (nextHealth <= 0) {
+      if (timing.playerDeathStartedAt === 0) {
+        timing.beginPlayerDeath(time);
+        combat.beams = [];
+        combat.bombs = [];
+        combat.enemyShots = [];
+        combat.gateLasers = [];
+        combat.projectiles = [];
+        combat.projectilePositions.clear();
+        gameSfx.playPlayerDamage();
+        onMusicCue?.("silence", { fadeOutMs: 600 });
+        onPlayerDeath?.();
+      }
+      player.health = 0;
       return;
     }
 
-    player.health = result.nextHealth;
+    player.health = nextHealth;
   };
 
   onMount(() => {
@@ -539,7 +618,7 @@
 
       previousTime = time;
 
-      if (scene.controlsLocked) {
+      if (scene.controlsLocked || timing.playerDeathActive) {
         timing.now = time;
         textures.advanceLava(delta);
       } else {

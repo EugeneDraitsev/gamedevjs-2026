@@ -193,7 +193,7 @@
   const { pause, rapier, resume, world } = useRapier();
 
   $effect(() => {
-    if (scene.controlsLocked) {
+    if (scene.controlsLocked || scene.timing.playerDeathActive) {
       pause();
     } else {
       resume();
@@ -1090,6 +1090,8 @@
     hitFlash={scene.playerHitFlash}
     machineLoadout={scene.machineLoadout}
     showWeaponAttachment={false}
+    dying={scene.timing.playerDeathActive}
+    deathProgress={scene.timing.playerDeathAnimationProgress}
   />
 
   {#if laserChargeActive}

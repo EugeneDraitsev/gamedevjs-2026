@@ -153,6 +153,7 @@
             class:polygon={room.kind === "polygon"}
             class:current={room.id === scene.currentRoom.id}
             class:sealed={!scene.isRoomUnlocked(room)}
+            class:shop={room.kind === "shop"}
             class:treasure={room.kind === "treasure"}
             style:grid-column={room.grid[0] - scene.minimapBounds.minX + 1}
             style:grid-row={room.grid[1] - scene.minimapBounds.minY + 1}
@@ -378,6 +379,11 @@
   .minimap-room.treasure {
     background: rgba(205, 168, 82, 0.72);
     border-color: rgba(255, 229, 154, 0.32);
+  }
+
+  .minimap-room.shop {
+    background: rgba(102, 184, 153, 0.62);
+    border-color: rgba(174, 240, 210, 0.32);
   }
 
   .minimap-room.polygon {
