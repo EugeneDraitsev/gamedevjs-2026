@@ -109,6 +109,14 @@ export interface VegetationInstance {
   z: number;
 }
 
+export interface ShopkeeperLocation {
+  offerPositions: [number, number, number][];
+  rotationY: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface OutsideChunkPlan {
   enemySpawns: EnemySpawn[];
   grids: ChunkGrids;
@@ -121,6 +129,7 @@ export interface OutsideChunkPlan {
   // continuous height anywhere in world space via bilinear lerp.
   sampleHeight(x: number, z: number): number;
   seed: string;
+  shopkeeper: ShopkeeperLocation | null;
   size: ChunkSize;
   spawn: [number, number, number];
   // Vegetation is grouped by kind so the renderer can make one

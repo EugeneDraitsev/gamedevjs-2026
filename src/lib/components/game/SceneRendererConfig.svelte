@@ -1,5 +1,6 @@
 <script lang="ts">
   import { useThrelte } from "@threlte/core";
+  import { onMount } from "svelte";
   import {
     ACESFilmicToneMapping,
     Color,
@@ -9,22 +10,79 @@
 
   let {
     backgroundColor = "#050403",
+    compileBeforeReady = true,
     environmentMap = null,
     exposure,
+    onProgress,
     onReady,
     preloadTextures = [],
     showEnvironmentMap = false,
+    warmupTextures = [],
   }: {
     backgroundColor?: string;
+    compileBeforeReady?: boolean;
     environmentMap?: Texture | null;
     exposure: number;
+    onProgress?: (progress: {
+      detail?: string;
+      label: string;
+      progress: number;
+    }) => void;
     onReady?: () => void;
     preloadTextures?: Array<Texture | null>;
     showEnvironmentMap?: boolean;
+    warmupTextures?: Array<Texture | null>;
   } = $props();
 
   const { camera, invalidate, renderer, scene } = useThrelte();
   const background = $derived(new Color(backgroundColor));
+  const uploadedTextures = new WeakSet<Texture>();
+
+  const existingTextures = (textures: Array<Texture | null>) =>
+    textures.filter((texture): texture is Texture => Boolean(texture));
+
+  const uploadTextureBatch = (
+    textures: Array<Texture | null>,
+    maxUploads: number
+  ) => {
+    let uploads = 0;
+
+    for (const texture of textures) {
+      if (!texture?.image || uploadedTextures.has(texture)) {
+        continue;
+      }
+
+      renderer.initTexture(texture);
+      uploadedTextures.add(texture);
+      uploads += 1;
+
+      if (uploads >= maxUploads) {
+        break;
+      }
+    }
+  };
+
+  const hasPendingUpload = (textures: Array<Texture | null>) =>
+    textures.some(
+      (texture) => texture?.image && !uploadedTextures.has(texture)
+    );
+  const clampProgress = (value: number) => Math.max(0, Math.min(1, value));
+  const emitProgress = (label: string, progress: number, detail?: string) => {
+    onProgress?.({
+      detail,
+      label,
+      progress: clampProgress(progress),
+    });
+  };
+  const getTextureProgress = (textures: Array<Texture | null>) => {
+    const total = textures.length;
+    const imageReady = textures.filter((texture) => texture?.image).length;
+    const uploaded = textures.filter(
+      (texture) => texture && uploadedTextures.has(texture)
+    ).length;
+
+    return { imageReady, total, uploaded };
+  };
 
   $effect(() => {
     scene.background =
@@ -53,37 +111,87 @@
     };
   });
 
-  $effect(() => {
+  onMount(() => {
     let frame = 0;
     let ticks = 0;
     let done = false;
     let canceled = false;
+    let compileStarted = false;
+    let warmupTicks = 0;
+
     const ready = () => {
       if (!(done || canceled)) {
         done = true;
+        emitProgress("Ready", 1, "Ready");
         onReady?.();
+        frame = requestAnimationFrame(warmup);
+      }
+    };
+
+    const warmup = () => {
+      if (canceled) {
+        return;
+      }
+
+      uploadTextureBatch(warmupTextures, 1);
+      warmupTicks += 1;
+
+      if (warmupTicks < 600 || hasPendingUpload(warmupTextures)) {
+        frame = requestAnimationFrame(warmup);
       }
     };
 
     const preload = () => {
-      for (const texture of preloadTextures) {
-        if (texture?.image) {
-          renderer.initTexture(texture);
+      const textureProgress = getTextureProgress(preloadTextures);
+      const blockingTextures = existingTextures(preloadTextures);
+      const blockingReady =
+        textureProgress.total === 0 ||
+        (blockingTextures.length === textureProgress.total &&
+          blockingTextures.every(
+            (texture) => texture.image && uploadedTextures.has(texture)
+          ));
+
+      uploadTextureBatch(blockingTextures, 2);
+
+      if (camera.current && blockingReady) {
+        if (!compileBeforeReady) {
+          ready();
+          return;
         }
+
+        if (!compileStarted) {
+          compileStarted = true;
+          emitProgress("Compiling Scene", 0.92, "Compiling shaders");
+          renderer
+            .compileAsync(scene, camera.current)
+            .catch(() => undefined)
+            .finally(() =>
+              requestAnimationFrame(() => requestAnimationFrame(ready))
+            );
+        }
+
+        return;
       }
 
-      if (
-        camera.current &&
-        preloadTextures.some(Boolean) &&
-        preloadTextures.every((texture) => !texture || texture.image)
-      ) {
-        renderer
-          .compileAsync(scene, camera.current)
-          .catch(() => undefined)
-          .finally(() =>
-            requestAnimationFrame(() => requestAnimationFrame(ready))
+      if (textureProgress.total > 0) {
+        const imageRatio = textureProgress.imageReady / textureProgress.total;
+        const uploadRatio = textureProgress.uploaded / textureProgress.total;
+
+        if (textureProgress.imageReady < textureProgress.total) {
+          emitProgress(
+            "Loading Textures",
+            0.08 + imageRatio * 0.46,
+            `Textures ${textureProgress.imageReady}/${textureProgress.total}`
           );
-        return;
+        } else {
+          emitProgress(
+            "Uploading Textures",
+            0.54 + uploadRatio * 0.34,
+            `GPU upload ${textureProgress.uploaded}/${textureProgress.total}`
+          );
+        }
+      } else {
+        emitProgress("Preparing Scene", 0.72, "Preparing renderer");
       }
 
       ticks += 1;

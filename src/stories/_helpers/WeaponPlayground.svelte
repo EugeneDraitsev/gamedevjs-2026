@@ -1,11 +1,18 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { Button, Folder, List, Pane } from "svelte-tweakpane-ui";
+  import { gameMusic } from "$lib/audio/music";
+  import { gameSfx } from "$lib/audio/sfx";
+  import AppModalShell from "$lib/components/app/AppModalShell.svelte";
+  import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import GameScene from "$lib/components/game/GameScene.svelte";
   import {
     createSceneSettings,
+    loadSceneSettings,
     type SceneSettings,
+    saveSceneSettings,
   } from "$lib/config/scene-settings";
+  import { isEditableTarget } from "$lib/game/dom";
   import { cheats } from "$lib/stores/cheats.svelte";
   import {
     buildPlaygroundDungeon,
@@ -22,7 +29,8 @@
 
   let { initialWeaponId = weaponPlaygroundPresets[0].id }: Props = $props();
 
-  let settings = $state<SceneSettings>(createSceneSettings());
+  let settings = $state<SceneSettings>(loadSceneSettings());
+  let settingsOpen = $state(false);
   let weaponId = $state(weaponPlaygroundPresets[0].id);
   let restartTick = $state(0);
   let DebugPane = $state<
@@ -45,6 +53,7 @@
   const trailSettings = $derived(buildPlaygroundTrailSettings(settings));
 
   const restart = () => {
+    settingsOpen = false;
     restartTick += 1;
   };
 
@@ -52,6 +61,20 @@
     Object.assign(settings, createSceneSettings());
     restart();
   };
+
+  const closeSettings = () => {
+    settingsOpen = false;
+  };
+
+  const openSettings = () => {
+    settingsOpen = true;
+  };
+
+  $effect(() => {
+    saveSceneSettings(settings);
+    gameMusic.syncMix(settings);
+    gameSfx.syncMix(settings);
+  });
 
   onMount(() => {
     if (initialWeaponId && weaponById[initialWeaponId]) {
@@ -63,6 +86,21 @@
     import("$lib/components/debug/DebugPane.svelte").then((module) => {
       DebugPane = module.default;
     });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Escape" || isEditableTarget(event.target)) {
+        return;
+      }
+
+      settingsOpen = !settingsOpen;
+      event.preventDefault();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   });
 
   onDestroy(() => {
@@ -74,7 +112,7 @@
   {#key sceneKey}
     <GameScene
       collectedArtifactRoomIds={[]}
-      controlsLocked={false}
+      controlsLocked={settingsOpen}
       {dungeon}
       enemyAiPaused
       enemySpawnOverride={{
@@ -84,9 +122,10 @@
       }}
       {meleeParams}
       meleeTrailSettings={trailSettings}
+      machineLoadout={currentWeapon.machineLoadout}
       machineStats={currentWeapon.machineStats}
       onCollectArtifact={noop}
-      onOpenSettings={noop}
+      onOpenSettings={openSettings}
       onOpenWeaponLab={noop}
       {settings}
       weaponBuild={currentWeapon.weaponBuild}
@@ -110,6 +149,16 @@
       onResetLevel={restart}
       onResetScene={restart}
     />
+  {/if}
+
+  {#if settingsOpen}
+    <AppModalShell onClose={closeSettings} open={settingsOpen}>
+      <SettingsPanel
+        bind:settings
+        onBack={closeSettings}
+        onResetDefaults={resetDefaults}
+      />
+    </AppModalShell>
   {/if}
 </main>
 

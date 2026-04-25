@@ -383,21 +383,21 @@
     topColor: { value: new Color("#d9e1d9") },
   };
   const outsideHazeVertex = `
-                                      varying vec2 vUv;
-                                      void main() {
-                                        vUv = uv;
-                                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                                      }
-                                    `;
+                                                varying vec2 vUv;
+                                                void main() {
+                                                  vUv = uv;
+                                                  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                                                }
+                                              `;
   const outsideHazeFragment = `
-                                      varying vec2 vUv;
-                                      uniform vec3 bottomColor;
-                                      uniform vec3 topColor;
-                                      void main() {
-                                        vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
-                                        gl_FragColor = vec4(color, 0.42);
-                                      }
-                                    `;
+                                                varying vec2 vUv;
+                                                uniform vec3 bottomColor;
+                                                uniform vec3 topColor;
+                                                void main() {
+                                                  vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
+                                                  gl_FragColor = vec4(color, 0.42);
+                                                }
+                                              `;
 
   let {
     animationNow = 0,
@@ -416,6 +416,7 @@
     outsideRocksTexture = null,
     outsideWaterDecalTexture = null,
     outsideWaterTexture = null,
+    outsideDetailLevel = 3,
     startAnimationAt = 0,
   }: {
     animationNow?: number;
@@ -434,10 +435,14 @@
     outsideRocksTexture?: Texture | null;
     outsideWaterDecalTexture?: Texture | null;
     outsideWaterTexture?: Texture | null;
+    outsideDetailLevel?: number;
     startAnimationAt?: number;
   } = $props();
 
   const outside = $derived(environment === "outside-start");
+  const outsideAtmosphereReady = $derived(outsideDetailLevel >= 1);
+  const outsideDecorReady = $derived(outsideDetailLevel >= 2);
+  const outsideColliderReady = $derived(outsideDetailLevel >= 3);
   const exitReveal = $derived(Math.max(0, Math.min(1, floorExitOpenAmount)));
   const bannerLift = $derived(exitReveal * exitReveal);
   const startAnimationAge = $derived(
@@ -536,10 +541,11 @@
 {/if}
 
 {#if outside}
-  <OutsideAtmosphere
-    grassCount={5500}
-    bounds={{ xMin: -36, xMax: 36, zMin: -88, zMax: 82 }}
-    avoid={[
+  {#if outsideAtmosphereReady}
+    <OutsideAtmosphere
+      grassCount={5500}
+      bounds={{ xMin: -36, xMax: 36, zMin: -88, zMax: 82 }}
+      avoid={[
       // roads (central thoroughfare + side spurs)
       ...outsideRoads.map((r) => ({
         x: r.position[0],
@@ -593,21 +599,37 @@
         z: p.position[2],
         r: 2.6,
       })),
-    ]}
-  />
+      ]}
+    />
+  {/if}
 
   <OutsideTerrain texture={outsideEarthTexture} />
 
-  <T.Mesh position={[0, 12, -112]} rotation={[-0.14, 0, 0]}>
-    <T.PlaneGeometry args={[150, 58]} />
-    <T.ShaderMaterial
-      depthWrite={false}
-      fragmentShader={outsideHazeFragment}
-      transparent
-      uniforms={outsideHazeUniforms}
-      vertexShader={outsideHazeVertex}
-    />
-  </T.Mesh>
+  {#if outsideGateUnlocked}
+    {#each [-1, 1] as side}
+      <T.Mesh position={[side * 47, 12, -112]} rotation={[-0.14, 0, 0]}>
+        <T.PlaneGeometry args={[56, 58]} />
+        <T.ShaderMaterial
+          depthWrite={false}
+          fragmentShader={outsideHazeFragment}
+          transparent
+          uniforms={outsideHazeUniforms}
+          vertexShader={outsideHazeVertex}
+        />
+      </T.Mesh>
+    {/each}
+  {:else}
+    <T.Mesh position={[0, 12, -112]} rotation={[-0.14, 0, 0]}>
+      <T.PlaneGeometry args={[150, 58]} />
+      <T.ShaderMaterial
+        depthWrite={false}
+        fragmentShader={outsideHazeFragment}
+        transparent
+        uniforms={outsideHazeUniforms}
+        vertexShader={outsideHazeVertex}
+      />
+    </T.Mesh>
+  {/if}
 
   <!-- Mountain ring is now carved directly into the terrain heightmap;
        we only need the invisible collider wall so the player can't walk
@@ -715,21 +737,27 @@
        follows the plan's actual rivers. Old codex water / earth /
        rock decal overlays removed — they floated above the new
        heightmap and the shader handles surface detail now. -->
-  <OutsideProceduralWater />
+  {#if outsideAtmosphereReady}
+    <OutsideProceduralWater />
+  {/if}
 
   <!-- Procedural trees + bushes + rocks — driven by the chunk plan.
        Visual meshes and colliders are split so the renderer can
-       batch instanced meshes while rapier still gets one collider
-       per solid tree / rock. -->
+       batch instanced meshes while rapier gets a capped collider set
+       after the playable scene is visible. -->
   <OutsideFoliage />
-  <OutsideVegetationColliders />
+  {#if outsideColliderReady}
+    <OutsideVegetationColliders />
+  {/if}
 
   <!-- Rocks, camps, POIs etc are now picked procedurally by the
        outside-chunk pipeline and rendered via OutsidePoIs / the rock
        instance pass inside OutsideFoliage. The codex hand-authored
        arrays were still around but conflicted with the plan's
        landmark selection. -->
-  <OutsidePoIs />
+  {#if outsideDecorReady}
+    <OutsidePoIs />
+  {/if}
 
   <OutsideMechanicalCastleEntrance
     {animationNow}
@@ -737,15 +765,14 @@
   />
 {/if}
 
-{#if environment === "core-prison"}
-  <StartingMachineSetpiece
-    animationAge={startAnimationAge}
-    breakAge={corePrisonSealBreakAge}
-    locked={corePrisonSealLocked}
-    sealHits={corePrisonSealHits}
-    sealHitsRequired={corePrisonSealHitsRequired}
-  />
-{/if}
+<StartingMachineSetpiece
+  active={environment === "core-prison"}
+  animationAge={startAnimationAge}
+  breakAge={corePrisonSealBreakAge}
+  locked={environment === "core-prison" && corePrisonSealLocked}
+  sealHits={corePrisonSealHits}
+  sealHitsRequired={corePrisonSealHitsRequired}
+/>
 
 {#if environment === "training-range"}
   <T.Group position={[2.9, 0.65, -1.6]} rotation={[0, 0, -0.32]}>

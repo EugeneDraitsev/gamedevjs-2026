@@ -88,7 +88,7 @@
 </script>
 
 <main class="stage" style:--h={height}>
-  <Canvas dpr={2} shadows>
+  <Canvas dpr={1} shadows>
     <SceneRendererConfig
       exposure={1.1}
       {preloadTextures}

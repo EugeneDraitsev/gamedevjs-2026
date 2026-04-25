@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Stats from "stats.js";
+  import { onMount } from "svelte";
   import type { ListChangeEvent, ListOptions } from "svelte-tweakpane-ui";
   import {
     Button,
@@ -150,9 +152,39 @@
     settings = $bindable(),
   }: DebugPaneProps = $props();
   let debugFloor = $state(String(initialDungeonFloor));
+  let statsContainer = $state<HTMLDivElement>();
 
   $effect(() => {
     debugFloor = String(currentFloor);
+  });
+
+  onMount(() => {
+    if (!statsContainer) {
+      return;
+    }
+
+    const stats = new Stats();
+    let frameId = 0;
+
+    stats.showPanel(0);
+    stats.dom.title = "FPS graph";
+    stats.dom.style.position = "static";
+    stats.dom.style.cursor = "default";
+    stats.dom.style.opacity = "1";
+    stats.dom.style.zIndex = "auto";
+    statsContainer.append(stats.dom);
+
+    const updateStats = () => {
+      stats.update();
+      frameId = requestAnimationFrame(updateStats);
+    };
+
+    frameId = requestAnimationFrame(updateStats);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      stats.dom.remove();
+    };
   });
 
   const resetAllDefaults = () => {
@@ -179,6 +211,12 @@
 </script>
 
 <div class="debug-anchor">
+  <div
+    bind:this={statsContainer}
+    class="fps-counter"
+    aria-label="FPS performance graph"
+  ></div>
+
   <Pane position="inline" title="Debug Controls" width={320}>
     <Folder title="Camera" expanded={false}>
       <List
@@ -568,6 +606,10 @@
         on:click={() => cheats.requestRevealMap()}
         title="Reveal Entire Map"
       />
+      <Button
+        on:click={() => cheats.requestGiveAllModules()}
+        title="Give All Modules"
+      />
       <Button on:click={() => cheats.reset()} title="Reset cheat defaults" />
     </Folder>
 
@@ -602,5 +644,28 @@
     right: 1rem;
     bottom: 1rem;
     z-index: 12;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    align-items: flex-end;
+  }
+
+  .fps-counter {
+    display: block;
+    min-inline-size: 80px;
+    min-block-size: 48px;
+    padding: 0.36rem;
+    overflow: hidden;
+    background: rgba(13, 11, 15, 0.86);
+    border: 1px solid rgba(236, 224, 196, 0.22);
+    border-radius: 0.45rem;
+    box-shadow:
+      0 0.65rem 1.6rem rgba(0, 0, 0, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(8px);
+  }
+
+  .fps-counter :global(canvas) {
+    display: block;
   }
 </style>

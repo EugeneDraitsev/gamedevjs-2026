@@ -1,11 +1,24 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { Button, Folder, List, Pane } from "svelte-tweakpane-ui";
+  import { Button, Checkbox, Folder, List, Pane } from "svelte-tweakpane-ui";
+  import AppModalShell from "$lib/components/app/AppModalShell.svelte";
+  import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import GameScene from "$lib/components/game/GameScene.svelte";
+  import MachineBayModal from "$lib/components/machine-bay/MachineBayModal.svelte";
+  import {
+    computeMachineStats,
+    createDefaultMachineLoadout,
+    type MachineLoadout,
+    type MachineModuleId,
+    type MachineSlotId,
+    machineModuleIds,
+    moduleFitsSlot,
+  } from "$lib/config/machine-modules";
   import {
     createSceneSettings,
     type SceneSettings,
   } from "$lib/config/scene-settings";
+  import { isEditableTarget } from "$lib/game/dom";
   import { cheats } from "$lib/stores/cheats.svelte";
   import {
     buildPlaygroundDungeon,
@@ -14,8 +27,6 @@
     type CombatPreset,
     combatPresets,
     noop,
-    playgroundMachineStats,
-    playgroundWeaponBuild,
   } from "./playground-scene";
 
   interface Props {
@@ -25,8 +36,15 @@
   let { initialPresetId = combatPresets[0].id }: Props = $props();
 
   let settings = $state<SceneSettings>(createSceneSettings());
+  let settingsOpen = $state(false);
+  let machineBayOpen = $state(false);
   let presetId = $state(combatPresets[0].id);
   let restartTick = $state(0);
+  let infiniteHealth = $state(false);
+  let oneHitKill = $state(false);
+  let machineLoadout = $state<MachineLoadout>(createDefaultMachineLoadout());
+  let moduleInventory = $state<MachineModuleId[]>([]);
+  let debugEnabled = $state(false);
   let DebugPane = $state<
     typeof import("$lib/components/debug/DebugPane.svelte").default | null
   >(null);
@@ -43,10 +61,29 @@
   const dungeon = $derived(
     buildPlaygroundDungeon(currentPreset.templateId, sceneKey)
   );
+  const machineStats = $derived(computeMachineStats(machineLoadout));
   const meleeParams = $derived(buildPlaygroundMeleeParams(settings));
   const trailSettings = $derived(buildPlaygroundTrailSettings(settings));
 
+  const giveAllModules = () => {
+    const ownedModuleIds = new Set<MachineModuleId>([
+      ...Object.values(machineLoadout).filter(
+        (moduleId): moduleId is MachineModuleId => Boolean(moduleId)
+      ),
+      ...moduleInventory,
+    ]);
+    const missingModuleIds = machineModuleIds.filter(
+      (moduleId) => !ownedModuleIds.has(moduleId)
+    );
+
+    if (missingModuleIds.length > 0) {
+      moduleInventory = [...moduleInventory, ...missingModuleIds];
+    }
+  };
+
   const restart = () => {
+    settingsOpen = false;
+    machineBayOpen = false;
     restartTick += 1;
   };
 
@@ -55,22 +92,121 @@
     restart();
   };
 
+  const closeSettings = () => {
+    settingsOpen = false;
+  };
+
+  const openSettings = () => {
+    machineBayOpen = false;
+    settingsOpen = true;
+  };
+
+  const openMachineBay = () => {
+    settingsOpen = false;
+    machineBayOpen = true;
+  };
+
+  const removeInventoryModule = (moduleId: MachineModuleId) => {
+    const index = moduleInventory.indexOf(moduleId);
+
+    if (index === -1) {
+      return null;
+    }
+
+    moduleInventory = moduleInventory.toSpliced(index, 1);
+    return moduleId;
+  };
+
+  const installModule = (moduleId: MachineModuleId, slotId: MachineSlotId) => {
+    if (!moduleFitsSlot(moduleId, slotId)) {
+      return;
+    }
+
+    const removed = removeInventoryModule(moduleId);
+
+    if (!removed) {
+      return;
+    }
+
+    const previous = machineLoadout[slotId];
+
+    machineLoadout = { ...machineLoadout, [slotId]: moduleId };
+
+    if (previous) {
+      moduleInventory = [...moduleInventory, previous];
+    }
+  };
+
+  const ejectModule = (slotId: MachineSlotId) => {
+    if (slotId === "attack" || slotId === "body" || slotId === "utility-c") {
+      return;
+    }
+
+    const moduleId = machineLoadout[slotId];
+
+    if (!moduleId) {
+      return;
+    }
+
+    machineLoadout = { ...machineLoadout, [slotId]: null };
+    moduleInventory = [...moduleInventory, moduleId];
+  };
+
   $effect(() => {
-    cheats.infiniteHealth = currentPreset.id === "gate-keeper";
+    cheats.infiniteHealth = infiniteHealth;
+    cheats.oneHitKill = oneHitKill;
   });
 
   onMount(() => {
     if (initialPresetId && presetById[initialPresetId]) {
       presetId = initialPresetId;
+      infiniteHealth = initialPresetId === "gate-keeper";
     }
 
-    import("$lib/components/debug/DebugPane.svelte").then((module) => {
-      DebugPane = module.default;
-    });
+    giveAllModules();
+
+    debugEnabled =
+      new URL(window.location.href).searchParams.get("debug") === "true";
+
+    if (debugEnabled) {
+      import("$lib/components/debug/DebugPane.svelte").then((module) => {
+        DebugPane = module.default;
+      });
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      if (event.code === "Escape") {
+        if (machineBayOpen) {
+          machineBayOpen = false;
+        } else {
+          settingsOpen = !settingsOpen;
+        }
+
+        event.preventDefault();
+        return;
+      }
+
+      if (event.code === "KeyE" && !event.repeat) {
+        machineBayOpen = !machineBayOpen;
+        settingsOpen = false;
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   });
 
   onDestroy(() => {
     cheats.infiniteHealth = false;
+    cheats.oneHitKill = false;
   });
 </script>
 
@@ -78,34 +214,43 @@
   {#key sceneKey}
     <GameScene
       collectedArtifactRoomIds={[]}
-      controlsLocked={false}
+      controlsLocked={settingsOpen || machineBayOpen}
       {dungeon}
       enemySpawnOverride={{
         enemyCount: currentPreset.enemyCount,
         enemyTemplateId: currentPreset.enemyTemplateId,
       }}
+      inventoryModuleIds={moduleInventory}
+      {machineLoadout}
       {meleeParams}
       meleeTrailSettings={trailSettings}
-      machineStats={playgroundMachineStats}
+      {machineStats}
       onCollectArtifact={noop}
-      onOpenSettings={noop}
-      onOpenWeaponLab={noop}
+      onOpenSettings={openSettings}
+      onOpenWeaponLab={openMachineBay}
       {settings}
-      weaponBuild={playgroundWeaponBuild}
+      weaponBuild={machineStats.weaponBuild}
     />
   {/key}
 
   <div class="combat-pane">
-    <Pane position="inline" title="Combat Preset" width={280}>
+    <Pane position="inline" title="Combat Preset" width={300}>
       <Folder title="Encounter">
         <List bind:value={presetId} label="Preset" options={presetOptions} />
         <Button on:click={restart} title="Restart fight" />
+      </Folder>
+      <Folder title="Cheats">
+        <Checkbox bind:value={oneHitKill} label="One-Hit Kill" />
+        <Checkbox bind:value={infiniteHealth} label="Infinite Health" />
+        <Button on:click={giveAllModules} title="Give all modules" />
+        <Button on:click={() => cheats.requestRevealMap()} title="Reveal map" />
+        <Button on:click={openMachineBay} title="Open loadout (E)" />
       </Folder>
       <p class="hint">{currentPreset.description}</p>
     </Pane>
   </div>
 
-  {#if DebugPane}
+  {#if debugEnabled && DebugPane}
     <DebugPane
       bind:settings
       onResetDefaults={resetDefaults}
@@ -113,6 +258,27 @@
       onResetScene={restart}
     />
   {/if}
+
+  {#if settingsOpen}
+    <AppModalShell onClose={closeSettings} open={settingsOpen}>
+      <SettingsPanel
+        bind:settings
+        onBack={closeSettings}
+        onResetDefaults={resetDefaults}
+      />
+    </AppModalShell>
+  {/if}
+
+  <MachineBayModal
+    gearCount={0}
+    {machineLoadout}
+    {machineStats}
+    {moduleInventory}
+    onClose={() => (machineBayOpen = false)}
+    onEjectModule={ejectModule}
+    onInstallModule={installModule}
+    open={machineBayOpen}
+  />
 </main>
 
 <style>
@@ -133,7 +299,7 @@
   .combat-pane {
     position: fixed;
     inset-block-start: 1rem;
-    inset-inline-end: 1rem;
+    inset-inline-start: 1rem;
     z-index: 12;
   }
 

@@ -39,7 +39,7 @@
 </script>
 
 <div class="stage" style:--h={height}>
-  <Canvas dpr={2} shadows>
+  <Canvas dpr={1} shadows>
     <T.PerspectiveCamera fov={34} makeDefault position={[0, 3.2, 8.5]}>
       <OrbitControls
         enableDamping

@@ -34,7 +34,7 @@
   {/if}
 
   <div class="canvas">
-    <Canvas dpr={2} shadows>
+    <Canvas dpr={1} shadows>
       <T.PerspectiveCamera fov={42} makeDefault position={cameraPosition}>
         <OrbitControls
           {autoRotate}

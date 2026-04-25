@@ -4,12 +4,14 @@ import type { MusicCue, MusicTransitionOptions } from "$lib/audio/music";
 import type { SwingParams } from "$lib/combat/melee-swing";
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
 import type {
+  MachineLoadout,
   MachineModuleId,
   MachineModuleTemplate,
   MachineStats,
 } from "$lib/config/machine-modules";
 import type { RoomTemplate } from "$lib/config/room-templates";
 import type { SceneSettings } from "$lib/config/scene-settings";
+import type { ShopOffer } from "$lib/config/shop-offers";
 import type { WeaponBuild } from "$lib/config/weapon-graph";
 import type {
   ActiveBeam,
@@ -21,6 +23,7 @@ import type {
   MeleeTrailSettings,
   MinimapBounds,
   ProjectileData,
+  ProjectileImpactBurst,
   RenderedDeflectBurst,
   RoomHazard,
   RoomPlatform,
@@ -39,6 +42,8 @@ export interface GameSceneProps {
   floorReliefMaps?: boolean;
   floorReliefStrength?: number;
   gearCount?: number;
+  inventoryModuleIds?: MachineModuleId[];
+  machineLoadout?: MachineLoadout;
   machineStats: MachineStats;
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;
@@ -46,11 +51,25 @@ export interface GameSceneProps {
   onCollectArtifact?: (roomId: string, type: MachineModuleId) => void;
   onEndDemo?: () => void;
   onGearCountChange?: (gearCount: number) => void;
+  onLoadProgress?: (progress: SceneLoadProgress) => void;
   onMusicCue?: (cue: MusicCue, options?: MusicTransitionOptions) => void;
   onOpenSettings?: () => void;
   onOpenWeaponLab?: () => void;
+  onPlayerDeath?: () => void;
+  onPurchaseShopOffer?: (offer: ShopOffer) => void;
+  onReady?: () => void;
+  purchasedShopOfferIds?: string[];
+  revivalNonce?: number;
   settings: SceneSettings;
+  showLoader?: boolean;
+  showPlayer?: boolean;
   weaponBuild: WeaponBuild;
+}
+
+export interface SceneLoadProgress {
+  detail?: string;
+  label: string;
+  progress: number;
 }
 
 export interface GameSceneEnvironmentProps {
@@ -113,6 +132,7 @@ export interface PlayerMeleeVisualsProps {
   meleeShowSword: boolean;
   meleeSwordOpacity: number;
   meleeTrailSettings: MeleeTrailSettings;
+  meleeWeaponForm?: "axe" | "sword";
   swingActiveFlare: number;
   swingBladeLength: number;
   swingBladeMidZ: number;
@@ -139,5 +159,6 @@ export interface ProjectileProps {
   data: ProjectileData;
   enemyTargets?: Vec3[];
   onExpire?: (id: string) => void;
-  onMove?: (id: string, position: Vec3) => void;
+  onImpact?: (impact: Omit<ProjectileImpactBurst, "createdAt" | "id">) => void;
+  onMove?: (id: string, x: number, y: number, z: number) => void;
 }

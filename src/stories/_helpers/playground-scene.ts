@@ -3,6 +3,7 @@ import type { DungeonLayout } from "$lib/config/dungeon-layout";
 import {
   computeMachineStats,
   createDefaultMachineLoadout,
+  type MachineModuleId,
 } from "$lib/config/machine-modules";
 import { roomTemplateById } from "$lib/config/room-templates";
 import type { SceneSettings } from "$lib/config/scene-settings";
@@ -23,7 +24,8 @@ export const playgroundRoomId = "playground-room";
 export const buildPlaygroundDungeon = (
   templateId: string,
   seed = "playground",
-  previewExits = false
+  previewExits = false,
+  artifactType: MachineModuleId = "ammo-hopper"
 ): DungeonLayout => {
   const template = roomTemplateById[templateId];
 
@@ -49,9 +51,7 @@ export const buildPlaygroundDungeon = (
         kind: template.kind,
         label: template.label,
         templateId,
-        ...(template.kind === "treasure"
-          ? { artifactType: "ammo-hopper" }
-          : {}),
+        ...(template.kind === "treasure" ? { artifactType } : {}),
       },
     },
     seed,
@@ -90,7 +90,7 @@ export const buildPlaygroundDungeon = (
       kind: "treasure",
       label: "Treasure",
       templateId: "treasure-artifact",
-      artifactType: "ammo-hopper",
+      artifactType,
     };
   }
 
@@ -100,6 +100,7 @@ export const buildPlaygroundDungeon = (
 export const playgroundMachineStats = computeMachineStats(
   createDefaultMachineLoadout()
 );
+export const playgroundMachineLoadout = createDefaultMachineLoadout();
 export const playgroundWeaponBuild = playgroundMachineStats.weaponBuild;
 
 const buildGraphWeapon = (types: WeaponNodeType[]): WeaponBuild => {
@@ -125,6 +126,7 @@ export interface WeaponPlaygroundPreset {
   description: string;
   id: string;
   label: string;
+  machineLoadout: ReturnType<typeof createDefaultMachineLoadout>;
   machineStats: typeof playgroundMachineStats;
   weaponBuild: WeaponBuild;
 }
@@ -137,12 +139,14 @@ const buildPresetMachineStats = (weaponBuild: WeaponBuild) => ({
 const buildMachinePreset = (
   attack: NonNullable<ReturnType<typeof createDefaultMachineLoadout>["attack"]>
 ) => {
-  const machineStats = computeMachineStats({
+  const machineLoadout = {
     ...createDefaultMachineLoadout(),
     attack,
-  });
+  };
+  const machineStats = computeMachineStats(machineLoadout);
 
   return {
+    machineLoadout,
     machineStats,
     weaponBuild: machineStats.weaponBuild,
   };
@@ -152,6 +156,7 @@ const buildGraphPreset = (types: WeaponNodeType[]) => {
   const weaponBuild = buildGraphWeapon(types);
 
   return {
+    machineLoadout: playgroundMachineLoadout,
     machineStats: buildPresetMachineStats(weaponBuild),
     weaponBuild,
   };
@@ -162,6 +167,7 @@ export const weaponPlaygroundPresets: WeaponPlaygroundPreset[] = [
     description: "Starter rivet shot with the normal machine loadout.",
     id: "default",
     label: "Default Rivet",
+    machineLoadout: playgroundMachineLoadout,
     machineStats: playgroundMachineStats,
     weaponBuild: playgroundWeaponBuild,
   },
@@ -184,7 +190,7 @@ export const weaponPlaygroundPresets: WeaponPlaygroundPreset[] = [
     ...buildGraphPreset(["lob-common"]),
   },
   {
-    description: "Charged beam from the Pressure Lance module.",
+    description: "Charged beam from the Laser Beam module.",
     id: "laser",
     label: "Laser",
     ...buildMachinePreset("pressure-lance-nozzle"),

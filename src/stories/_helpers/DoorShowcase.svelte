@@ -28,7 +28,7 @@
 </script>
 
 <div class="stage" style:--h={height}>
-  <Canvas dpr={2} shadows>
+  <Canvas dpr={1} shadows>
     <T.PerspectiveCamera fov={46} makeDefault position={[0, 2.8, 6.2]}>
       <OrbitControls enableDamping enableZoom target={[0, 1.9, 0]} />
     </T.PerspectiveCamera>

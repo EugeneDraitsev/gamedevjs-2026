@@ -3,7 +3,7 @@
 
 import { buildBiome } from "./biome";
 import { buildEnemySpawns } from "./enemies";
-import { buildHeightmap, heightSampler } from "./heightmap";
+import { buildHeightmap, cellToWorld, heightSampler } from "./heightmap";
 import { buildHydrology } from "./hydrology";
 import { buildPois } from "./pois";
 import { createRng, hashSeed } from "./rng";
@@ -11,10 +11,362 @@ import { buildRoads } from "./roads";
 import {
   BIOME_ORDER,
   type BiomeId,
+  biomeIndex,
+  type ChunkFeature,
   type ChunkSize,
   type OutsideChunkPlan,
+  type ShopkeeperLocation,
 } from "./types";
 import { buildVegetation } from "./vegetation";
+
+interface ShopkeeperSearchParams {
+  biome: Uint8Array;
+  height: Float32Array;
+  playable: Uint8Array;
+  pois: ChunkFeature[];
+  roadCost: Float32Array;
+  seedHash: number;
+  size: ChunkSize;
+  water: Uint8Array;
+  waterLevel: number;
+}
+
+const SHOPKEEPER_MIN_POI_DISTANCE = 16;
+const SHOPKEEPER_MIDDLE_HALF_DEPTH = 22;
+const SHOPKEEPER_MIDDLE_HALF_WIDTH = 24;
+const SHOPKEEPER_FALLBACK_HALF_DEPTH = 54;
+const SHOPKEEPER_FALLBACK_HALF_WIDTH = 28;
+const SHOP_OFFER_CLEARANCE_RADIUS = 0.82;
+const SHOP_OFFER_FORWARD_DISTANCE = 3.1;
+const SHOP_OFFER_SIDE_OFFSETS = [-5.4, -1.8, 1.8, 5.4] as const;
+
+interface ShopkeeperCandidateLayout {
+  offerPositions: [number, number, number][];
+  rotationY: number;
+  score: number;
+}
+
+const worldToGridIndex = (
+  { size }: ShopkeeperSearchParams,
+  worldX: number,
+  worldZ: number
+) => {
+  const col = Math.round(
+    ((worldX + size.width * 0.5) / size.width) * size.cols
+  );
+  const row = Math.round(
+    ((worldZ + size.depth * 0.5) / size.depth) * size.rows
+  );
+
+  if (col < 0 || col > size.cols || row < 0 || row > size.rows) {
+    return null;
+  }
+
+  return row * (size.cols + 1) + col;
+};
+
+const isDryPlayablePoint = (
+  params: ShopkeeperSearchParams,
+  worldX: number,
+  worldZ: number
+) => {
+  const index = worldToGridIndex(params, worldX, worldZ);
+
+  if (index === null) {
+    return false;
+  }
+
+  return (
+    params.playable[index] !== 0 &&
+    params.water[index] === 0 &&
+    params.height[index] >= params.waterLevel + 0.05
+  );
+};
+
+const isDryPlayableArea = (
+  params: ShopkeeperSearchParams,
+  worldX: number,
+  worldZ: number,
+  radius: number
+) =>
+  [
+    [0, 0],
+    [radius, 0],
+    [-radius, 0],
+    [0, radius],
+    [0, -radius],
+  ].every(([dx, dz]) => isDryPlayablePoint(params, worldX + dx, worldZ + dz));
+
+const getGridHeight = (
+  params: ShopkeeperSearchParams,
+  worldX: number,
+  worldZ: number
+) => {
+  const index = worldToGridIndex(params, worldX, worldZ);
+
+  return index === null ? params.waterLevel : params.height[index];
+};
+
+const findShopkeeperLayout = (
+  params: ShopkeeperSearchParams,
+  worldX: number,
+  worldZ: number
+): ShopkeeperCandidateLayout | null => {
+  const baseHeight = getGridHeight(params, worldX, worldZ);
+  const offerPositions = SHOP_OFFER_SIDE_OFFSETS.map((sideOffset) => {
+    const x = worldX + sideOffset;
+    const z = worldZ + SHOP_OFFER_FORWARD_DISTANCE;
+
+    return [x, getGridHeight(params, x, z), z] as [number, number, number];
+  });
+
+  if (
+    !offerPositions.every(([x, y, z]) => {
+      const closeToShopkeeperHeight = Math.abs(y - baseHeight) < 0.72;
+
+      return (
+        closeToShopkeeperHeight &&
+        isDryPlayableArea(params, x, z, SHOP_OFFER_CLEARANCE_RADIUS)
+      );
+    })
+  ) {
+    return null;
+  }
+
+  const averageHeightDelta =
+    offerPositions.reduce(
+      (total, [, y]) => total + Math.abs(y - baseHeight),
+      0
+    ) / offerPositions.length;
+  const centerBias = 1 - Math.min(1, Math.hypot(worldX, worldZ) / 72);
+
+  return {
+    offerPositions,
+    rotationY: 0,
+    score: centerBias - averageHeightDelta * 0.8,
+  };
+};
+
+const isShopkeeperCellEligible = (
+  params: ShopkeeperSearchParams,
+  index: number,
+  worldX: number,
+  worldZ: number,
+  forestId: number,
+  grassId: number
+): boolean => {
+  const { biome, height, pois, playable, roadCost, water, waterLevel } = params;
+  if (!playable[index]) {
+    return false;
+  }
+  if (water[index] !== 0) {
+    return false;
+  }
+  if (height[index] < waterLevel + 0.05) {
+    return false;
+  }
+  const b = biome[index];
+  if (b !== forestId && b !== grassId) {
+    return false;
+  }
+  if (roadCost[index] > 60) {
+    return false;
+  }
+  if (Math.abs(worldX) > SHOPKEEPER_MIDDLE_HALF_WIDTH) {
+    return false;
+  }
+  if (Math.abs(worldZ) > SHOPKEEPER_MIDDLE_HALF_DEPTH) {
+    return false;
+  }
+  return !pois.some(
+    (poi) =>
+      (poi.x - worldX) ** 2 + (poi.z - worldZ) ** 2 <
+      SHOPKEEPER_MIN_POI_DISTANCE ** 2
+  );
+};
+
+const isShopkeeperFallbackCellEligible = (
+  params: ShopkeeperSearchParams,
+  index: number,
+  worldX: number,
+  worldZ: number
+) => {
+  const { height, playable, roadCost, water, waterLevel } = params;
+
+  if (!playable[index] || water[index] !== 0) {
+    return false;
+  }
+  if (height[index] < waterLevel + 0.05) {
+    return false;
+  }
+  if (roadCost[index] > 140) {
+    return false;
+  }
+  if (Math.abs(worldX) > SHOPKEEPER_FALLBACK_HALF_WIDTH) {
+    return false;
+  }
+  if (Math.abs(worldZ) > SHOPKEEPER_FALLBACK_HALF_DEPTH) {
+    return false;
+  }
+  return true;
+};
+
+interface ShopkeeperSearchCandidate {
+  i: number;
+  layout: ShopkeeperCandidateLayout;
+  score: number;
+}
+
+const makeShopkeeperJitter = (seedHash: number) => (i: number) => {
+  const h = Math.sin((i + seedHash + 0x11_22_33) * 12.9898) * 43_758.5453;
+
+  return h - Math.floor(h);
+};
+
+const collectStrictShopkeeperCandidates = (
+  params: ShopkeeperSearchParams,
+  jitter: (i: number) => number,
+  forest: number,
+  grass: number
+) => {
+  const { biome, size } = params;
+  const stride = size.cols + 1;
+  const candidates: ShopkeeperSearchCandidate[] = [];
+
+  for (let row = 1; row < size.rows; row += 1) {
+    for (let col = 1; col < size.cols; col += 1) {
+      const i = row * stride + col;
+      const { x, z } = cellToWorld(size, col, row);
+      if (!isShopkeeperCellEligible(params, i, x, z, forest, grass)) {
+        continue;
+      }
+      const layout = findShopkeeperLayout(params, x, z);
+      if (!layout) {
+        continue;
+      }
+      const distFromCenter = Math.hypot(x, z);
+      const forestBonus = biome[i] === forest ? 1.4 : 0.6;
+      const score =
+        forestBonus * (1 - distFromCenter / 60) +
+        layout.score +
+        jitter(i) * 0.4;
+
+      candidates.push({ i, layout, score });
+    }
+  }
+
+  return candidates;
+};
+
+const collectFallbackShopkeeperCandidates = (
+  params: ShopkeeperSearchParams,
+  jitter: (i: number) => number
+) => {
+  const { size } = params;
+  const stride = size.cols + 1;
+  const candidates: ShopkeeperSearchCandidate[] = [];
+
+  for (let row = 1; row < size.rows; row += 1) {
+    for (let col = 1; col < size.cols; col += 1) {
+      const i = row * stride + col;
+      const { x, z } = cellToWorld(size, col, row);
+      if (!isShopkeeperFallbackCellEligible(params, i, x, z)) {
+        continue;
+      }
+      const layout = findShopkeeperLayout(params, x, z);
+      if (!layout) {
+        continue;
+      }
+      const distFromCenter = Math.hypot(x, z);
+      const score =
+        0.8 * (1 - distFromCenter / 80) + layout.score + jitter(i) * 0.25;
+
+      candidates.push({ i, layout, score });
+    }
+  }
+
+  return candidates;
+};
+
+const candidateToShopkeeperLocation = (
+  params: ShopkeeperSearchParams,
+  candidate: ShopkeeperSearchCandidate
+): ShopkeeperLocation => {
+  const { height, size } = params;
+  const stride = size.cols + 1;
+  const col = candidate.i % stride;
+  const row = (candidate.i - col) / stride;
+  const { x, z } = cellToWorld(size, col, row);
+
+  return {
+    offerPositions: candidate.layout.offerPositions,
+    rotationY: candidate.layout.rotationY,
+    x,
+    y: height[candidate.i],
+    z,
+  };
+};
+
+const pickEmergencyShopkeeperLocation = (
+  params: ShopkeeperSearchParams
+): ShopkeeperLocation | null => {
+  const { height } = params;
+  const emergencyLocations: [number, number][] = [
+    [0, 22],
+    [0, -22],
+    [-12, 16],
+    [12, 16],
+    [-12, -16],
+    [12, -16],
+    [0, 0],
+  ];
+
+  for (const [x, z] of emergencyLocations) {
+    const index = worldToGridIndex(params, x, z);
+    const layout = findShopkeeperLayout(params, x, z);
+
+    if (
+      index !== null &&
+      layout &&
+      isDryPlayableArea(params, x, z, SHOP_OFFER_CLEARANCE_RADIUS)
+    ) {
+      return {
+        offerPositions: layout.offerPositions,
+        rotationY: layout.rotationY,
+        x,
+        y: height[index],
+        z,
+      };
+    }
+  }
+
+  return null;
+};
+
+const pickShopkeeperLocation = (
+  params: ShopkeeperSearchParams
+): ShopkeeperLocation | null => {
+  const jitter = makeShopkeeperJitter(params.seedHash);
+  const forest = biomeIndex("forest");
+  const grass = biomeIndex("grassland");
+  const candidates = collectStrictShopkeeperCandidates(
+    params,
+    jitter,
+    forest,
+    grass
+  );
+  const fallbackCandidates =
+    candidates.length > 0
+      ? candidates
+      : collectFallbackShopkeeperCandidates(params, jitter);
+
+  if (fallbackCandidates.length === 0) {
+    return pickEmergencyShopkeeperLocation(params);
+  }
+
+  fallbackCandidates.sort((a, b) => b.score - a.score);
+  return candidateToShopkeeperLocation(params, fallbackCandidates[0]);
+};
 
 export interface BuildChunkConfig {
   cliffSlope: number;
@@ -217,14 +569,37 @@ export const buildOutsideChunkPlan = (
   //    for the heavy stuff (trees, big rocks).
   const sampleHeightForVeg = heightSampler(size, height);
   const pois = poisEarly;
+  const shopkeeper = pickShopkeeperLocation({
+    biome,
+    height,
+    pois,
+    playable,
+    roadCost: roads.cost,
+    seedHash,
+    size,
+    water: hydro.water,
+    waterLevel: config.waterLevel,
+  });
+  const shopAvoidPoints: [number, number, number][] = shopkeeper
+    ? [
+        [shopkeeper.x, 0, shopkeeper.z],
+        ...shopkeeper.offerPositions.map(
+          ([x, , z]) => [x, 0, z] as [number, number, number]
+        ),
+      ]
+    : [];
+  const vegetationAvoidRadius = shopAvoidPoints.length > 0 ? 4.6 : 3.2;
   const vegetation = buildVegetation({
     size,
     seedHash,
     height,
     biome,
     playable,
-    avoid: pois.map((p) => [p.x, 0, p.z] as [number, number, number]),
-    avoidRadius: 3.2,
+    avoid: [
+      ...pois.map((p) => [p.x, 0, p.z] as [number, number, number]),
+      ...shopAvoidPoints,
+    ],
+    avoidRadius: vegetationAvoidRadius,
     sampleHeight: sampleHeightForVeg,
   });
 
@@ -300,6 +675,7 @@ export const buildOutsideChunkPlan = (
     sampleHeight,
     sampleBiome,
     isUnderwater,
+    shopkeeper,
   };
 };
 

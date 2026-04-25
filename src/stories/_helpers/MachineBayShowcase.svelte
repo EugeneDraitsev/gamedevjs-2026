@@ -3,14 +3,13 @@
   import {
     computeMachineStats,
     createDefaultMachineLoadout,
-    getMachineModule,
     type MachineLoadout,
     type MachineModuleId,
     type MachineSlotId,
     moduleFitsSlot,
   } from "$lib/config/machine-modules";
 
-  type ShowcaseVariant = "starter" | "inventory" | "five-installed";
+  type ShowcaseVariant = "starter" | "loadout" | "five-installed";
 
   interface Props {
     gearCount?: number;
@@ -27,7 +26,7 @@
       body: "gyro-servo-frame",
       "utility-a": "ammo-hopper",
       "utility-b": "overclock-governor",
-      "utility-c": "parry-reflector",
+      "utility-c": "cleaver-axe-head",
     };
   };
 
@@ -41,6 +40,7 @@
         "arc-splitter-coil",
         "pressure-lance-nozzle",
         "boiler-plate-frame",
+        "parry-reflector",
       ];
     }
 
@@ -48,7 +48,7 @@
       "ammo-hopper",
       "overclock-governor",
       "salvage-magnet",
-      "parry-reflector",
+      "cleaver-axe-head",
       "arc-splitter-coil",
       "pressure-lance-nozzle",
       "boiler-plate-frame",
@@ -103,6 +103,10 @@
   };
 
   const ejectModule = (slotId: MachineSlotId) => {
+    if (slotId === "attack" || slotId === "body" || slotId === "utility-c") {
+      return;
+    }
+
     const moduleId = machineLoadout[slotId];
 
     if (!moduleId) {
@@ -111,17 +115,6 @@
 
     machineLoadout = { ...machineLoadout, [slotId]: null };
     moduleInventory = [...moduleInventory, moduleId];
-  };
-
-  const scrapModule = (moduleId: MachineModuleId) => {
-    const removed = removeInventoryModule(moduleId);
-
-    if (!removed) {
-      return;
-    }
-
-    gearCount +=
-      getMachineModule(moduleId).scrapValue + machineStats.scrapYieldBonus;
   };
 </script>
 
@@ -134,7 +127,6 @@
     onClose={() => undefined}
     onEjectModule={ejectModule}
     onInstallModule={installModule}
-    onScrapModule={scrapModule}
     open
   />
 </div>

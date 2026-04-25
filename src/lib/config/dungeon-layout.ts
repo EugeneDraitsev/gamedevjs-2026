@@ -257,12 +257,9 @@ export const createDungeonLayout = (
 
   connectRooms(bossAnchor, boss, bossDirection.key);
 
+  const sideBranches = branches.filter((branch) => branch !== mainBranch);
   const treasureAnchor =
-    sampleUnique(
-      branches.filter((branch) => branch !== mainBranch),
-      branches.length,
-      random
-    )
+    sampleUnique(sideBranches, sideBranches.length, random)
       .flatMap((branch) => [...branch.rooms].reverse())
       .find((room) => getFreeDirections(room.grid).length) ?? bossAnchor;
   const treasureOptions = getFreeDirections(treasureAnchor.grid);
@@ -279,6 +276,31 @@ export const createDungeonLayout = (
   );
 
   connectRooms(treasureAnchor, treasure, treasureDirection.key);
+
+  const shopCandidates = sampleUnique(sideBranches, sideBranches.length, random)
+    .flatMap((branch) => [...branch.rooms].reverse())
+    .filter(
+      (room) => room !== treasureAnchor && getFreeDirections(room.grid).length
+    );
+  const shopAnchor =
+    shopCandidates[0] ??
+    [...mainPath].reverse().find((room) => getFreeDirections(room.grid).length);
+
+  if (shopAnchor) {
+    const shopOptions = getFreeDirections(shopAnchor.grid);
+    const shopDirection =
+      shopOptions[Math.floor(random() * shopOptions.length)];
+    const shop = createRoom(
+      "shop",
+      [
+        shopAnchor.grid[0] + shopDirection.dx,
+        shopAnchor.grid[1] + shopDirection.dy,
+      ],
+      "shop-empty"
+    );
+
+    connectRooms(shopAnchor, shop, shopDirection.key);
+  }
 
   return {
     floor: runFloor,

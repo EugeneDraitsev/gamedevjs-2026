@@ -7,7 +7,7 @@
 </script>
 
 <div class="stage">
-  <Canvas shadows={PCFSoftShadowMap} dpr={2}>
+  <Canvas shadows={PCFSoftShadowMap} dpr={1}>
     <SceneRendererConfig backgroundColor="#14100b" exposure={0.86} />
     <T.Fog attach="fog" args={["#15100b", 16, 34]} />
 

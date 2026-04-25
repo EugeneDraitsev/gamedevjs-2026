@@ -4,6 +4,8 @@ import {
   bossDeathDurationMs,
   bossIntroDurationMs,
   floorIntroDurationMs,
+  playerDeathAnimationMs,
+  playerDeathOverlayMs,
   roomTransitionDurationMs,
 } from "$lib/game/scene-layout";
 
@@ -16,6 +18,7 @@ export class TimingStore {
   enemyWakeUntil = $state(0);
   pickedArtifactAt = $state(0);
   pickedArtifactType = $state<MachineModuleId | null>(null);
+  playerDeathStartedAt = $state(0);
   roomTransitionStartedAt = $state(0);
   lastHazardAt = 0;
 
@@ -70,6 +73,37 @@ export class TimingStore {
       : 0
   );
 
+  readonly playerDeathActive = $derived(this.playerDeathStartedAt > 0);
+
+  readonly playerDeathAnimationProgress = $derived(
+    this.playerDeathStartedAt > 0
+      ? Math.max(
+          0,
+          Math.min(
+            1,
+            (this.now - this.playerDeathStartedAt) / playerDeathAnimationMs
+          )
+        )
+      : 0
+  );
+
+  readonly playerDeathOverlayProgress = $derived(
+    this.playerDeathStartedAt > 0
+      ? Math.max(
+          0,
+          Math.min(
+            1,
+            (this.now - this.playerDeathStartedAt) / playerDeathOverlayMs
+          )
+        )
+      : 0
+  );
+
+  readonly playerDeathModalReady = $derived(
+    this.playerDeathStartedAt > 0 &&
+      this.now - this.playerDeathStartedAt >= playerDeathAnimationMs
+  );
+
   beginBossIntro(title: string, at: number) {
     this.bossIntroStartedAt = at;
     this.bossIntroTitle = title;
@@ -88,6 +122,14 @@ export class TimingStore {
     this.roomTransitionStartedAt = at;
   }
 
+  beginPlayerDeath(at: number) {
+    this.playerDeathStartedAt = at;
+  }
+
+  clearPlayerDeath() {
+    this.playerDeathStartedAt = 0;
+  }
+
   resetForFloor() {
     this.floorIntroStartedAt =
       typeof performance === "undefined" ? 0 : performance.now();
@@ -97,6 +139,7 @@ export class TimingStore {
     this.bossDeathStartedAt = 0;
     this.pickedArtifactAt = 0;
     this.pickedArtifactType = null;
+    this.playerDeathStartedAt = 0;
     this.roomTransitionStartedAt = 0;
     this.lastHazardAt = 0;
   }

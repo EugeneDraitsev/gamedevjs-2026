@@ -17,6 +17,7 @@ export interface SavedRunState {
   gearCount?: number;
   machineLoadout: MachineLoadout;
   moduleInventory: MachineModuleId[];
+  purchasedShopOfferIds?: string[];
   version: 2;
 }
 
@@ -53,6 +54,11 @@ const parseSavedRun = (value: unknown): SavedRunState | null => {
           isMachineModuleId(moduleId) && !installed.has(moduleId)
       )
     : createDefaultModuleInventory();
+  const purchasedShopOfferIds = Array.isArray(value.purchasedShopOfferIds)
+    ? value.purchasedShopOfferIds.filter(
+        (id): id is string => typeof id === "string"
+      )
+    : [];
 
   return {
     collectedArtifactRooms,
@@ -60,6 +66,7 @@ const parseSavedRun = (value: unknown): SavedRunState | null => {
     gearCount,
     machineLoadout,
     moduleInventory,
+    purchasedShopOfferIds,
     version: 2,
   };
 };
@@ -70,6 +77,7 @@ export const createDefaultRunState = (): SavedRunState => ({
   gearCount: 0,
   machineLoadout: createDefaultMachineLoadout(),
   moduleInventory: createDefaultModuleInventory(),
+  purchasedShopOfferIds: [],
   version: 2,
 });
 

@@ -15,7 +15,9 @@ const defaultSfxMix: SfxMixSettings = {
 };
 
 const sfxOutputBoost = 3;
+const modalSfxDuckFactor = 0.18;
 const silentLevel = 0.0001;
+const sharedNoiseBufferSeconds = 1.25;
 const stopTailSeconds = 0.02;
 
 const compressorSettings = {
@@ -180,17 +182,28 @@ const connectOutput = (
   panner.connect(root);
 };
 
-const createNoiseBuffer = (context: AudioContext, durationSeconds: number) => {
-  const length = Math.max(1, Math.floor(context.sampleRate * durationSeconds));
+let sharedNoiseBuffer: AudioBuffer | null = null;
+let sharedNoiseBufferSampleRate = 0;
+
+const getSharedNoiseBuffer = (context: AudioContext) => {
+  if (sharedNoiseBuffer && sharedNoiseBufferSampleRate === context.sampleRate) {
+    return sharedNoiseBuffer;
+  }
+
+  const length = Math.max(
+    1,
+    Math.floor(context.sampleRate * sharedNoiseBufferSeconds)
+  );
   const buffer = context.createBuffer(1, length, context.sampleRate);
   const data = buffer.getChannelData(0);
 
   for (let index = 0; index < length; index += 1) {
-    const fade = 1 - index / length;
-    data[index] = (Math.random() * 2 - 1) * (0.35 + fade * fade * 0.65);
+    data[index] = Math.random() * 2 - 1;
   }
 
-  return buffer;
+  sharedNoiseBuffer = buffer;
+  sharedNoiseBufferSampleRate = context.sampleRate;
+  return sharedNoiseBuffer;
 };
 
 const playTone = (context: AudioContext, root: AudioNode, voice: ToneVoice) => {
@@ -225,7 +238,8 @@ const playNoise = (
   const gain = context.createGain();
   const bufferLength = voice.bufferDuration ?? voice.duration;
 
-  source.buffer = createNoiseBuffer(context, bufferLength);
+  source.buffer = getSharedNoiseBuffer(context);
+  source.loop = true;
 
   if (voice.playbackRate !== undefined) {
     source.playbackRate.setValueAtTime(voice.playbackRate, voice.start);
@@ -244,8 +258,10 @@ const playNoise = (
   filtered.connect(gain);
   connectOutput(context, gain, root, voice.pan, voice.start, voice.duration);
 
-  source.start(voice.start);
-  source.stop(voice.start + bufferLength + stopTailSeconds);
+  source.start(voice.start, randomBetween(0, sharedNoiseBufferSeconds * 0.86));
+  source.stop(
+    voice.start + Math.max(bufferLength, voice.duration) + stopTailSeconds
+  );
 };
 
 const defaultPerSoundLevels: Record<string, number> = {
@@ -254,9 +270,9 @@ const defaultPerSoundLevels: Record<string, number> = {
   crack: 1,
   damage: 1,
   death: 0.62,
-  door: 2.4,
+  door: 1.75,
   gear: 1,
-  hit: 1,
+  hit: 2.2,
   laser: 0.1,
   laserWindup: 0.16,
   loot: 1,
@@ -265,8 +281,53 @@ const defaultPerSoundLevels: Record<string, number> = {
   sword: 2.4,
 };
 
+const enemyHitSlapVariants = [
+  {
+    bodyEnd: 54,
+    bodyPeak: 0.07,
+    bodyStart: 118,
+    noiseBand: 210,
+    noiseDuration: 0.052,
+    noisePeak: 0.17,
+    playbackRate: 0.58,
+    tailBand: 135,
+  },
+  {
+    bodyEnd: 62,
+    bodyPeak: 0.06,
+    bodyStart: 136,
+    noiseBand: 255,
+    noiseDuration: 0.045,
+    noisePeak: 0.15,
+    playbackRate: 0.66,
+    tailBand: 150,
+  },
+  {
+    bodyEnd: 48,
+    bodyPeak: 0.08,
+    bodyStart: 104,
+    noiseBand: 185,
+    noiseDuration: 0.06,
+    noisePeak: 0.16,
+    playbackRate: 0.52,
+    tailBand: 118,
+  },
+  {
+    bodyEnd: 58,
+    bodyPeak: 0.055,
+    bodyStart: 126,
+    noiseBand: 235,
+    noiseDuration: 0.048,
+    noisePeak: 0.14,
+    playbackRate: 0.72,
+    tailBand: 170,
+  },
+] as const;
+
 class GameSfxManager {
+  #ducked = false;
   readonly #lastFiredAt = new Map<string, number>();
+  #laserWarmupKey = "";
   #mix: SfxMixSettings = defaultSfxMix;
   #output: GainNode | null = null;
   readonly #perSoundLevel = new Map<string, number>(
@@ -310,6 +371,72 @@ class GameSfxManager {
 
     Howler.volume(this.#mix.masterSoundEnabled ? this.#mix.masterVolume : 0);
     this.#applyOutputVolume();
+  }
+
+  setDucked(ducked: boolean) {
+    if (this.#ducked === ducked) {
+      return;
+    }
+
+    this.#ducked = ducked;
+    this.#applyOutputVolume();
+  }
+
+  warmupLaser(chargeTimeMs = 520) {
+    if (
+      typeof window === "undefined" ||
+      !this.#mix.masterSoundEnabled ||
+      !this.#mix.sfxSoundEnabled ||
+      this.#mix.masterVolume <= 0 ||
+      this.#mix.sfxVolume <= 0
+    ) {
+      return;
+    }
+
+    const duration = Math.max(0.18, Math.min(0.9, chargeTimeMs / 1000));
+    const key = `${Math.round(duration * 1000)}`;
+
+    if (this.#laserWarmupKey === key) {
+      return;
+    }
+
+    const context = this.#getContext();
+    const output = this.#getOutput();
+
+    if (!(context && output)) {
+      return;
+    }
+
+    this.#laserWarmupKey = key;
+    const noiseBuffer = getSharedNoiseBuffer(context);
+
+    const root = context.createGain();
+    const tone = context.createOscillator();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    const panner = context.createStereoPanner();
+    const noise = context.createBufferSource();
+
+    root.gain.setValueAtTime(silentLevel, context.currentTime);
+    gain.gain.setValueAtTime(silentLevel, context.currentTime);
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(1800, context.currentTime);
+    filter.Q.setValueAtTime(8, context.currentTime);
+    noise.buffer = noiseBuffer;
+    noise.loop = true;
+
+    tone.connect(filter);
+    filter.connect(gain);
+    noise.connect(gain);
+    gain.connect(panner);
+    panner.connect(root);
+    root.connect(output);
+    tone.disconnect();
+    filter.disconnect();
+    noise.disconnect();
+    gain.disconnect();
+    panner.disconnect();
+    root.disconnect();
   }
 
   playArtifactPickup() {
@@ -414,7 +541,7 @@ class GameSfxManager {
   }
 
   playDoorOpen() {
-    const shot = this.#beginOneShot(this.#scaledGain("door", 0.82), 1.85);
+    const shot = this.#beginOneShot(this.#scaledGain("door", 0.95), 1.65);
 
     if (!shot) {
       return;
@@ -422,10 +549,45 @@ class GameSfxManager {
 
     const { context, root, start } = shot;
 
-    this.#playStoneSlideRumble(context, root, start);
-    this.#playStoneFrictionCrunches(context, root, start + 0.05);
-    this.#playStoneGearTeeth(context, root, start + 0.18);
-    this.#playStoneSettleThud(context, root, start + 1.42);
+    playNoise(context, root, {
+      bufferDuration: 1.5,
+      duration: 1.4,
+      filter: [
+        { freq: 320, type: "lowpass" },
+        { freq: 180, q: 0.8, type: "bandpass" },
+      ],
+      gain: { attack: 0.18, peak: 0.4, release: 0.2 },
+      playbackRate: 0.32,
+      start,
+    });
+
+    playNoise(context, root, {
+      bufferDuration: 1.5,
+      duration: 1.4,
+      filter: [
+        { freq: 80, type: "highpass" },
+        { freq: 520, type: "lowpass" },
+        {
+          freq: { from: 280, ramp: "linear", to: 240 },
+          q: 1.4,
+          type: "bandpass",
+        },
+      ],
+      gain: { attack: 0.16, peak: 0.28, release: 0.18 },
+      playbackRate: 0.42,
+      start: start + 0.01,
+    });
+
+    this.#playStoneGritWobble(context, root, start + 0.02);
+
+    playTone(context, root, {
+      duration: 1.35,
+      filter: { freq: 140, type: "lowpass" },
+      freq: 56,
+      gain: { attack: 0.18, peak: 0.06, release: 0.22 },
+      start,
+      type: "sine",
+    });
   }
 
   playEnemyDeath(intensity = 0.5) {
@@ -583,7 +745,7 @@ class GameSfxManager {
       return;
     }
 
-    const shot = this.#beginOneShot(this.#scaledGain("hit", 0.55), 0.18, 0.002);
+    const shot = this.#beginOneShot(this.#scaledGain("hit", 0.24), 0.16, 0.002);
 
     if (!shot) {
       return;
@@ -591,32 +753,53 @@ class GameSfxManager {
 
     const { context, root, start } = shot;
     const pan = randomBetween(-0.18, 0.18);
+    const variant =
+      enemyHitSlapVariants[
+        Math.floor(randomBetween(0, enemyHitSlapVariants.length))
+      ] ?? enemyHitSlapVariants[0];
 
     playTone(context, root, {
-      duration: 0.08,
-      filter: { freq: 720, type: "lowpass" },
+      duration: 0.09,
+      filter: { freq: 230, type: "lowpass" },
       freq: {
-        from: 520 + randomBetween(-80, 80),
+        from: variant.bodyStart + randomBetween(-10, 10),
         ramp: "exp",
-        to: 180,
+        to: variant.bodyEnd,
       },
-      gain: { attack: 0.002, peak: 0.16 },
+      gain: { attack: 0.006, peak: variant.bodyPeak },
       pan,
       start,
-      type: "sine",
+      type: "triangle",
     });
 
     playNoise(context, root, {
-      bufferDuration: 0.05,
-      duration: 0.024,
+      bufferDuration: variant.noiseDuration + 0.012,
+      duration: variant.noiseDuration,
       filter: [
-        { freq: 320, type: "highpass" },
-        { freq: 850, q: 1.4, type: "bandpass" },
+        { freq: 520 + randomBetween(-40, 55), type: "lowpass" },
+        {
+          freq: variant.noiseBand + randomBetween(-24, 24),
+          q: 0.95,
+          type: "bandpass",
+        },
       ],
-      gain: { attack: 0.001, peak: 0.05 },
+      gain: { attack: 0.001, peak: variant.noisePeak },
       pan,
-      playbackRate: 0.95,
+      playbackRate: variant.playbackRate,
       start,
+    });
+
+    playNoise(context, root, {
+      bufferDuration: 0.09,
+      duration: 0.065,
+      filter: [
+        { freq: 240, type: "lowpass" },
+        { freq: variant.tailBand, q: 0.8, type: "bandpass" },
+      ],
+      gain: { attack: 0.004, peak: 0.045 },
+      pan: pan * 0.6,
+      playbackRate: variant.playbackRate * 0.82,
+      start: start + 0.016,
     });
   }
 
@@ -1222,7 +1405,11 @@ class GameSfxManager {
   }
 
   #targetOutputVolume() {
-    return this.#mix.sfxSoundEnabled ? this.#mix.sfxVolume * sfxOutputBoost : 0;
+    return this.#mix.sfxSoundEnabled
+      ? this.#mix.sfxVolume *
+          sfxOutputBoost *
+          (this.#ducked ? modalSfxDuckFactor : 1)
+      : 0;
   }
 
   #playBrightCrack(context: AudioContext, root: GainNode, start: number) {
@@ -1299,6 +1486,49 @@ class GameSfxManager {
     oscillator.stop(start + duration + stopTailSeconds);
   }
 
+  #playStoneGritWobble(context: AudioContext, root: GainNode, start: number) {
+    const source = context.createBufferSource();
+    const lowpass = context.createBiquadFilter();
+    const bandpass = context.createBiquadFilter();
+    const gain = context.createGain();
+    const duration = 1.35;
+    const bufferDur = duration + 0.1;
+    const peak = 0.16;
+    const attack = 0.18;
+    const release = 0.18;
+
+    source.buffer = getSharedNoiseBuffer(context);
+    source.loop = true;
+    source.playbackRate.setValueAtTime(0.55, start);
+
+    lowpass.type = "lowpass";
+    lowpass.frequency.setValueAtTime(680, start);
+
+    bandpass.type = "bandpass";
+    bandpass.Q.setValueAtTime(1.8, start);
+    bandpass.frequency.setValueAtTime(380, start);
+
+    let t = start;
+
+    while (t < start + duration) {
+      const target = randomBetween(280, 480);
+      t += randomBetween(0.04, 0.085);
+      bandpass.frequency.linearRampToValueAtTime(target, t);
+    }
+
+    gain.gain.setValueAtTime(silentLevel, start);
+    gain.gain.exponentialRampToValueAtTime(peak, start + attack);
+    gain.gain.setValueAtTime(peak, start + duration - release);
+    gain.gain.exponentialRampToValueAtTime(silentLevel, start + duration);
+
+    source.connect(lowpass);
+    lowpass.connect(bandpass);
+    bandpass.connect(gain);
+    gain.connect(root);
+    source.start(start, randomBetween(0, sharedNoiseBufferSeconds * 0.86));
+    source.stop(start + bufferDur + stopTailSeconds);
+  }
+
   #playDamageStatic(context: AudioContext, root: GainNode, start: number) {
     const duration = 0.19;
 
@@ -1332,116 +1562,6 @@ class GameSfxManager {
       freq: { from: 620, ramp: "exp", to: 152 },
       gain: { attack: 0.01, peak: 0.17 },
       pan: { from: -0.08, to: 0.09 },
-      start,
-      type: "sawtooth",
-    });
-  }
-
-  #playStoneFrictionCrunches(
-    context: AudioContext,
-    root: GainNode,
-    start: number
-  ) {
-    for (let index = 0; index < 5; index += 1) {
-      const crunchStart = start + index * 0.24 + randomBetween(-0.03, 0.03);
-      const frequency = randomBetween(60, 110);
-
-      playTone(context, root, {
-        duration: 0.09,
-        filter: { freq: 320, type: "lowpass" },
-        freq: {
-          from: frequency,
-          ramp: "exp",
-          to: frequency * 0.55,
-        },
-        gain: { attack: 0.003, peak: randomBetween(0.16, 0.24) },
-        pan: randomBetween(-0.18, 0.18),
-        start: crunchStart,
-        type: "triangle",
-      });
-
-      playNoise(context, root, {
-        bufferDuration: 0.08,
-        duration: 0.06,
-        filter: [
-          { freq: 980, type: "lowpass" },
-          { freq: 620, q: 1.8, type: "bandpass" },
-        ],
-        gain: { attack: 0.002, peak: 0.1 },
-        playbackRate: 0.85,
-        start: crunchStart,
-      });
-    }
-  }
-
-  #playStoneGearTeeth(context: AudioContext, root: GainNode, start: number) {
-    for (let index = 0; index < 8; index += 1) {
-      const tickStart = start + index * 0.14 + randomBetween(-0.012, 0.012);
-      const baseFreq = index % 2 === 0 ? 240 : 180;
-
-      playTone(context, root, {
-        duration: 0.06,
-        filter: {
-          freq: baseFreq * 1.4,
-          q: 3.8,
-          type: "bandpass",
-        },
-        freq: {
-          from: baseFreq + randomBetween(-30, 50),
-          ramp: "exp",
-          to: baseFreq * 0.75,
-        },
-        gain: { attack: 0.002, peak: randomBetween(0.06, 0.1) },
-        pan: index % 2 === 0 ? -0.18 : 0.16,
-        start: tickStart,
-        type: "square",
-      });
-    }
-  }
-
-  #playStoneSettleThud(context: AudioContext, root: GainNode, start: number) {
-    this.#playDullImpact(context, root, start, {
-      duration: 0.36,
-      endFrequency: 32,
-      startFrequency: 78,
-      volume: 0.28,
-    });
-
-    playNoise(context, root, {
-      bufferDuration: 0.22,
-      duration: 0.18,
-      filter: [
-        { freq: 380, type: "lowpass" },
-        { freq: 140, q: 1.6, type: "bandpass" },
-      ],
-      gain: { attack: 0.005, peak: 0.16 },
-      playbackRate: 0.7,
-      start,
-    });
-  }
-
-  #playStoneSlideRumble(context: AudioContext, root: GainNode, start: number) {
-    playNoise(context, root, {
-      bufferDuration: 1.4,
-      duration: 1.3,
-      filter: [
-        { freq: 520, q: 0.7, type: "lowpass" },
-        {
-          freq: { from: 180, over: 0.6, ramp: "exp", to: 240 },
-          q: 1.6,
-          type: "bandpass",
-        },
-      ],
-      gain: { attack: 0.18, peak: 0.38, release: 0.32 },
-      playbackRate: 0.62,
-      start,
-    });
-
-    playTone(context, root, {
-      duration: 1.25,
-      filter: { freq: 180, type: "lowpass" },
-      freq: { from: 38, over: 0.6, ramp: "linear", to: 32 },
-      gain: { attack: 0.15, peak: 0.16, release: 0.28 },
       start,
       type: "sawtooth",
     });

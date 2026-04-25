@@ -14,7 +14,7 @@ addons.setConfig({
     base: "dark",
     brandImage: "./storybook-brand.svg",
     brandTarget: "_self",
-    brandTitle: "Warden Labs",
+    brandTitle: "Orb Knight",
     brandUrl: "./",
     colorPrimary: "#ff7a1a",
     colorSecondary: "#5ee6ff",

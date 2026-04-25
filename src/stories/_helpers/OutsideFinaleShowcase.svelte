@@ -83,7 +83,7 @@
 </script>
 
 <main class="showcase">
-  <Canvas shadows={PCFSoftShadowMap} dpr={2}>
+  <Canvas shadows={PCFSoftShadowMap} dpr={1}>
     <SceneRendererConfig backgroundColor="#c7d0c0" exposure={0.9} />
     <T.Fog attach="fog" args={["#b8c3ad", 42, 170]} />
     <T.PerspectiveCamera

@@ -53,7 +53,9 @@ export const artifactPickupDurationMs = 2800;
 export const bossDeathDurationMs = 1500;
 export const bossIntroDurationMs = 2400;
 export const floorIntroDurationMs = 3100;
-export const beamDurationMs = 120;
+export const playerDeathAnimationMs = 1500;
+export const playerDeathOverlayMs = 1100;
+export const beamDurationMs = 500;
 export const doorOpenDelayMs = 1150;
 export const doorOpenDurationMs = 460;
 export const floorExitOpenDelayMs = 520;
@@ -97,6 +99,9 @@ export const outsideRoomBounds: RoomBounds = {
   wallHalfDepth: 79.5,
   wallHalfWidth: 34,
 };
+
+export const outsideGateTriggerHalfWidth = 6.6;
+export const outsideGateTriggerZ = -outsideRoomBounds.transitionInsetZ;
 
 export const getRoomBounds = (layout: RoomTemplate["layout"]): RoomBounds =>
   layout === "outside-yard" ? outsideRoomBounds : defaultRoomBounds;

@@ -34,11 +34,13 @@
   };
 
   const openGameRoute = async (path: URL | string, floor: number) => {
+    const cue = floor >= outsideFloor ? "outside" : "level";
+
     await gameMusic.unlock();
-    gameMusic.playCue("level", {
+    gameMusic.playCue(cue, {
       fadeInMs: 2300,
       fadeOutMs: 1800,
-      restart: floor < outsideFloor,
+      restart: cue === "level",
       startDelayMs: 380,
     });
     await goto(path);
@@ -50,7 +52,7 @@
   };
 </script>
 
-<svelte:head> <title>Warden's Trial</title> </svelte:head>
+<svelte:head> <title>Orb Knight</title> </svelte:head>
 
 <MainMenu
   {canResume}

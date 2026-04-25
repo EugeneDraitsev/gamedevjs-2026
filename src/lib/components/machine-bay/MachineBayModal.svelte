@@ -5,8 +5,12 @@
   import healthStatIconUrl from "$lib/assets/machine-stats/stat-health.svg";
   import magazineStatIconUrl from "$lib/assets/machine-stats/stat-magazine.svg";
   import reloadStatIconUrl from "$lib/assets/machine-stats/stat-reload.svg";
-  import { getMachineModuleIconUrl } from "$lib/config/machine-module-icons";
   import {
+    createAudioDuckReason,
+    setGameAudioDucked,
+  } from "$lib/audio/ducking";
+  import {
+    computeMachineStats,
     getMachineModule,
     getMachineModuleKindAccent,
     getMachineModuleRarityAccent,
@@ -14,10 +18,12 @@
     type MachineModuleId,
     type MachineSlotId,
     type MachineStats,
+    machineModuleTemplates,
     machineSlots,
     moduleFitsSlot,
   } from "$lib/config/machine-modules";
   import MachineBayOrbPreview from "./MachineBayOrbPreview.svelte";
+  import MachineModuleGlyph from "./MachineModuleGlyph.svelte";
 
   interface MachineBayModalProps {
     gearCount: number;
@@ -30,32 +36,52 @@
       moduleId: MachineModuleId,
       slotId: MachineSlotId
     ) => void;
-    onScrapModule?: (moduleId: MachineModuleId) => void;
     open?: boolean;
   }
+
+  const baySlotOrder = [
+    "attack",
+    "body",
+    "utility-c",
+    "utility-a",
+    "utility-b",
+  ] satisfies MachineSlotId[];
 
   const slotPresentation = {
     attack: {
       code: "EYE",
+      empty: "Recover an eye module from wardens.",
       label: "Eye Module",
+      shortLabel: "Eye",
     },
     body: {
       code: "BODY",
+      empty: "Recover a body module from wardens.",
       label: "Body Module",
+      shortLabel: "Body",
     },
     "utility-a": {
-      code: "Utility 1",
+      code: "UTILITY 1",
+      empty: "Recover utility modules from treasure rooms.",
       label: "Utility Module",
+      shortLabel: "Utility 1",
     },
     "utility-b": {
-      code: "Utility 2",
+      code: "UTILITY 2",
+      empty: "Recover utility modules from treasure rooms.",
       label: "Utility Module",
+      shortLabel: "Utility 2",
     },
     "utility-c": {
-      code: "SWORD",
-      label: "Sword Module",
+      code: "WEAPON",
+      empty: "Recover a weapon module from wardens.",
+      label: "Weapon Module",
+      shortLabel: "Weapon",
     },
-  } satisfies Record<MachineSlotId, { code: string; label: string }>;
+  } satisfies Record<
+    MachineSlotId,
+    { code: string; empty: string; label: string; shortLabel: string }
+  >;
 
   let {
     gearCount,
@@ -65,79 +91,86 @@
     onClose,
     onEjectModule,
     onInstallModule,
-    onScrapModule,
     open = false,
   }: MachineBayModalProps = $props();
 
-  let confirmingScrapModuleId = $state<MachineModuleId | null>(null);
-  let hoveredSlotId = $state<MachineSlotId | null>(null);
-
-  const clearHoveredSlot = () => {
-    hoveredSlotId = null;
-  };
-
-  const handleStagePointerMove = (event: PointerEvent) => {
-    const target = event.target;
-    const isInsideSlot =
-      target instanceof Element && target.closest(".loadout-slot");
-
-    if (!isInsideSlot) {
-      hoveredSlotId = null;
-    }
-  };
+  const audioDuckReason = createAudioDuckReason("machine-bay");
+  let selectedSlotId = $state<MachineSlotId | null>(null);
+  let viewingModuleId = $state<MachineModuleId | null>(null);
 
   const machineStatAccent = "#fbbf24";
+  const moduleCatalogOrder = new Map(
+    machineModuleTemplates.map((template, index) => [template.id, index])
+  );
 
-  const statReadouts = $derived([
-    {
-      accent: machineStatAccent,
-      description: "Damage dealt by each shot.",
-      iconUrl: damageStatIconUrl,
-      label: "Damage",
-      value: `${machineStats.damage}`,
-    },
-    {
-      accent: machineStatAccent,
-      description: "Shots fired per second.",
-      iconUrl: fireRateStatIconUrl,
-      label: "Fire Rate",
-      value: `${machineStats.fireRate.toFixed(2)}/s`,
-    },
-    {
-      accent: machineStatAccent,
-      description: "Maximum machine health.",
-      iconUrl: healthStatIconUrl,
-      label: "Max HP",
-      value: `${machineStats.maxHealth}`,
-    },
-    {
-      accent: machineStatAccent,
-      description: "Shots available before reloading.",
-      iconUrl: magazineStatIconUrl,
-      label: "Magazine",
-      value: `${machineStats.magazineSize}`,
-    },
-    {
-      accent: machineStatAccent,
-      description: "Time needed to reload.",
-      iconUrl: reloadStatIconUrl,
-      label: "Reload",
-      value: `${(machineStats.reloadDurationMs / 1000).toFixed(2)}s`,
-    },
-  ]);
+  const formatCompactDelta = (delta: number) => {
+    if (Math.abs(delta) < 0.05) {
+      return null;
+    }
 
-  const compatibleSlots = (moduleId: MachineModuleId) =>
-    machineSlots.filter((slot) => moduleFitsSlot(moduleId, slot.id));
+    const rounded =
+      Math.abs(delta) >= 1 ? Math.round(delta) : Math.round(delta * 10) / 10;
+
+    if (rounded === 0) {
+      return null;
+    }
+
+    const magnitude =
+      Math.abs(rounded) >= 1 ? `${Math.abs(rounded)}` : `${Math.abs(rounded)}`;
+    const sign = rounded > 0 ? "+" : "-";
+
+    return `${sign}${magnitude}`;
+  };
+
+  const deltaKind = (delta: number, lowerIsBetter = false) => {
+    if (Math.abs(delta) < 0.005) {
+      return "flat";
+    }
+
+    return (lowerIsBetter ? delta < 0 : delta > 0) ? "buff" : "nerf";
+  };
+
+  const slotById = Object.fromEntries(
+    machineSlots.map((slot) => [slot.id, slot])
+  ) as Record<MachineSlotId, (typeof machineSlots)[number]>;
+
+  const getModuleOptionsForSlot = (slotId: MachineSlotId) => {
+    const currentModuleId = machineLoadout[slotId];
+    const ids = [
+      ...(currentModuleId ? [currentModuleId] : []),
+      ...moduleInventory.filter((moduleId) => moduleFitsSlot(moduleId, slotId)),
+    ];
+    const uniqueIds = [...new Set(ids)].sort(
+      (left, right) =>
+        (moduleCatalogOrder.get(left) ?? Number.MAX_SAFE_INTEGER) -
+        (moduleCatalogOrder.get(right) ?? Number.MAX_SAFE_INTEGER)
+    );
+
+    return uniqueIds.map((moduleId) => {
+      const template = getMachineModule(moduleId);
+
+      return {
+        accent: template.accent,
+        equipped: currentModuleId === moduleId,
+        moduleId,
+        rarityAccent: getMachineModuleRarityAccent(template.rarity),
+        template,
+      };
+    });
+  };
 
   const socketViews = $derived(
-    machineSlots.map((slot) => {
-      const moduleId = machineLoadout[slot.id];
+    baySlotOrder.map((slotId) => {
+      const slot = slotById[slotId];
+      const moduleId = machineLoadout[slotId];
       const template = moduleId ? getMachineModule(moduleId) : null;
 
       return {
         accent: getMachineModuleKindAccent(slot.kind),
         moduleId,
-        presentation: slotPresentation[slot.id],
+        moduleAccent: template?.accent ?? getMachineModuleKindAccent(slot.kind),
+        options: getModuleOptionsForSlot(slotId),
+        presentation: slotPresentation[slotId],
         rarityAccent: template
           ? getMachineModuleRarityAccent(template.rarity)
           : getMachineModuleRarityAccent("common"),
@@ -146,54 +179,170 @@
       };
     })
   );
-  const inventoryViews = $derived(
-    moduleInventory.map((moduleId, index) => {
-      const template = getMachineModule(moduleId);
-
-      return {
-        key: `${moduleId}-${index}`,
-        kindAccent: getMachineModuleKindAccent(template.kind),
-        moduleId,
-        rarityAccent: getMachineModuleRarityAccent(template.rarity),
-        scrapValue: template.scrapValue + machineStats.scrapYieldBonus,
-        slots: compatibleSlots(moduleId),
-        template,
-      };
-    })
+  const selectedSocket = $derived(
+    selectedSlotId
+      ? (socketViews.find((socket) => socket.slot.id === selectedSlotId) ??
+          null)
+      : null
   );
+  const selectedOptions = $derived(selectedSocket?.options ?? []);
+  const selectedModule = $derived(
+    viewingModuleId ? getMachineModule(viewingModuleId) : null
+  );
+  const selectedModuleAccent = $derived(
+    selectedModule ? selectedModule.accent : "#fbbf24"
+  );
+  const selectedModuleRarityAccent = $derived(
+    selectedModule
+      ? getMachineModuleRarityAccent(selectedModule.rarity)
+      : getMachineModuleRarityAccent("common")
+  );
+  const selectedIsEquipped = $derived(
+    Boolean(
+      selectedSlotId &&
+        viewingModuleId &&
+        machineLoadout[selectedSlotId] === viewingModuleId
+    )
+  );
+  const selectedCanEquip = $derived(
+    Boolean(
+      selectedSlotId &&
+        viewingModuleId &&
+        !selectedIsEquipped &&
+        moduleInventory.includes(viewingModuleId)
+    )
+  );
+  const selectedSlotRequired = $derived(
+    selectedSlotId === "attack" ||
+      selectedSlotId === "body" ||
+      selectedSlotId === "utility-c"
+  );
+  const previewLoadout = $derived.by(() => {
+    if (!(selectedSlotId && viewingModuleId)) {
+      return machineLoadout;
+    }
 
-  const handleScrapClick = (moduleId: MachineModuleId) => {
-    if (confirmingScrapModuleId !== moduleId) {
-      confirmingScrapModuleId = moduleId;
+    if (machineLoadout[selectedSlotId] === viewingModuleId) {
+      return machineLoadout;
+    }
+
+    return { ...machineLoadout, [selectedSlotId]: viewingModuleId };
+  });
+  const previewStats = $derived(computeMachineStats(previewLoadout));
+  const statReadouts = $derived.by(() => {
+    const damageDelta = previewStats.damage - machineStats.damage;
+    const fireRateDelta = previewStats.fireRate - machineStats.fireRate;
+    const healthDelta = previewStats.maxHealth - machineStats.maxHealth;
+    const magazineDelta = previewStats.magazineSize - machineStats.magazineSize;
+    const reloadDeltaSeconds =
+      (previewStats.reloadDurationMs - machineStats.reloadDurationMs) / 1000;
+
+    return [
+      {
+        accent: machineStatAccent,
+        deltaKind: deltaKind(damageDelta),
+        deltaLabel: formatCompactDelta(damageDelta),
+        description: "Damage dealt by each shot.",
+        iconUrl: damageStatIconUrl,
+        label: "Damage",
+        value: `${previewStats.damage}`,
+      },
+      {
+        accent: machineStatAccent,
+        deltaKind: deltaKind(fireRateDelta),
+        deltaLabel: formatCompactDelta(fireRateDelta),
+        description: "Shots fired per second.",
+        iconUrl: fireRateStatIconUrl,
+        label: "Fire Rate",
+        value: `${previewStats.fireRate.toFixed(2)}/s`,
+      },
+      {
+        accent: machineStatAccent,
+        deltaKind: deltaKind(healthDelta),
+        deltaLabel: formatCompactDelta(healthDelta),
+        description: "Maximum machine health.",
+        iconUrl: healthStatIconUrl,
+        label: "Max HP",
+        value: `${previewStats.maxHealth}`,
+      },
+      {
+        accent: machineStatAccent,
+        deltaKind: deltaKind(magazineDelta),
+        deltaLabel: formatCompactDelta(magazineDelta),
+        description: "Shots available before reloading.",
+        iconUrl: magazineStatIconUrl,
+        label: "Magazine",
+        value: `${previewStats.magazineSize}`,
+      },
+      {
+        accent: machineStatAccent,
+        deltaKind: deltaKind(reloadDeltaSeconds, true),
+        deltaLabel: formatCompactDelta(reloadDeltaSeconds),
+        description: "Time needed to reload.",
+        iconUrl: reloadStatIconUrl,
+        label: "Reload",
+        value: `${(previewStats.reloadDurationMs / 1000).toFixed(2)}s`,
+      },
+    ];
+  });
+  const selectSlot = (slotId: MachineSlotId) => {
+    selectedSlotId = selectedSlotId === slotId ? null : slotId;
+  };
+
+  const equipViewedModule = () => {
+    if (!(selectedSlotId && viewingModuleId && selectedCanEquip)) {
       return;
     }
 
-    confirmingScrapModuleId = null;
-    onScrapModule?.(moduleId);
+    onInstallModule?.(viewingModuleId, selectedSlotId);
+  };
+
+  const ejectSelectedModule = () => {
+    if (!(selectedSlotId && selectedIsEquipped)) {
+      return;
+    }
+
+    onEjectModule?.(selectedSlotId);
   };
 
   $effect(() => {
     if (!open) {
-      confirmingScrapModuleId = null;
+      selectedSlotId = null;
+      viewingModuleId = null;
+      return;
+    }
+
+    if (!selectedSlotId) {
+      viewingModuleId = null;
       return;
     }
 
     if (
-      confirmingScrapModuleId &&
-      !moduleInventory.includes(confirmingScrapModuleId)
+      viewingModuleId &&
+      selectedOptions.some((item) => item.moduleId === viewingModuleId)
     ) {
-      confirmingScrapModuleId = null;
+      return;
     }
+
+    viewingModuleId = selectedOptions[0]?.moduleId ?? null;
+  });
+
+  $effect(() => {
+    setGameAudioDucked(audioDuckReason, open);
+
+    return () => {
+      setGameAudioDucked(audioDuckReason, false);
+    };
   });
 </script>
 
 {#if open}
   <div class="backdrop">
-    <section class="bay" aria-label="Warden Chassis">
+    <section class="bay" aria-label="Orb Knight Loadout">
       <header class="bay-header">
-        <div class="bay-heading"><strong>Core Configuration</strong></div>
+        <div class="bay-heading"><strong>Loadout</strong></div>
 
-        <div class="machine-summary" aria-label="Machine stats">
+        <div class="machine-summary" aria-label="Loadout stats">
           {#each statReadouts as stat}
             <div
               class="stat-chip"
@@ -205,13 +354,21 @@
                 <img class="stat-icon" src={stat.iconUrl} alt="">
               </span>
               <strong>{stat.value}</strong>
+              <small
+                class:buff={stat.deltaKind === "buff"}
+                class:empty={!stat.deltaLabel}
+                class:nerf={stat.deltaKind === "nerf"}
+                aria-hidden={!stat.deltaLabel}
+              >
+                {stat.deltaLabel ?? ""}
+              </small>
             </div>
           {/each}
 
           <div
             class="stat-chip gear-chip"
-            aria-label={`Gears: ${gearCount}. Currency used for machine modules.`}
-            data-tooltip="Gears: Currency used for machine modules."
+            aria-label={`Gears: ${gearCount}. Currency used for loadout modules.`}
+            data-tooltip="Gears: Currency used for loadout modules."
           >
             <span class="stat-icon-frame" aria-hidden="true">
               <img class="stat-icon" src={gearCurrencyUrl} alt="">
@@ -223,7 +380,7 @@
         <button
           class="close-button"
           type="button"
-          aria-label="Close Warden Chassis"
+          aria-label="Close Loadout"
           onclick={onClose}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -232,180 +389,170 @@
         </button>
       </header>
 
-      <div class="bay-layout">
-        <section class="socket-panel" aria-label="Installed modules">
-          <div class="panel-title">
-            <div><span>Installed Modules</span></div>
-            <small
-              >{machineStats.installedModuleIds.length}/{machineSlots.length}
-              active</small
+      <div class:menu-open={selectedSlotId !== null} class="bay-layout">
+        <nav class="socket-rail" aria-label="Loadout sockets">
+          {#each socketViews as socket (socket.slot.id)}
+            <button
+              class:active={selectedSlotId === socket.slot.id}
+              class="socket-button"
+              style:--accent={socket.accent}
+              type="button"
+              aria-label={socket.presentation.label}
+              aria-pressed={selectedSlotId === socket.slot.id}
+              onclick={() => selectSlot(socket.slot.id)}
             >
-          </div>
+              <span class="socket-glyph" aria-hidden="true">
+                {#if socket.moduleId}
+                  <MachineModuleGlyph
+                    accent={socket.moduleAccent}
+                    moduleId={socket.moduleId}
+                  />
+                {:else}
+                  <svg viewBox="0 0 64 64" aria-hidden="true">
+                    <circle cx="32" cy="32" r="19" />
+                    <path d="M32 21v22M21 32h22" />
+                  </svg>
+                {/if}
+              </span>
+            </button>
+          {/each}
+        </nav>
 
-          <div
-            class="chassis-stage"
-            onpointercancel={clearHoveredSlot}
-            onpointerleave={clearHoveredSlot}
-            onpointermove={handleStagePointerMove}
-            role="presentation"
+        {#if selectedSocket}
+          <aside
+            class="module-drawer"
+            style:--accent={selectedSocket.accent}
+            aria-label={`${selectedSocket.presentation.shortLabel} modules`}
           >
-            <div class="model-port">
-              <MachineBayOrbPreview highlightedSlotId={hoveredSlotId} />
-            </div>
+            <section class="drawer-grid">
+              <div class="drawer-title">
+                <span>Available {selectedSocket.presentation.shortLabel}</span>
+                <small>{selectedOptions.length}</small>
+              </div>
 
-            <div class="loadout-slots">
-              {#each socketViews as socket (socket.slot.id)}
-                <article
-                  class:empty={!socket.template}
-                  class:highlighted={hoveredSlotId === socket.slot.id}
-                  class={`loadout-slot slot-${socket.slot.id}`}
-                  onfocusin={() => (hoveredSlotId = socket.slot.id)}
-                  onfocusout={clearHoveredSlot}
-                  onpointerenter={() => (hoveredSlotId = socket.slot.id)}
-                  onpointerleave={clearHoveredSlot}
-                  style:--accent={socket.accent}
-                  style:--rarity={socket.rarityAccent}
-                >
-                  <div class="slot-kicker">
-                    <span>{socket.presentation.code}</span>
-                    <small>{socket.presentation.label}</small>
+              {#if selectedOptions.length > 0}
+                <div class="module-tile-grid">
+                  {#each selectedOptions as option (option.moduleId)}
+                    <button
+                      class:equipped={option.equipped}
+                      class:selected={viewingModuleId === option.moduleId}
+                      class="module-tile"
+                      style:--accent={option.accent}
+                      type="button"
+                      aria-label={option.template.label}
+                      aria-pressed={viewingModuleId === option.moduleId}
+                      onclick={() => (viewingModuleId = option.moduleId)}
+                    >
+                      <MachineModuleGlyph
+                        accent={option.accent}
+                        moduleId={option.moduleId}
+                      />
+                      {#if option.equipped}
+                        <span class="equipped-dot" aria-hidden="true"></span>
+                      {/if}
+                    </button>
+                  {/each}
+                </div>
+              {:else}
+                <div class="empty-modules">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 10V7a4 4 0 0 1 8 0v3M6 10h12v10H6z" />
+                  </svg>
+                  <strong>No modules found</strong>
+                  <span>{selectedSocket.presentation.empty}</span>
+                </div>
+              {/if}
+            </section>
+
+            <section
+              class:empty={!selectedModule}
+              class="module-detail"
+              style:--accent={selectedModuleAccent}
+              style:--rarity={selectedModuleRarityAccent}
+            >
+              <div class="detail-kicker">
+                <span>{selectedSocket.presentation.shortLabel}</span>
+                <small>{selectedSocket.presentation.label}</small>
+              </div>
+
+              {#if selectedModule && viewingModuleId}
+                <div class="detail-body">
+                  <div class="detail-head">
+                    <div class="detail-glyph" aria-hidden="true">
+                      <MachineModuleGlyph
+                        accent={selectedModuleAccent}
+                        moduleId={viewingModuleId}
+                      />
+                    </div>
+                    <div>
+                      <strong>{selectedModule.label}</strong>
+                      <small>{selectedModule.rarity}</small>
+                    </div>
                   </div>
 
-                  {#if socket.template}
-                    <div class="module-head">
-                      <div class="module-glyph" aria-hidden="true">
-                        <img
-                          src={getMachineModuleIconUrl(socket.template.id)}
-                          alt=""
-                        >
-                      </div>
-                      <div>
-                        <strong>{socket.template.label}</strong>
-                        <small class="module-meta">
-                          <span class="rarity-label">
-                            {socket.template.rarity}
-                          </span>
-                        </small>
-                      </div>
-                    </div>
-                    <p>{socket.template.effect}</p>
-                    <div class="slot-footer">
-                      <div class="tag-row">
-                        {#each socket.template.statLines as statLine}
-                          <span>{statLine}</span>
-                        {/each}
-                      </div>
+                  <p>{selectedModule.description}</p>
+                  <p class="effect">{selectedModule.effect}</p>
+
+                  <div class="tag-row">
+                    {#each selectedModule.statLines as statLine}
+                      <span>{statLine}</span>
+                    {/each}
+                  </div>
+
+                  <div class="detail-actions">
+                    {#if selectedIsEquipped}
                       <button
-                        class="bay-button secondary"
+                        class="bay-button equipped"
                         type="button"
-                        onclick={() => onEjectModule?.(socket.slot.id)}
+                        disabled
                       >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M12 5v10M7 10l5-5 5 5M6 19h12" />
-                        </svg>
-                        <span>Eject</span>
+                        <span>Equipped</span>
                       </button>
-                    </div>
-                  {:else}
-                    <div class="empty-copy">
-                      <strong>Empty socket</strong>
-                      <span>
-                        Waiting for {socket.presentation.label.toLowerCase()}.
-                      </span>
-                    </div>
-                  {/if}
-                </article>
-              {/each}
-            </div>
-          </div>
-        </section>
-
-        <section class="inventory-panel" aria-label="Module inventory">
-          <div class="panel-title inventory-title">
-            <div>
-              <span>Recovered Modules</span>
-              <strong>Loose machine parts</strong>
-            </div>
-            <small>{moduleInventory.length} loose</small>
-          </div>
-
-          <div class="inventory-well">
-            {#if moduleInventory.length === 0}
-              <div class="inventory-empty">
-                <strong>No loose modules</strong>
-                <span
-                  >Treasure rooms and cleared wardens drop machine parts.</span
-                >
-              </div>
-            {:else}
-              <div class="inventory-list">
-                {#each inventoryViews as item (item.key)}
-                  <article
-                    class="inventory-item"
-                    style:--accent={item.kindAccent}
-                    style:--rarity={item.rarityAccent}
-                  >
-                    <div class="module-head">
-                      <div class="module-glyph" aria-hidden="true">
-                        <img
-                          src={getMachineModuleIconUrl(item.moduleId)}
-                          alt=""
-                        >
-                      </div>
-                      <div>
-                        <strong>{item.template.label}</strong>
-                        <small class="module-meta">
-                          <span class="rarity-label">
-                            {item.template.rarity}
-                          </span>
-                        </small>
-                      </div>
-                    </div>
-                    <p>{item.template.description}</p>
-                    <div class="tag-row">
-                      {#each item.template.statLines as statLine}
-                        <span>{statLine}</span>
-                      {/each}
-                    </div>
-                    <div class="inventory-actions">
-                      {#each item.slots as slot}
+                      {#if !selectedSlotRequired}
                         <button
-                          class="bay-button"
+                          class="bay-button secondary"
                           type="button"
-                          onclick={() =>
-                            onInstallModule?.(item.moduleId, slot.id)}
+                          onclick={ejectSelectedModule}
                         >
                           <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 5v14M5 12h14" />
+                            <path d="M12 5v10M7 10l5-5 5 5M6 19h12" />
                           </svg>
-                          <span>Install {slot.label}</span>
+                          <span>Eject</span>
                         </button>
-                      {/each}
+                      {/if}
+                    {:else}
                       <button
-                        class="bay-button secondary"
-                        class:confirming={confirmingScrapModuleId ===
-                          item.moduleId}
-                        disabled={item.scrapValue <= 0}
+                        class="bay-button"
+                        disabled={!selectedCanEquip}
                         type="button"
-                        onclick={() => handleScrapClick(item.moduleId)}
+                        onclick={equipViewedModule}
                       >
                         <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path
-                            d="M8 8h10M10 8V6h6v2M9 11v7M14 11v7M6 8l1 12h10l1-12"
-                          />
+                          <path d="M12 5v14M5 12h14" />
                         </svg>
-                        <span>
-                          {confirmingScrapModuleId === item.moduleId
-                            ? `Confirm +${item.scrapValue}`
-                            : `Scrap +${item.scrapValue}`}
-                        </span>
+                        <span>Equip Module</span>
                       </button>
-                    </div>
-                  </article>
-                {/each}
-              </div>
-            {/if}
+                    {/if}
+                  </div>
+                </div>
+              {:else}
+                <div class="empty-detail">
+                  <strong>Empty socket</strong>
+                  <span>{selectedSocket.presentation.empty}</span>
+                </div>
+              {/if}
+            </section>
+          </aside>
+        {/if}
+
+        <section class="hero-stage" aria-label="Orb Knight preview">
+          <div class="model-port">
+            <MachineBayOrbPreview
+              highlightedSlotId={selectedSlotId}
+              machineLoadout={previewLoadout}
+            />
           </div>
+          <span class="drag-hint">Drag to rotate</span>
         </section>
       </div>
     </section>
@@ -438,8 +585,8 @@
 
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
-    inline-size: min(1240px, 100%);
-    block-size: min(850px, calc(100vh - 1.4rem));
+    inline-size: min(1180px, 100%);
+    block-size: min(820px, calc(100vh - 1.4rem));
     overflow: hidden;
     font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
     color: var(--bay-text);
@@ -459,12 +606,8 @@
 
   .bay-header,
   .machine-summary,
-  .module-head,
-  .inventory-actions,
-  .panel-title,
-  .slot-kicker,
-  .socket-label,
-  .slot-footer,
+  .detail-head,
+  .detail-actions,
   .tag-row,
   .bay-button {
     display: flex;
@@ -487,23 +630,6 @@
     min-inline-size: 10rem;
   }
 
-  .panel-title span,
-  .slot-kicker small,
-  .socket-label small,
-  .module-head small,
-  p,
-  .empty-copy span,
-  .inventory-empty span {
-    color: rgba(203, 214, 210, 0.72);
-  }
-
-  .panel-title span {
-    font-size: 0.67rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-  }
-
   .bay-heading strong {
     font-size: clamp(1rem, 1.5vw, 1.18rem);
     line-height: 1;
@@ -521,7 +647,7 @@
   .stat-chip {
     position: relative;
     display: inline-flex;
-    gap: 0.42rem;
+    gap: 0.34rem;
     align-items: center;
     min-block-size: 2.35rem;
     padding: 0.34rem 0.55rem;
@@ -607,74 +733,31 @@
     line-height: 1;
   }
 
+  .stat-chip small {
+    min-inline-size: 1.45rem;
+    padding: 0;
+    margin-inline-start: 0.04rem;
+    font-size: 0.68rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-align: end;
+  }
+
+  .stat-chip small.buff {
+    color: #4ade80;
+  }
+
+  .stat-chip small.nerf {
+    color: #fb7185;
+  }
+
+  .stat-chip small.empty {
+    visibility: hidden;
+  }
+
   button {
     font: inherit;
-  }
-
-  .bay-button {
-    gap: 0.32rem;
-    justify-content: center;
-    min-inline-size: 0;
-    min-block-size: 1.72rem;
-    padding: 0.34rem 0.5rem;
-    font-size: 0.66rem;
-    font-weight: 900;
-    line-height: 1;
-    color: #061015;
-    cursor: pointer;
-    background: color-mix(in srgb, var(--accent, #f59e0b) 76%, white);
-    border: 1px solid color-mix(in srgb, var(--accent, #f59e0b) 64%, white);
-    border-radius: 6px;
-  }
-
-  .bay-button svg {
-    flex: 0 0 auto;
-    inline-size: 0.78rem;
-    block-size: 0.78rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.25;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  .bay-button:hover,
-  .bay-button:focus-visible,
-  .close-button:hover,
-  .close-button:focus-visible {
-    filter: brightness(1.08);
-  }
-
-  .bay-button:disabled {
-    color: rgba(227, 235, 240, 0.42);
-    cursor: not-allowed;
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .secondary {
-    color: rgba(240, 247, 252, 0.88);
-    background: rgba(255, 255, 255, 0.065);
-    border-color: rgba(255, 255, 255, 0.13);
-  }
-
-  .secondary.confirming {
-    color: #140d05;
-    background: #fbbf24;
-    border-color: #ffe08a;
-    animation: scrap-confirm-pulse 0.58s ease-in-out infinite alternate;
-  }
-
-  @keyframes scrap-confirm-pulse {
-    from {
-      box-shadow: 0 0 0 color-mix(in srgb, #fbbf24 0%, transparent);
-      transform: translateY(0);
-    }
-
-    to {
-      box-shadow: 0 0 0.85rem color-mix(in srgb, #fbbf24 42%, transparent);
-      transform: translateY(-1px);
-    }
   }
 
   .close-button {
@@ -689,7 +772,7 @@
     cursor: pointer;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.13);
-    border-radius: 50%;
+    border-radius: 6px;
   }
 
   .close-button svg {
@@ -702,424 +785,423 @@
   }
 
   .bay-layout {
+    position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1.72fr) minmax(16.75rem, 0.78fr);
+    grid-template-columns: 4rem minmax(0, 1fr);
+    gap: 1rem;
     min-block-size: 0;
+    padding: 1rem;
   }
 
-  .socket-panel,
-  .inventory-panel {
+  .socket-rail {
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    gap: 0.72rem;
+    min-inline-size: 0;
+  }
+
+  .socket-button {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: 3.55rem;
+    block-size: 3.55rem;
+    padding: 0.48rem;
+    color: var(--accent);
+    cursor: pointer;
+    background:
+      linear-gradient(180deg, rgba(14, 21, 23, 0.98), rgba(5, 11, 14, 0.98)),
+      radial-gradient(
+        circle,
+        color-mix(in srgb, var(--accent) 8%, transparent),
+        transparent 64%
+      );
+    border: 2px solid color-mix(in srgb, var(--accent) 32%, #1c252f);
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      transform 150ms ease,
+      background 150ms ease;
+  }
+
+  .socket-button:hover,
+  .socket-button.active,
+  .socket-button:focus-visible {
+    border-color: color-mix(in srgb, var(--accent) 78%, white);
+    box-shadow:
+      0 0 1rem color-mix(in srgb, var(--accent) 24%, transparent),
+      inset 0 0 1rem color-mix(in srgb, var(--accent) 16%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .socket-glyph,
+  .module-tile,
+  .detail-glyph {
+    display: grid;
+    place-items: center;
+  }
+
+  .socket-glyph {
+    inline-size: 2.1rem;
+    block-size: 2.1rem;
+  }
+
+  .socket-glyph svg {
+    inline-size: 100%;
+    block-size: 100%;
+    opacity: 0.62;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .equipped-dot {
+    position: absolute;
+    inline-size: 0.48rem;
+    block-size: 0.48rem;
+    background: #4ade80;
+    border-radius: 999px;
+    box-shadow: 0 0 0.35rem #22c55e;
+  }
+
+  .module-drawer {
+    position: absolute;
+    inset-block: 1rem;
+    inset-inline-start: 5.75rem;
+    z-index: 5;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
-    min-inline-size: 0;
-    min-block-size: 0;
-    padding: 0.72rem;
+    gap: 0.8rem;
+    inline-size: 20rem;
   }
 
-  .socket-panel {
-    border-inline-end: 1px solid rgba(252, 211, 77, 0.12);
-  }
-
-  .panel-title {
-    gap: 1rem;
-    justify-content: space-between;
-    min-block-size: 1.9rem;
-    margin-bottom: 0.48rem;
-  }
-
-  .panel-title > div {
-    display: grid;
-    gap: 0.16rem;
-  }
-
-  .panel-title strong {
-    font-size: 0.98rem;
-    line-height: 1.08;
-  }
-
-  .panel-title small {
-    font-size: 0.76rem;
-    font-weight: 900;
-    color: rgba(237, 227, 199, 0.78);
-    white-space: nowrap;
-  }
-
-  .chassis-stage {
-    --module-card-height: 8.05rem;
-    --module-side-fr: 0.56fr;
-
-    position: relative;
-    display: grid;
-    grid-template-areas:
-      "attack model body"
-      "utility-a model utility-b"
-      ". model ."
-      ". utility-c .";
-    grid-template-rows:
-      var(--module-card-height) minmax(var(--module-card-height), 1fr)
-      minmax(1.1rem, 0.34fr) var(--module-card-height);
-    grid-template-columns:
-      minmax(9.4rem, var(--module-side-fr)) minmax(0, 1fr)
-      minmax(9.4rem, var(--module-side-fr));
-    gap: 0.58rem;
-    min-block-size: 0;
-    padding: 0.58rem;
+  .drawer-grid,
+  .module-detail {
     overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(8, 16, 19, 0.97), rgba(3, 9, 12, 0.98)),
+      radial-gradient(
+        circle at 0 0,
+        color-mix(in srgb, var(--accent) 14%, transparent),
+        transparent 64%
+      );
+    border: 1px solid color-mix(in srgb, var(--accent) 42%, #26313e);
+    border-radius: 8px;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.46);
+  }
+
+  .drawer-grid {
+    display: grid;
+    gap: 0.85rem;
+    padding: 0.92rem;
+  }
+
+  .drawer-title,
+  .detail-kicker {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-inline-size: 0;
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .drawer-title span,
+  .detail-kicker span {
+    color: color-mix(in srgb, var(--accent) 72%, white);
+  }
+
+  .drawer-title small,
+  .detail-kicker small,
+  .detail-head small,
+  .empty-modules span,
+  .empty-detail span,
+  .module-detail p {
+    color: rgba(203, 214, 210, 0.72);
+  }
+
+  .module-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .module-tile {
+    position: relative;
+    aspect-ratio: 1;
+    padding: 0.52rem;
+    color: var(--accent);
+    cursor: pointer;
+    background: rgba(5, 12, 15, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    opacity: 0.84;
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease,
+      opacity 140ms ease,
+      transform 140ms ease;
+  }
+
+  .module-tile:hover,
+  .module-tile.selected,
+  .module-tile:focus-visible {
+    border-color: color-mix(in srgb, var(--accent) 76%, white);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent),
+      0 0 1rem color-mix(in srgb, var(--accent) 18%, transparent);
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+
+  .module-tile.equipped {
     background:
       radial-gradient(
-        circle at 50% 45%,
-        rgba(77, 222, 235, 0.1),
-        transparent 32%
+        circle,
+        color-mix(in srgb, #22c55e 12%, transparent),
+        transparent 62%
       ),
-      linear-gradient(180deg, rgba(9, 17, 18, 0.92), rgba(2, 8, 11, 0.96)),
-      repeating-linear-gradient(
-        0deg,
-        transparent 0 27px,
-        rgba(255, 219, 139, 0.028) 27px 28px
-      );
-    border: 1px solid rgba(255, 221, 139, 0.14);
-    border-radius: 8px;
-    box-shadow: inset 0 0 3rem rgba(0, 0, 0, 0.34);
+      rgba(5, 12, 15, 0.92);
   }
 
-  .model-port {
-    position: relative;
-    z-index: 2;
-    grid-area: model;
-    align-self: center;
-    justify-self: center;
-    inline-size: min(100%, clamp(19rem, 38vw, 30rem));
-    aspect-ratio: 1;
-    border-radius: 50%;
+  .equipped-dot {
+    inset-block-start: 0.38rem;
+    inset-inline-end: 0.38rem;
+    inline-size: 0.42rem;
+    block-size: 0.42rem;
   }
 
-  .loadout-slots {
-    display: contents;
-  }
-
-  .loadout-slot,
-  .inventory-item {
-    box-sizing: border-box;
+  .empty-modules,
+  .empty-detail {
     display: grid;
-    gap: 0.34rem;
-    align-content: start;
-    min-inline-size: 0;
-    overflow: hidden;
-    background:
-      linear-gradient(180deg, rgba(13, 22, 23, 0.96), rgba(5, 12, 15, 0.98)),
-      linear-gradient(
-        110deg,
-        color-mix(in srgb, var(--accent, #f59e0b) 17%, transparent),
-        transparent 45%
-      );
-    border: 1px solid
-      color-mix(in srgb, var(--accent, #f59e0b) 46%, rgba(255, 255, 255, 0.09));
-    border-radius: 8px;
-    box-shadow:
-      inset 0 0 0 1px
-      color-mix(in srgb, var(--accent, #f59e0b) 13%, transparent),
-      0 0 1.2rem color-mix(in srgb, var(--accent, #f59e0b) 10%, transparent);
+    gap: 0.36rem;
+    place-content: center;
+    justify-items: center;
+    text-align: center;
   }
 
-  .loadout-slot {
-    position: relative;
-    z-index: 3;
-    align-self: start;
-    inline-size: min(100%, 11.8rem);
-    block-size: var(--module-card-height);
+  .empty-modules {
+    min-block-size: 8.6rem;
+  }
+
+  .empty-modules svg {
+    inline-size: 1.35rem;
+    block-size: 1.35rem;
+    fill: none;
+    stroke: rgba(203, 214, 210, 0.36);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .empty-modules strong,
+  .empty-detail strong {
+    font-size: 0.84rem;
+  }
+
+  .empty-modules span,
+  .empty-detail span {
+    max-inline-size: 13rem;
+    font-size: 0.72rem;
+    line-height: 1.32;
+  }
+
+  .module-detail {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
     min-block-size: 0;
-    padding: 0.46rem;
-    transition:
-      border-color 160ms ease,
-      box-shadow 160ms ease,
-      transform 160ms ease,
-      background 160ms ease;
+    padding: 1rem;
+    border-color: color-mix(in srgb, var(--accent) 48%, #26313e);
   }
 
-  .slot-attack {
-    grid-area: attack;
-    align-self: start;
-    justify-self: start;
-  }
-
-  .slot-body {
-    grid-area: body;
-    align-self: start;
-    justify-self: end;
-  }
-
-  .slot-utility-a {
-    grid-area: utility-a;
-    align-self: center;
-    justify-self: start;
-  }
-
-  .slot-utility-b {
-    grid-area: utility-b;
-    align-self: center;
-    justify-self: end;
-  }
-
-  .slot-utility-c {
-    grid-area: utility-c;
-    align-self: end;
-    justify-self: center;
-    inline-size: min(100%, 11.8rem);
-  }
-
-  .loadout-slot.empty {
+  .module-detail.empty {
     border-style: dashed;
   }
 
-  .loadout-slot:hover,
-  .loadout-slot:focus-within,
-  .loadout-slot.highlighted,
-  .inventory-item:hover,
-  .inventory-item:focus-within {
-    background:
-      linear-gradient(180deg, rgba(16, 29, 30, 0.98), rgba(7, 15, 18, 0.99)),
-      linear-gradient(
-        110deg,
-        color-mix(in srgb, var(--accent, #f59e0b) 24%, transparent),
-        transparent 48%
-      );
-    border-color: color-mix(in srgb, var(--accent, #f59e0b) 78%, white);
-    box-shadow:
-      inset 0 0 0 1px
-      color-mix(in srgb, var(--accent, #f59e0b) 22%, transparent),
-      0 0 1.6rem color-mix(in srgb, var(--accent, #f59e0b) 22%, transparent);
-    transform: translateY(-2px);
+  .detail-body {
+    display: grid;
+    gap: 0.8rem;
+    align-content: start;
+    min-block-size: 0;
+    padding-top: 0.95rem;
   }
 
-  .slot-kicker {
-    gap: 0.28rem;
-    justify-content: space-between;
+  .detail-head {
+    gap: 0.7rem;
     min-inline-size: 0;
-    min-block-size: 0.9rem;
-    font-size: 0.54rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
   }
 
-  .slot-kicker span {
-    flex: 1 1 auto;
+  .detail-head > div:last-child {
+    display: grid;
+    gap: 0.12rem;
     min-inline-size: 0;
+  }
+
+  .detail-head strong {
     overflow: hidden;
     text-overflow: ellipsis;
-    color: color-mix(in srgb, var(--accent, #f59e0b) 72%, white);
+    font-size: 0.98rem;
+    line-height: 1.1;
     white-space: nowrap;
   }
 
-  .slot-kicker small {
-    flex: 0 1 45%;
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: end;
-    white-space: nowrap;
-  }
-
-  .socket-label {
-    gap: 0.38rem;
-    justify-content: space-between;
-    min-block-size: 0.95rem;
-    font-size: 0.58rem;
+  .detail-head small,
+  .drawer-title small {
+    font-size: 0.62rem;
     font-weight: 900;
     text-transform: uppercase;
     letter-spacing: 0.1em;
   }
 
-  .socket-label span {
-    min-inline-size: 0;
-    color: color-mix(in srgb, var(--accent, #f59e0b) 72%, white);
-  }
-
-  .socket-label small {
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: end;
-    white-space: nowrap;
-  }
-
-  .module-head {
-    gap: 0.42rem;
-    min-inline-size: 0;
-  }
-
-  .module-head > div:last-child {
-    display: grid;
-    gap: 0.08rem;
-    min-inline-size: 0;
-  }
-
-  .module-head strong {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 0.74rem;
-    line-height: 1.1;
-    white-space: nowrap;
-  }
-
-  .module-head small {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.22rem;
-    font-size: 0.54rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .rarity-label {
-    color: color-mix(in srgb, var(--rarity, #cbd5e1) 86%, white);
-  }
-
-  .module-glyph {
-    position: relative;
-    display: grid;
+  .detail-glyph {
     flex: 0 0 auto;
-    place-items: center;
-    inline-size: 1.78rem;
-    block-size: 1.78rem;
-    background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--accent) 26%, transparent),
-      rgba(255, 255, 255, 0.035)
-    );
+    inline-size: 3.05rem;
+    block-size: 3.05rem;
+    padding: 0.42rem;
+    background:
+      radial-gradient(
+        circle,
+        color-mix(in srgb, var(--accent) 22%, transparent),
+        transparent 68%
+      ),
+      rgba(0, 0, 0, 0.28);
     border: 2px solid color-mix(in srgb, var(--accent) 58%, white);
-    border-radius: 50%;
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent),
-      0 0 1rem color-mix(in srgb, var(--accent) 28%, transparent);
+    border-radius: 7px;
   }
 
-  .module-glyph img {
-    inline-size: 2.05rem;
-    block-size: 2.05rem;
-    object-fit: contain;
-    filter: drop-shadow(0 0.28rem 0.32rem rgba(0, 0, 0, 0.38));
-  }
-
-  p {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    min-block-size: 0;
+  .module-detail p {
     margin: 0;
-    overflow: hidden;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    font-size: 0.64rem;
-    line-height: 1.16;
+    font-size: 0.76rem;
+    line-height: 1.38;
   }
 
-  .slot-footer {
-    gap: 0.34rem;
-    justify-content: space-between;
-    margin-top: auto;
+  .module-detail p.effect {
+    color: color-mix(in srgb, var(--accent) 54%, white);
   }
 
   .tag-row {
-    flex: 1 1 auto;
     flex-wrap: wrap;
-    gap: 0.22rem;
+    gap: 0.34rem;
   }
 
   .tag-row span {
-    padding: 0.13rem 0.3rem;
-    font-size: 0.56rem;
+    padding: 0.18rem 0.42rem;
+    font-size: 0.62rem;
     font-weight: 900;
-    color: color-mix(in srgb, var(--accent) 76%, white);
+    color: color-mix(in srgb, var(--accent) 78%, white);
     background: color-mix(in srgb, var(--accent) 13%, transparent);
-    border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
-    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+    border-radius: 4px;
   }
 
-  .empty-copy,
-  .inventory-empty {
-    display: grid;
-    gap: 0.18rem;
-    place-content: center;
-    min-block-size: 4.25rem;
-    text-align: center;
-  }
-
-  .empty-copy strong,
-  .inventory-empty strong {
-    font-size: 0.78rem;
-  }
-
-  .inventory-panel {
-    background:
-      linear-gradient(180deg, rgba(8, 14, 15, 0.26), transparent),
-      radial-gradient(
-        circle at 50% 12%,
-        rgba(251, 191, 36, 0.07),
-        transparent 33%
-      );
-  }
-
-  .inventory-well {
-    min-block-size: 0;
-    overflow: hidden;
-    background:
-      linear-gradient(180deg, rgba(9, 18, 20, 0.93), rgba(3, 9, 12, 0.98)),
-      radial-gradient(
-        circle at 50% 48%,
-        rgba(251, 191, 36, 0.055),
-        transparent 44%
-      );
-    border: 2px solid rgba(190, 125, 23, 0.86);
-    border-radius: 8px;
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 225, 154, 0.12),
-      inset 0 0 3rem rgba(0, 0, 0, 0.42),
-      0 0 1.8rem rgba(189, 117, 16, 0.12);
-  }
-
-  .inventory-empty {
-    block-size: 100%;
-    padding: 1.4rem;
-  }
-
-  .inventory-list {
-    display: grid;
-    gap: 0.75rem;
-    align-content: start;
-    block-size: 100%;
-    padding: 0.85rem;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  .inventory-item {
-    padding: 0.82rem;
-  }
-
-  .inventory-item p {
-    min-block-size: auto;
-  }
-
-  .inventory-actions {
+  .detail-actions {
     flex-wrap: wrap;
-    gap: 0.45rem;
+    gap: 0.48rem;
+    align-self: end;
+    padding-top: 0.8rem;
+    margin-top: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  @media (max-width: 1080px) {
+  .bay-button {
+    gap: 0.36rem;
+    justify-content: center;
+    min-inline-size: 8.6rem;
+    min-block-size: 2.2rem;
+    padding: 0.45rem 0.68rem;
+    font-size: 0.7rem;
+    font-weight: 900;
+    line-height: 1;
+    color: #061015;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--accent, #f59e0b) 76%, white);
+    border: 1px solid color-mix(in srgb, var(--accent, #f59e0b) 64%, white);
+    border-radius: 6px;
+  }
+
+  .bay-button svg {
+    flex: 0 0 auto;
+    inline-size: 0.82rem;
+    block-size: 0.82rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .bay-button.secondary {
+    color: rgba(240, 247, 252, 0.88);
+    background: rgba(255, 255, 255, 0.065);
+    border-color: rgba(255, 255, 255, 0.13);
+  }
+
+  .bay-button.equipped,
+  .bay-button:disabled {
+    color: #4ade80;
+    cursor: default;
+    background: rgba(14, 40, 24, 0.95);
+    border-color: rgba(34, 197, 94, 0.3);
+  }
+
+  .hero-stage {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    min-inline-size: 0;
+    min-block-size: 0;
+    overflow: visible;
+  }
+
+  .model-port {
+    inline-size: min(100%, clamp(22rem, 42vw, 31rem));
+    aspect-ratio: 1;
+    transition:
+      transform 260ms ease,
+      opacity 260ms ease;
+  }
+
+  .menu-open .model-port {
+    transform: translateX(6.5rem) scale(0.82);
+  }
+
+  .drag-hint {
+    position: absolute;
+    inset-block-end: 1.2rem;
+    font-size: 0.68rem;
+    font-weight: 900;
+    color: rgba(203, 214, 210, 0.34);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    pointer-events: none;
+  }
+
+  .close-button:hover,
+  .close-button:focus-visible,
+  .bay-button:hover,
+  .bay-button:focus-visible {
+    filter: brightness(1.08);
+  }
+
+  @media (max-width: 1060px) {
     .bay-layout {
-      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(26rem, 1fr) minmax(16rem, 0.68fr);
+      grid-template-columns: 4rem minmax(0, 1fr);
       overflow: auto;
     }
 
-    .socket-panel {
-      min-block-size: 42rem;
-      border-inline-end: 0;
-      border-bottom: 1px solid rgba(252, 211, 77, 0.12);
-    }
-
-    .inventory-panel {
-      min-block-size: 24rem;
+    .menu-open .model-port {
+      transform: translateX(5rem) scale(0.76);
     }
   }
 
@@ -1199,162 +1281,68 @@
       font-size: 0.78rem;
     }
 
-    .socket-panel,
-    .inventory-panel {
-      padding: 0.55rem;
+    .bay-layout {
+      display: block;
+      padding: 0.65rem;
+      overflow: auto;
     }
 
-    .socket-panel {
-      min-block-size: auto;
-    }
-
-    .chassis-stage {
-      --module-card-height: 7.65rem;
-
-      display: grid;
-      grid-template-areas:
-        "model model"
-        "attack body"
-        "utility-a utility-b"
-        "utility-c utility-c";
-      grid-template-rows: auto repeat(3, var(--module-card-height));
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    .socket-rail {
+      position: sticky;
+      top: 0;
+      z-index: 8;
+      flex-direction: row;
       gap: 0.5rem;
-      padding: 0.55rem;
-      overflow: hidden;
+      padding-bottom: 0.65rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+      background: linear-gradient(180deg, rgba(3, 8, 11, 0.98), transparent);
     }
 
-    .model-port {
-      position: relative;
-      inset: auto;
-      grid-area: model;
-      justify-self: center;
-      inline-size: min(12.8rem, 56vw);
-      transform: none;
+    .socket-rail::-webkit-scrollbar {
+      display: none;
     }
 
-    .loadout-slots {
-      display: contents;
+    .socket-button {
+      flex: 0 0 auto;
+      inline-size: 3.1rem;
+      block-size: 3.1rem;
     }
 
-    .loadout-slot {
+    .module-drawer {
       position: relative;
       inset: auto;
       inline-size: 100%;
-      block-size: var(--module-card-height);
-      min-block-size: 0;
-      padding: 0.42rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .hero-stage {
+      min-block-size: 16rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .model-port,
+    .menu-open .model-port {
+      inline-size: min(16rem, 72vw);
       transform: none;
     }
 
-    .slot-attack {
-      grid-area: attack;
+    .drag-hint {
+      inset-block-end: 0.2rem;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .module-tile-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .slot-body {
-      grid-area: body;
-    }
-
-    .slot-utility-a {
-      grid-area: utility-a;
-    }
-
-    .slot-utility-b {
-      grid-area: utility-b;
-    }
-
-    .slot-utility-c {
-      grid-area: utility-c;
-      grid-column: 1 / -1;
-      justify-self: center;
-      inline-size: min(50%, 11.8rem);
-    }
-
-    .module-head {
-      gap: 0.34rem;
-    }
-
-    .module-head strong {
-      font-size: 0.68rem;
-    }
-
-    .module-glyph {
-      inline-size: 1.48rem;
-      block-size: 1.48rem;
-    }
-
-    .module-glyph img {
-      inline-size: 1.72rem;
-      block-size: 1.72rem;
-    }
-
-    .empty-copy {
-      min-block-size: 0;
-    }
-
-    p {
-      -webkit-line-clamp: 1;
-      line-clamp: 1;
-      font-size: 0.58rem;
-    }
-
-    .tag-row span {
-      font-size: 0.5rem;
+    .detail-actions {
+      align-items: stretch;
     }
 
     .bay-button {
-      min-block-size: 1.55rem;
-      font-size: 0.62rem;
-    }
-
-    .slot-footer,
-    .inventory-actions {
-      flex-direction: column;
-      align-items: stretch;
-    }
-  }
-
-  @media (max-width: 430px) {
-    .panel-title {
-      flex-direction: column;
-      gap: 0.35rem;
-      align-items: start;
-    }
-
-    .slot-utility-c {
-      inline-size: min(64%, 11.8rem);
-    }
-
-    .slot-kicker,
-    .socket-label {
-      flex-direction: column;
-      gap: 0.15rem;
-      align-items: start;
-    }
-
-    .socket-label small {
-      text-align: start;
-    }
-  }
-
-  @media (max-width: 360px) {
-    .chassis-stage {
-      --module-card-height: 6.55rem;
-
-      grid-template-areas:
-        "model"
-        "attack"
-        "body"
-        "utility-a"
-        "utility-b"
-        "utility-c";
-      grid-template-rows: auto repeat(5, var(--module-card-height));
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .slot-utility-c {
-      grid-column: auto;
-      inline-size: 100%;
+      flex: 1 1 100%;
     }
   }
 </style>

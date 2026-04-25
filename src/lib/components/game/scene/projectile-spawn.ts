@@ -33,6 +33,9 @@ interface AttackVectors {
   rightZ: number;
 }
 
+const laserBeamCoreColor = "#ffe1e8";
+const laserBeamShellColor = "#ff365f";
+
 const createAttackVectors = (
   build: WeaponBuild,
   velocity: Vec3
@@ -105,8 +108,8 @@ const applyBeamAttack = (
         : (index / (build.pelletCount - 1) - 0.5) * build.beamWidth * 3.4;
 
     beams.push({
-      color: build.colors.shell,
-      core: build.colors.core,
+      color: laserBeamShellColor,
+      core: laserBeamCoreColor,
       curve: build.curve,
       createdAt: now,
       id: crypto.randomUUID(),
