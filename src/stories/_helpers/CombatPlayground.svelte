@@ -80,6 +80,10 @@
       collectedArtifactRoomIds={[]}
       controlsLocked={false}
       {dungeon}
+      enemySpawnOverride={{
+        enemyCount: currentPreset.enemyCount,
+        enemyTemplateId: currentPreset.enemyTemplateId,
+      }}
       {meleeParams}
       meleeTrailSettings={trailSettings}
       machineStats={playgroundMachineStats}

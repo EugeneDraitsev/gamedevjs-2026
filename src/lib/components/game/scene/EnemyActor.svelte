@@ -17,6 +17,8 @@
   export const enemyEyeGeometry = new SphereGeometry(1, 16, 16);
   export const enemyGunGeometry = new BoxGeometry(1, 1, 1);
   export const enemyConeGeometry = new ConeGeometry(1, 1, 18);
+  export const stealthWingGeometry = new BoxGeometry(1, 1, 1);
+  export const stealthNoseGeometry = new ConeGeometry(1, 1, 4);
   export const enemyHealthBarGeometry = new BoxGeometry(1.1, 0.11, 0.06);
   export const enemyEyeMaterial = new MeshStandardMaterial({
     color: "#f5fbff",
@@ -47,7 +49,49 @@
 
   const isMineHerald = $derived(enemy.templateId === "mine-herald");
   const isGateKeeper = $derived(enemy.templateId === "gate-keeper");
+  const isStealther = $derived(typeof enemy.stealthRevealMs === "number");
   const hitFlash = $derived(animationNow - enemy.lastHitAt < 130);
+  const stealthReveal = $derived.by(() => {
+    if (!isStealther) {
+      return 1;
+    }
+
+    if (enemy.stealthMode === "aiming") {
+      return 1;
+    }
+
+    const revealMs = enemy.stealthRevealMs ?? 760;
+    const hitReveal = 1 - (animationNow - enemy.lastHitAt) / (revealMs * 0.7);
+
+    return Math.max(0, Math.min(1, hitReveal));
+  });
+  const stealthMoving = $derived(enemy.stealthMode === "relocating");
+  const stealthRevealCurve = $derived(stealthReveal * stealthReveal);
+  const stealthBodyOpacity = $derived(
+    isStealther ? Math.min(0.92, stealthRevealCurve * 1.15) : 1
+  );
+  const stealthShimmerOpacity = $derived(
+    isStealther
+      ? 0.0015 + (stealthMoving ? 0.009 : 0) + stealthRevealCurve * 0.08
+      : 0
+  );
+  const stealthShowHealth = $derived(!isStealther || stealthReveal > 0.22);
+  const stealthShowBody = $derived(!isStealther || stealthReveal > 0.16);
+  const bodyEmissiveIntensity = $derived.by(() => {
+    if (isStealther) {
+      return 0.08 + stealthReveal * 0.9;
+    }
+
+    return hitFlash ? 0.52 : 0.18;
+  });
+  const stealthDistortionVisible = $derived(
+    isStealther && (stealthMoving || stealthReveal > 0.02)
+  );
+  const stealthDroneYaw = $derived(
+    typeof enemy.stealthAimYaw === "number"
+      ? enemy.stealthAimYaw
+      : Math.sin(animationNow * 0.0008 + enemy.position[0]) * 0.2
+  );
   const lampBob = $derived(
     Math.sin(animationNow * 0.0022 + enemy.radius) * enemy.radius * 0.05
   );
@@ -102,19 +146,21 @@
 </script>
 
 <T.Group position={enemy.position}>
-  <T.Mesh
-    geometry={enemyBodyGeometry}
-    renderOrder={29}
-    scale={[enemy.radius * 1.12, enemy.radius * 1.12, enemy.radius * 1.12]}
-  >
-    <T.MeshBasicMaterial
-      color="#ff5353"
-      depthFunc={GreaterDepth}
-      opacity={0.22}
-      transparent
-      depthWrite={false}
-    />
-  </T.Mesh>
+  {#if !isStealther}
+    <T.Mesh
+      geometry={enemyBodyGeometry}
+      renderOrder={29}
+      scale={[enemy.radius * 1.12, enemy.radius * 1.12, enemy.radius * 1.12]}
+    >
+      <T.MeshBasicMaterial
+        color="#ff5353"
+        depthFunc={GreaterDepth}
+        opacity={0.22}
+        transparent
+        depthWrite={false}
+      />
+    </T.Mesh>
+  {/if}
 
   {#if enemy.radius > 1}
     <T.Mesh
@@ -468,34 +514,299 @@
       {/each}
     </T.Group>
   {:else}
-    <T.Mesh
-      geometry={enemyBodyGeometry}
-      castShadow
-      receiveShadow
-      scale={[enemy.radius, enemy.radius, enemy.radius]}
-    >
-      <T.MeshStandardMaterial
-        color={hitFlash ? "#fff4da" : enemy.color}
-        emissive={enemy.color}
-        emissiveIntensity={hitFlash ? 0.52 : 0.18}
-        metalness={0.16}
-        roughness={0.36}
+    {#if stealthDistortionVisible}
+      <T.Mesh
+        geometry={enemyRingGeometry}
+        position={[0, -enemy.radius + 0.08, 0]}
+        renderOrder={13}
+        rotation={[-Math.PI / 2, 0, animationNow * 0.0031]}
+        scale={[
+          enemy.radius * (0.42 + stealthReveal * 0.34),
+          enemy.radius * (0.42 + stealthReveal * 0.34),
+          1,
+        ]}
+      >
+        <T.MeshBasicMaterial
+          color={enemy.color}
+          depthWrite={false}
+          opacity={stealthShimmerOpacity}
+          transparent
+        />
+      </T.Mesh>
+
+      <T.Mesh
+        geometry={stealthWingGeometry}
+        renderOrder={14}
+        scale={[
+          enemy.radius * (0.58 + Math.sin(animationNow * 0.009) * 0.012),
+          enemy.radius * (0.04 + Math.sin(animationNow * 0.007) * 0.006),
+          enemy.radius * (0.72 + Math.cos(animationNow * 0.009) * 0.012),
+        ]}
+      >
+        <T.MeshBasicMaterial
+          color="#dffbff"
+          depthWrite={false}
+          opacity={0.003 + (stealthMoving ? 0.01 : 0) + stealthRevealCurve * 0.06}
+          transparent
+          wireframe
+        />
+      </T.Mesh>
+    {/if}
+
+    {#if stealthShowBody && isStealther}
+      <T.Group
+        rotation={[0, stealthDroneYaw, 0]}
+        scale={[1, 0.92 + stealthReveal * 0.08, 1]}
+      >
+        <T.Mesh
+          geometry={stealthWingGeometry}
+          castShadow
+          receiveShadow
+          position={[0, enemy.radius * 0.02, -enemy.radius * 0.08]}
+          scale={[enemy.radius * 1.5, enemy.radius * 0.1, enemy.radius * 0.52]}
+        >
+          <T.MeshStandardMaterial
+            color={hitFlash ? "#fff4da" : "#17202d"}
+            emissive={enemy.color}
+            emissiveIntensity={0.08 + stealthReveal * 0.5}
+            flatShading
+            metalness={0.84}
+            opacity={stealthBodyOpacity}
+            roughness={0.12}
+            transparent
+          />
+        </T.Mesh>
+
+        <T.Mesh
+          geometry={stealthWingGeometry}
+          castShadow
+          receiveShadow
+          position={[0, enemy.radius * 0.13, enemy.radius * 0.02]}
+          rotation={[0.08, Math.PI / 4, 0]}
+          scale={[enemy.radius * 0.62, enemy.radius * 0.2, enemy.radius * 0.62]}
+        >
+          <T.MeshStandardMaterial
+            color="#d7d8d2"
+            emissive={enemy.color}
+            emissiveIntensity={0.04 + stealthReveal * 0.28}
+            flatShading
+            metalness={0.5}
+            opacity={stealthBodyOpacity}
+            roughness={0.28}
+            transparent
+          />
+        </T.Mesh>
+
+        <T.Mesh
+          geometry={stealthWingGeometry}
+          castShadow
+          receiveShadow
+          position={[0, enemy.radius * 0.1, enemy.radius * 0.14]}
+          scale={[enemy.radius * 0.42, enemy.radius * 0.16, enemy.radius * 1.3]}
+        >
+          <T.MeshStandardMaterial
+            color="#1b2634"
+            emissive={enemy.color}
+            emissiveIntensity={0.08 + stealthReveal * 0.48}
+            flatShading
+            metalness={0.76}
+            opacity={stealthBodyOpacity}
+            roughness={0.14}
+            transparent
+          />
+        </T.Mesh>
+
+        {#each [-1, 1] as side}
+          <T.Mesh
+            geometry={stealthWingGeometry}
+            castShadow
+            receiveShadow
+            position={[side * enemy.radius * 0.78, enemy.radius * 0.05, enemy.radius * 0.06]}
+            rotation={[0, side * -0.55, side * 0.05]}
+            scale={[
+              enemy.radius * 1.02,
+              enemy.radius * 0.08,
+              enemy.radius * 0.36,
+            ]}
+          >
+            <T.MeshStandardMaterial
+              color="#2a3446"
+              emissive={enemy.color}
+              emissiveIntensity={0.05 + stealthReveal * 0.28}
+              flatShading
+              metalness={0.82}
+              opacity={stealthBodyOpacity}
+              roughness={0.16}
+              transparent
+            />
+          </T.Mesh>
+
+          <T.Mesh
+            geometry={stealthWingGeometry}
+            castShadow
+            receiveShadow
+            position={[side * enemy.radius * 0.7, 0, -enemy.radius * 0.34]}
+            rotation={[0, side * -0.22, side * -0.12]}
+            scale={[
+              enemy.radius * 0.82,
+              enemy.radius * 0.07,
+              enemy.radius * 0.48,
+            ]}
+          >
+            <T.MeshStandardMaterial
+              color="#111a26"
+              emissive={enemy.color}
+              emissiveIntensity={0.06 + stealthReveal * 0.34}
+              flatShading
+              metalness={0.9}
+              opacity={stealthBodyOpacity}
+              roughness={0.1}
+              transparent
+            />
+          </T.Mesh>
+
+          <T.Mesh
+            geometry={stealthWingGeometry}
+            castShadow
+            position={[side * enemy.radius * 1.18, enemy.radius * 0.02, -enemy.radius * 0.1]}
+            rotation={[0, side * -0.08, side * -0.02]}
+            scale={[
+              enemy.radius * 0.18,
+              enemy.radius * 0.12,
+              enemy.radius * 1.18,
+            ]}
+          >
+            <T.MeshStandardMaterial
+              color="#221915"
+              emissive={enemy.color}
+              emissiveIntensity={0.04 + stealthReveal * 0.18}
+              flatShading
+              metalness={0.72}
+              opacity={stealthBodyOpacity}
+              roughness={0.2}
+              transparent
+            />
+          </T.Mesh>
+
+          <T.Mesh
+            castShadow
+            position={[side * enemy.radius * 1.18, enemy.radius * 0.03, enemy.radius * 0.58]}
+            rotation={[Math.PI / 2, 0, 0]}
+            scale={[enemy.radius * 0.22, enemy.radius * 0.34, enemy.radius * 0.22]}
+          >
+            <T.CylinderGeometry args={[1, 0.78, 1, 6]} />
+            <T.MeshStandardMaterial
+              color="#5c4c41"
+              emissive={enemy.color}
+              emissiveIntensity={0.04 + stealthReveal * 0.2}
+              flatShading
+              metalness={0.62}
+              opacity={stealthBodyOpacity}
+              roughness={0.22}
+              transparent
+            />
+          </T.Mesh>
+
+          <T.Mesh
+            castShadow
+            position={[side * enemy.radius * 1.18, enemy.radius * 0.03, -enemy.radius * 0.72]}
+            rotation={[Math.PI / 2, 0, 0]}
+            scale={[enemy.radius * 0.24, enemy.radius * 0.4, enemy.radius * 0.24]}
+          >
+            <T.CylinderGeometry args={[0.78, 1, 1, 6]} />
+            <T.MeshStandardMaterial
+              color="#2f3748"
+              emissive={enemy.color}
+              emissiveIntensity={0.04 + stealthReveal * 0.24}
+              flatShading
+              metalness={0.78}
+              opacity={stealthBodyOpacity}
+              roughness={0.18}
+              transparent
+            />
+          </T.Mesh>
+
+          <T.Mesh
+            geometry={stealthWingGeometry}
+            castShadow
+            position={[side * enemy.radius * 0.62, enemy.radius * 0.3, -enemy.radius * 0.54]}
+            rotation={[0.4, side * 0.26, side * 0.4]}
+            scale={[
+              enemy.radius * 0.14,
+              enemy.radius * 0.36,
+              enemy.radius * 0.28,
+            ]}
+          >
+            <T.MeshStandardMaterial
+              color="#121b24"
+              emissive={enemy.color}
+              emissiveIntensity={0.04 + stealthReveal * 0.24}
+              flatShading
+              metalness={0.86}
+              opacity={stealthBodyOpacity}
+              roughness={0.14}
+              transparent
+            />
+          </T.Mesh>
+        {/each}
+
+        <T.Mesh
+          geometry={stealthNoseGeometry}
+          castShadow
+          position={[0, enemy.radius * 0.1, enemy.radius * 0.94]}
+          rotation={[Math.PI / 2, 0, Math.PI / 4]}
+          scale={[
+            enemy.radius * 0.22,
+            enemy.radius * 0.58,
+            enemy.radius * 0.22,
+          ]}
+        >
+          <T.MeshStandardMaterial
+            color={enemy.shotColor ?? enemy.color}
+            emissive={enemy.shotColor ?? enemy.color}
+            emissiveIntensity={0.28 + stealthReveal * 1.1}
+            flatShading
+            metalness={0.42}
+            opacity={stealthBodyOpacity}
+            roughness={0.1}
+            transparent
+          />
+        </T.Mesh>
+      </T.Group>
+    {:else if stealthShowBody}
+      <T.Mesh
+        geometry={enemyBodyGeometry}
+        castShadow
+        receiveShadow
+        scale={[enemy.radius, enemy.radius, enemy.radius]}
+      >
+        <T.MeshStandardMaterial
+          color={hitFlash ? "#fff4da" : enemy.color}
+          emissive={enemy.color}
+          emissiveIntensity={bodyEmissiveIntensity}
+          metalness={isStealther ? 0.72 : 0.16}
+          opacity={stealthBodyOpacity}
+          roughness={isStealther ? 0.08 : 0.36}
+          transparent={isStealther}
+        />
+      </T.Mesh>
+    {/if}
+
+    {#if !isStealther}
+      <T.Mesh
+        geometry={enemyEyeGeometry}
+        material={enemyEyeMaterial}
+        castShadow
+        position={[0, enemy.radius * 0.92, 0]}
+        scale={[
+          enemy.radius * 0.38,
+          enemy.radius * 0.38,
+          enemy.radius * 0.38,
+        ]}
       />
-    </T.Mesh>
+    {/if}
 
-    <T.Mesh
-      geometry={enemyEyeGeometry}
-      material={enemyEyeMaterial}
-      castShadow
-      position={[0, enemy.radius * 0.92, 0]}
-      scale={[
-        enemy.radius * 0.38,
-        enemy.radius * 0.38,
-        enemy.radius * 0.38,
-      ]}
-    />
-
-    {#if enemy.behavior === "shooter"}
+    {#if enemy.behavior === "shooter" && !isStealther}
       <T.Mesh
         geometry={enemyGunGeometry}
         castShadow
@@ -509,9 +820,11 @@
         <T.MeshStandardMaterial
           color={enemy.shotColor ?? enemy.color}
           emissive={enemy.shotColor ?? enemy.color}
-          emissiveIntensity={0.12}
+          emissiveIntensity={isStealther ? 0.18 + stealthReveal * 1.2 : 0.12}
           metalness={0.28}
+          opacity={stealthBodyOpacity}
           roughness={0.26}
+          transparent={isStealther}
         />
       </T.Mesh>
     {/if}
@@ -543,18 +856,20 @@
     </T.Mesh>
   {/each}
 
-  <T.Group position={[0, healthBarY, 0]}>
-    <T.Mesh
-      geometry={enemyHealthBarGeometry}
-      material={enemyHealthBackMaterial}
-      position={[0, 0, -0.02]}
-    />
+  {#if stealthShowHealth}
+    <T.Group position={[0, healthBarY, 0]}>
+      <T.Mesh
+        geometry={enemyHealthBarGeometry}
+        material={enemyHealthBackMaterial}
+        position={[0, 0, -0.02]}
+      />
 
-    <T.Mesh
-      geometry={enemyHealthBarGeometry}
-      material={enemyHealthFillMaterial}
-      position={[-0.55 * (1 - enemy.hp / enemy.maxHp) * 0.5, 0, 0]}
-      scale={[enemy.hp / enemy.maxHp, 1, 1]}
-    />
-  </T.Group>
+      <T.Mesh
+        geometry={enemyHealthBarGeometry}
+        material={enemyHealthFillMaterial}
+        position={[-0.55 * (1 - enemy.hp / enemy.maxHp) * 0.5, 0, 0]}
+        scale={[enemy.hp / enemy.maxHp, 1, 1]}
+      />
+    </T.Group>
+  {/if}
 </T.Group>

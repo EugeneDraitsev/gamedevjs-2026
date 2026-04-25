@@ -46,6 +46,21 @@ export interface ActiveBeam {
   width: number;
 }
 
+export interface ActiveStealthBeam {
+  color: string;
+  core: string;
+  createdAt: number;
+  fadeMs: number;
+  fireMs: number;
+  id: string;
+  length: number;
+  originId: string;
+  position: Vec3;
+  rotationY: number;
+  telegraphMs: number;
+  width: number;
+}
+
 export interface ActiveGateLaser {
   arcSpan: number;
   center: Vec3;
@@ -70,6 +85,7 @@ export interface ActiveEnemy {
   bombCooldownMs?: number;
   bombCount?: number;
   bombDamage?: number;
+  bombDelivery?: "drop" | "throw";
   bombExplosionRadius?: number;
   bombHp?: number;
   bombMaxActive?: number;
@@ -94,7 +110,14 @@ export interface ActiveEnemy {
   shotColor?: string;
   shotDamage?: number;
   shotIntervalMs?: number;
+  shotKind?: "energy" | "wheel";
   shotSpeed?: number;
+  stealthAimYaw?: number;
+  stealthMode?: "hidden" | "aiming" | "relocating";
+  stealthMoveSpeed?: number;
+  stealthRevealMs?: number;
+  stealthTargetPosition?: Vec3;
+  stealthWindupMs?: number;
   templateId: string;
   touchDamage: number;
   touchIntervalMs: number;
@@ -104,6 +127,9 @@ export interface ActiveEnemyShot {
   color: string;
   damage: number;
   id: string;
+  kind?: "energy" | "wheel";
+  lastHitAt?: number;
+  originId?: string;
   position: Vec3;
   radius: number;
   ttlMs: number;
@@ -114,6 +140,7 @@ export interface ActiveBomb {
   armAt: number;
   color: string;
   damage: number;
+  delivery?: "drop" | "throw";
   expiresAt: number;
   explosionRadius: number;
   hp: number;

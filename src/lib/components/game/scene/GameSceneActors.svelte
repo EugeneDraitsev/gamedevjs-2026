@@ -6,6 +6,7 @@
   import EnemyActor from "$lib/components/game/scene/EnemyActor.svelte";
   import GateKeeperArcLaser from "$lib/components/game/scene/GateKeeperArcLaser.svelte";
   import PickupActor from "$lib/components/game/scene/PickupActor.svelte";
+  import StealthBeamActor from "$lib/components/game/scene/StealthBeamActor.svelte";
   import WaterWake from "$lib/components/game/scene/WaterWake.svelte";
   import { enemyTemplateById } from "$lib/config/room-templates";
   import { getGameSceneContext } from "$lib/stores/scene-context";
@@ -15,6 +16,7 @@
     ActiveEnemyShot,
     ActiveGateLaser,
     ActivePickup,
+    ActiveStealthBeam,
   } from "$lib/types/game";
 
   const scene = getGameSceneContext();
@@ -56,7 +58,12 @@
       shotColor: template.shotColor,
       shotDamage: template.shotDamage,
       shotIntervalMs: template.shotIntervalMs,
+      shotKind: template.shotKind,
       shotSpeed: template.shotSpeed,
+      stealthMode: template.stealthRevealMs ? "hidden" : undefined,
+      stealthMoveSpeed: template.stealthMoveSpeed,
+      stealthRevealMs: template.stealthRevealMs,
+      stealthWindupMs: template.stealthWindupMs,
       templateId: template.id,
       touchDamage: template.touchDamage,
       touchIntervalMs: template.touchIntervalMs,
@@ -85,6 +92,7 @@
       color: "#ffd6a0",
       damage: 1,
       id: "enemy-shot-warmup",
+      kind: "energy",
       position: [0, 0.62, 0],
       radius: 0.18,
       ttlMs: 1000,
@@ -107,6 +115,22 @@
       sweepMs: 1320,
       telegraphMs: 720,
       width: 0.46,
+    },
+  ];
+  const stealthBeamWarmups: ActiveStealthBeam[] = [
+    {
+      color: "#8beeff",
+      core: "#f5feff",
+      createdAt: 0,
+      fadeMs: 180,
+      fireMs: 120,
+      id: "stealth-beam-warmup",
+      length: 8,
+      originId: "enemy-warmup-veil-stalker",
+      position: [0, 0.5, 0],
+      rotationY: 0,
+      telegraphMs: 900,
+      width: 0.26,
     },
   ];
   const pickupWarmups: ActivePickup[] = [
@@ -201,6 +225,10 @@
   {#each gateLaserWarmups as laser (laser.id)}
     <GateKeeperArcLaser animationNow={900} {laser} />
   {/each}
+
+  {#each stealthBeamWarmups as beam (beam.id)}
+    <StealthBeamActor animationNow={900} {beam} />
+  {/each}
 </T.Group>
 
 {#each combat.enemies as enemy (enemy.id)}
@@ -225,32 +253,76 @@
 
 {#each combat.enemyShots as shot (shot.id)}
   <T.Group position={shot.position}>
-    <T.Mesh renderOrder={28} scale={[1.35, 1.35, 1.35]}>
-      <T.SphereGeometry args={[shot.radius, 16, 16]} />
-      <T.MeshBasicMaterial
-        color="#ff8068"
-        depthFunc={GreaterDepth}
-        depthWrite={false}
-        opacity={0.36}
-        transparent
-      />
-    </T.Mesh>
+    {#if shot.kind === "wheel"}
+      <T.Group
+        rotation={[
+          Math.PI / 2,
+          Math.atan2(shot.velocity[0], shot.velocity[2]),
+          timing.now * 0.026,
+        ]}
+      >
+        <T.Mesh castShadow>
+          <T.TorusGeometry
+            args={[shot.radius * 0.72, shot.radius * 0.2, 10, 24]}
+          />
+          <T.MeshStandardMaterial
+            color="#20242a"
+            emissive={shot.color}
+            emissiveIntensity={0.26}
+            metalness={0.78}
+            roughness={0.28}
+          />
+        </T.Mesh>
 
-    <T.Mesh castShadow>
-      <T.SphereGeometry args={[shot.radius, 16, 16]} />
-      <T.MeshStandardMaterial
-        color={shot.color}
-        emissive={shot.color}
-        emissiveIntensity={0.7}
-        metalness={0.08}
-        roughness={0.16}
-      />
-    </T.Mesh>
+        <T.Mesh>
+          <T.TorusGeometry
+            args={[shot.radius * 0.38, shot.radius * 0.055, 8, 18]}
+          />
+          <T.MeshBasicMaterial color={shot.color} />
+        </T.Mesh>
+      </T.Group>
+
+      <T.Mesh renderOrder={28} rotation={[-Math.PI / 2, 0, timing.now * 0.004]}>
+        <T.RingGeometry args={[shot.radius * 1.1, shot.radius * 1.42, 32]} />
+        <T.MeshBasicMaterial
+          color={shot.color}
+          depthWrite={false}
+          opacity={0.34}
+          transparent
+        />
+      </T.Mesh>
+    {:else}
+      <T.Mesh renderOrder={28} scale={[1.35, 1.35, 1.35]}>
+        <T.SphereGeometry args={[shot.radius, 16, 16]} />
+        <T.MeshBasicMaterial
+          color="#ff8068"
+          depthFunc={GreaterDepth}
+          depthWrite={false}
+          opacity={0.36}
+          transparent
+        />
+      </T.Mesh>
+
+      <T.Mesh castShadow>
+        <T.SphereGeometry args={[shot.radius, 16, 16]} />
+        <T.MeshStandardMaterial
+          color={shot.color}
+          emissive={shot.color}
+          emissiveIntensity={0.7}
+          metalness={0.08}
+          roughness={0.16}
+        />
+      </T.Mesh>
+    {/if}
   </T.Group>
 {/each}
 
 {#each combat.gateLasers as laser (laser.id)}
   <GateKeeperArcLaser animationNow={timing.now} {laser} />
+{/each}
+
+{#each combat.stealthBeams as beam (beam.id)}
+  <StealthBeamActor animationNow={timing.now} {beam} />
 {/each}
 
 {#each scene.deflectBurstsRendered as burst (burst.id)}

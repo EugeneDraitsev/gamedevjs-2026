@@ -45,8 +45,8 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
     timing,
   } = args;
 
-  player.lastPosition = position;
   const now = performance.now();
+  player.updatePosition(position, now);
   const transition = currentRoomUnlocked
     ? getTransition(currentRoom, position)
     : null;

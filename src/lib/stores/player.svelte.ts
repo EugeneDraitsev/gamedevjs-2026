@@ -9,6 +9,8 @@ export class PlayerStore {
   ammo = $state(this.magazineSize);
   facingYaw = $state(0);
   lastPosition = $state<Vec3>([0, 1, 0]);
+  lastPositionAt = $state(0);
+  velocity = $state<Vec3>([0, 0, 0]);
   lastHitAt = $state(0);
   recoverDuration = $state(0);
   recoverUntil = $state(0);
@@ -66,6 +68,24 @@ export class PlayerStore {
     this.lastHitAt = at;
   }
 
+  updatePosition(position: Vec3, now: number) {
+    const elapsed =
+      this.lastPositionAt > 0 ? (now - this.lastPositionAt) / 1000 : 0;
+
+    if (elapsed > 0 && elapsed < 0.25) {
+      this.velocity = [
+        (position[0] - this.lastPosition[0]) / elapsed,
+        (position[1] - this.lastPosition[1]) / elapsed,
+        (position[2] - this.lastPosition[2]) / elapsed,
+      ];
+    } else {
+      this.velocity = [0, 0, 0];
+    }
+
+    this.lastPosition = position;
+    this.lastPositionAt = now;
+  }
+
   consumeAmmo() {
     if (this.reloading || this.ammo <= 0) {
       return false;
@@ -100,6 +120,8 @@ export class PlayerStore {
     this.health = this.maxHealth;
     this.ammo = this.magazineSize;
     this.facingYaw = 0;
+    this.velocity = [0, 0, 0];
+    this.lastPositionAt = 0;
     this.reloading = false;
     this.shotCount = 0;
     this.recoverDuration = 0;
@@ -114,6 +136,8 @@ export class PlayerStore {
     this.health = this.maxHealth;
     this.ammo = this.magazineSize;
     this.facingYaw = 0;
+    this.velocity = [0, 0, 0];
+    this.lastPositionAt = 0;
     this.reloading = false;
     this.shotCount = 0;
     this.lastHitAt = 0;

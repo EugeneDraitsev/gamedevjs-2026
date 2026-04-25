@@ -17,6 +17,9 @@
   const bombRingGeometry = new RingGeometry(0.86, 1, 64);
   const bombInnerRingGeometry = new RingGeometry(0.34, 0.4, 48);
   const bombArmBarGeometry = new BoxGeometry(1, 0.09, 0.05);
+  const plantedMineBodyGeometry = new CylinderGeometry(1, 1.08, 0.22, 28);
+  const plantedMineCoreGeometry = new CylinderGeometry(0.38, 0.46, 0.08, 18);
+  const plantedMineTickGeometry = new BoxGeometry(0.16, 0.04, 0.62);
   const bombArmBackMaterial = new MeshBasicMaterial({
     color: "#09131f",
     opacity: 0.88,
@@ -52,6 +55,7 @@
   const warningPulse = $derived(
     armed ? 0.5 + Math.sin(animationNow * 0.018) * 0.5 : 0.2 + armProgress * 0.8
   );
+  const planted = $derived(bomb.delivery === "drop");
   const hitFlash = $derived(animationNow - bomb.lastHitAt < 130);
   const sparkScale = $derived(
     armed
@@ -60,6 +64,10 @@
   );
   const bodyColor = $derived(hitFlash ? "#fff4da" : "#1a1420");
   const fuseHeight = $derived(bomb.radius * 0.9);
+  const plantedScale = $derived(
+    armed ? 1 + warningPulse * 0.08 : 0.86 + armProgress * 0.16
+  );
+  const plantedTickColor = $derived(armed ? "#fff0a8" : "#ff7a3d");
 </script>
 
 <T.Group position={bomb.position}>
@@ -69,8 +77,10 @@
     renderOrder={8}
     rotation={[-Math.PI / 2, 0, 0]}
     scale={[
-      bomb.explosionRadius * (0.98 + warningPulse * 0.05),
-      bomb.explosionRadius * (0.98 + warningPulse * 0.05),
+      bomb.explosionRadius *
+        (planted ? 0.92 + warningPulse * 0.12 : 0.98 + warningPulse * 0.05),
+      bomb.explosionRadius *
+        (planted ? 0.92 + warningPulse * 0.12 : 0.98 + warningPulse * 0.05),
       1,
     ]}
   >
@@ -101,10 +111,12 @@
     geometry={bombInnerRingGeometry}
     position={[0, -bomb.position[1] + 0.066, 0]}
     renderOrder={10}
-    rotation={[-Math.PI / 2, 0, animationNow * 0.004]}
+    rotation={[-Math.PI / 2, 0, animationNow * (planted ? -0.007 : 0.004)]}
     scale={[
-      bomb.explosionRadius * (0.92 + warningPulse * 0.18),
-      bomb.explosionRadius * (0.92 + warningPulse * 0.18),
+      bomb.explosionRadius *
+        (planted ? 0.5 + armProgress * 0.42 : 0.92 + warningPulse * 0.18),
+      bomb.explosionRadius *
+        (planted ? 0.5 + armProgress * 0.42 : 0.92 + warningPulse * 0.18),
       1,
     ]}
   >
@@ -116,68 +128,125 @@
     />
   </T.Mesh>
 
-  <T.Mesh
-    geometry={bombBodyGeometry}
-    castShadow
-    scale={[bomb.radius, bomb.radius, bomb.radius]}
-  >
-    <T.MeshStandardMaterial
-      color={bodyColor}
-      emissive={bomb.color}
-      emissiveIntensity={armed
-        ? 0.26 + Math.sin(animationNow * 0.02) * 0.18
-        : 0.08}
-      metalness={0.62}
-      roughness={0.32}
-    />
-  </T.Mesh>
-
-  <T.Group position={[0, bomb.radius * 0.92, 0]}>
+  {#if planted}
     <T.Mesh
-      geometry={bombFuseGeometry}
+      geometry={plantedMineBodyGeometry}
       castShadow
-      position={[0, fuseHeight / 2, 0]}
-      scale={[bomb.radius * 0.6, fuseHeight, bomb.radius * 0.6]}
+      position={[0, -bomb.radius * 0.52, 0]}
+      scale={[bomb.radius * 1.65, plantedScale, bomb.radius * 1.65]}
     >
       <T.MeshStandardMaterial
-        color="#2a1d16"
-        metalness={0.12}
-        roughness={0.82}
+        color={hitFlash ? "#fff4da" : "#151825"}
+        emissive={bomb.color}
+        emissiveIntensity={armed
+          ? 0.32 + Math.sin(animationNow * 0.024) * 0.22
+          : 0.12 + armProgress * 0.18}
+        metalness={0.74}
+        roughness={0.28}
       />
     </T.Mesh>
 
     <T.Mesh
-      geometry={bombFuseCapGeometry}
-      position={[0, fuseHeight + 0.02, 0]}
+      geometry={plantedMineCoreGeometry}
+      position={[0, -bomb.radius * 0.34, 0]}
+      rotation={[0, animationNow * 0.008, 0]}
+      scale={[bomb.radius * 1.5, 1, bomb.radius * 1.5]}
+    >
+      <T.MeshStandardMaterial
+        color={plantedTickColor}
+        emissive={plantedTickColor}
+        emissiveIntensity={armed ? 1.15 : 0.36 + armProgress * 0.58}
+        metalness={0.32}
+        roughness={0.18}
+      />
+    </T.Mesh>
+
+    <T.Group
+      position={[0, -bomb.radius * 0.24, 0]}
+      rotation={[0, animationNow * (armed ? 0.012 : 0.004 + armProgress * 0.006), 0]}
+    >
+      {#each [0, 1, 2, 3] as tick}
+        <T.Mesh
+          geometry={plantedMineTickGeometry}
+          position={[
+            Math.sin((tick * Math.PI) / 2) * bomb.radius * 0.84,
+            0,
+            Math.cos((tick * Math.PI) / 2) * bomb.radius * 0.84,
+          ]}
+          rotation={[0, (tick * Math.PI) / 2, 0]}
+        >
+          <T.MeshBasicMaterial
+            color={plantedTickColor}
+            opacity={armed ? 0.9 : 0.3 + armProgress * 0.48}
+            transparent
+          />
+        </T.Mesh>
+      {/each}
+    </T.Group>
+  {:else}
+    <T.Mesh
+      geometry={bombBodyGeometry}
+      castShadow
       scale={[bomb.radius, bomb.radius, bomb.radius]}
     >
       <T.MeshStandardMaterial
-        color="#3a2a1c"
-        metalness={0.16}
-        roughness={0.6}
+        color={bodyColor}
+        emissive={bomb.color}
+        emissiveIntensity={armed
+          ? 0.26 + Math.sin(animationNow * 0.02) * 0.18
+          : 0.08}
+        metalness={0.62}
+        roughness={0.32}
       />
     </T.Mesh>
 
-    <T.Mesh
-      geometry={bombSparkGeometry}
-      position={[0, fuseHeight + bomb.radius * 0.46, 0]}
-      scale={[
-        bomb.radius * sparkScale,
-        bomb.radius * sparkScale,
-        bomb.radius * sparkScale,
-      ]}
-    >
-      <T.MeshStandardMaterial
-        color={armed ? "#ffe2a8" : bomb.color}
-        emissive={armed ? "#ffb347" : bomb.color}
-        emissiveIntensity={armed ? 1.6 : 0.6 + armProgress * 0.8}
-        metalness={0.04}
-        roughness={0.18}
-        transparent
-        opacity={0.92}
-      />
-    </T.Mesh>
-  </T.Group>
+    <T.Group position={[0, bomb.radius * 0.92, 0]}>
+      <T.Mesh
+        geometry={bombFuseGeometry}
+        castShadow
+        position={[0, fuseHeight / 2, 0]}
+        scale={[bomb.radius * 0.6, fuseHeight, bomb.radius * 0.6]}
+      >
+        <T.MeshStandardMaterial
+          color="#2a1d16"
+          metalness={0.12}
+          roughness={0.82}
+        />
+      </T.Mesh>
+
+      <T.Mesh
+        geometry={bombFuseCapGeometry}
+        position={[0, fuseHeight + 0.02, 0]}
+        scale={[bomb.radius, bomb.radius, bomb.radius]}
+      >
+        <T.MeshStandardMaterial
+          color="#3a2a1c"
+          metalness={0.16}
+          roughness={0.6}
+        />
+      </T.Mesh>
+
+      <T.Mesh
+        geometry={bombSparkGeometry}
+        position={[0, fuseHeight + bomb.radius * 0.46, 0]}
+        scale={[
+          bomb.radius * sparkScale,
+          bomb.radius * sparkScale,
+          bomb.radius * sparkScale,
+        ]}
+      >
+        <T.MeshStandardMaterial
+          color={armed ? "#ffe2a8" : bomb.color}
+          emissive={armed ? "#ffb347" : bomb.color}
+          emissiveIntensity={armed ? 1.6 : 0.6 + armProgress * 0.8}
+          metalness={0.04}
+          roughness={0.18}
+          transparent
+          opacity={0.92}
+        />
+      </T.Mesh>
+    </T.Group>
+  {/if}
 
   <T.Group position={[0, bomb.radius + 0.42, 0]}>
     <T.Mesh
