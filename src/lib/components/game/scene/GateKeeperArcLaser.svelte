@@ -1,3 +1,10 @@
+<script module lang="ts">
+  import { BoxGeometry, SphereGeometry } from "three";
+
+  const laserBeamGeometry = new BoxGeometry(1, 1, 1);
+  const laserHeadGeometry = new SphereGeometry(1, 16, 16);
+</script>
+
 <script lang="ts">
   import { T } from "@threlte/core";
   import { AdditiveBlending, GreaterDepth } from "three";
@@ -11,7 +18,7 @@
     laser: ActiveGateLaser;
   } = $props();
 
-  const segmentCount = 38;
+  const segmentCount = 24;
   const age = $derived(animationNow - laser.createdAt);
   const active = $derived(
     age >= laser.telegraphMs && age <= laser.telegraphMs + laser.sweepMs
@@ -80,8 +87,12 @@
 <T.Group position={laser.center}>
   {#if radialBeamOpacity > 0.01}
     <T.Group rotation={[0, sweepAngle, 0]}>
-      <T.Mesh position={[0, 0.42, laser.radius * 0.5]} renderOrder={34}>
-        <T.BoxGeometry args={[laser.width * 2.6, 0.18, laser.radius]} />
+      <T.Mesh
+        geometry={laserBeamGeometry}
+        position={[0, 0.42, laser.radius * 0.5]}
+        renderOrder={34}
+        scale={[laser.width * 2.6, 0.18, laser.radius]}
+      >
         <T.MeshBasicMaterial
           blending={AdditiveBlending}
           color="#c90000"
@@ -93,8 +104,12 @@
         />
       </T.Mesh>
 
-      <T.Mesh position={[0, 0.52, laser.radius * 0.5]} renderOrder={35}>
-        <T.BoxGeometry args={[laser.width * 0.92, 0.2, laser.radius]} />
+      <T.Mesh
+        geometry={laserBeamGeometry}
+        position={[0, 0.52, laser.radius * 0.5]}
+        renderOrder={35}
+        scale={[laser.width * 0.92, 0.2, laser.radius]}
+      >
         <T.MeshBasicMaterial
           blending={AdditiveBlending}
           color={active ? "#ff3028" : "#ff3a28"}
@@ -110,14 +125,15 @@
 
   {#each segments as segment (segment.id)}
     <T.Group position={segment.position} rotation={[0, segment.rotationY, 0]}>
-      <T.Mesh renderOrder={31}>
-        <T.BoxGeometry
-          args={[
-            laser.width * (2.2 + segment.head * 1.2),
-            0.09 + segment.head * 0.08,
-            segment.length * 1.18,
-          ]}
-        />
+      <T.Mesh
+        geometry={laserBeamGeometry}
+        renderOrder={31}
+        scale={[
+          laser.width * (2.2 + segment.head * 1.2),
+          0.09 + segment.head * 0.08,
+          segment.length * 1.18,
+        ]}
+      >
         <T.MeshBasicMaterial
           blending={AdditiveBlending}
           color={laser.core}
@@ -129,14 +145,15 @@
         />
       </T.Mesh>
 
-      <T.Mesh renderOrder={32}>
-        <T.BoxGeometry
-          args={[
-            laser.width * (0.72 + segment.head * 0.45),
-            0.08 + segment.head * 0.06,
-            segment.length * 0.98,
-          ]}
-        />
+      <T.Mesh
+        geometry={laserBeamGeometry}
+        renderOrder={32}
+        scale={[
+          laser.width * (0.72 + segment.head * 0.45),
+          0.08 + segment.head * 0.06,
+          segment.length * 0.98,
+        ]}
+      >
         <T.MeshBasicMaterial
           blending={AdditiveBlending}
           color={segment.head > 0.4 ? laser.core : laser.color}
@@ -151,14 +168,19 @@
 
   {#if active}
     <T.Mesh
+      geometry={laserHeadGeometry}
       position={[
         Math.sin(sweepAngle) * laser.radius,
         0.26,
         Math.cos(sweepAngle) * laser.radius,
       ]}
       renderOrder={33}
+      scale={[
+        laser.width * 1.55,
+        laser.width * 1.55,
+        laser.width * 1.55,
+      ]}
     >
-      <T.SphereGeometry args={[laser.width * 1.55, 16, 16]} />
       <T.MeshBasicMaterial
         blending={AdditiveBlending}
         color={laser.core}

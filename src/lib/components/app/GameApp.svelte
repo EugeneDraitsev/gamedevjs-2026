@@ -10,6 +10,8 @@
   } from "$lib/audio/music";
   import { gameSfx } from "$lib/audio/sfx";
   import { DEFAULT_SWING, type SwingParams } from "$lib/combat/melee-swing";
+  import AppModalShell from "$lib/components/app/AppModalShell.svelte";
+  import EndDemoModal from "$lib/components/app/EndDemoModal.svelte";
   import FloorAdvanceTransition from "$lib/components/app/FloorAdvanceTransition.svelte";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import GameScene from "$lib/components/game/GameScene.svelte";
@@ -25,6 +27,7 @@
     type MachineLoadout,
     type MachineModuleId,
     type MachineSlotId,
+    machineModuleIds,
     moduleFitsSlot,
   } from "$lib/config/machine-modules";
   import {
@@ -49,6 +52,7 @@
     type SavedRunState,
     saveRunSave,
   } from "$lib/game/run-save";
+  import { cheats } from "$lib/stores/cheats.svelte";
   import { mobileInput } from "$lib/stores/mobile-input.svelte";
   import type { MeleeTrailSettings } from "$lib/types/game";
 
@@ -92,6 +96,7 @@
     createDefaultModuleInventory()
   );
   let musicFloorIndex: number | null = null;
+  let lastGiveAllModulesNonce = 0;
 
   const dungeon = $derived(
     createDungeonLayout(`${seed}-f${floorIndex}`, floorIndex)
@@ -328,6 +333,10 @@
   };
 
   const ejectModule = (slotId: MachineSlotId) => {
+    if (slotId === "attack" || slotId === "body" || slotId === "utility-c") {
+      return;
+    }
+
     const moduleId = machineLoadout[slotId];
 
     if (!moduleId) {
@@ -336,17 +345,6 @@
 
     machineLoadout = { ...machineLoadout, [slotId]: null };
     moduleInventory = [...moduleInventory, moduleId];
-  };
-
-  const scrapModule = (moduleId: MachineModuleId) => {
-    const removed = removeInventoryModule(moduleId);
-
-    if (!removed) {
-      return;
-    }
-
-    gearCount +=
-      getMachineModule(moduleId).scrapValue + machineStats.scrapYieldBonus;
   };
 
   const collectArtifact = (roomId: string, type: MachineModuleId) => {
@@ -425,6 +423,35 @@
       moduleInventory,
       version: 2,
     });
+  });
+
+  $effect(() => {
+    const nonce = cheats.giveAllModulesNonce;
+
+    if (nonce === 0) {
+      lastGiveAllModulesNonce = 0;
+      return;
+    }
+
+    if (nonce === lastGiveAllModulesNonce) {
+      return;
+    }
+
+    lastGiveAllModulesNonce = nonce;
+
+    const ownedModuleIds = new Set<MachineModuleId>([
+      ...Object.values(machineLoadout).filter(
+        (moduleId): moduleId is MachineModuleId => Boolean(moduleId)
+      ),
+      ...moduleInventory,
+    ]);
+    const missingModuleIds = machineModuleIds.filter(
+      (moduleId) => !ownedModuleIds.has(moduleId)
+    );
+
+    if (missingModuleIds.length > 0) {
+      moduleInventory = [...moduleInventory, ...missingModuleIds];
+    }
   });
 
   $effect(() => {
@@ -510,10 +537,10 @@
 </script>
 
 <svelte:head>
-  <title>Warden's Trial</title>
+  <title>Orb Knight</title>
   <meta
     name="description"
-    content="A dark-fantasy action prototype built with Threlte, Rapier, and Svelte."
+    content="A clockwork escape prototype about breaking out of a sealed machine, crossing the outside yard, and reaching the castle road."
   >
 </svelte:head>
 
@@ -525,6 +552,7 @@
         {controlsLocked}
         {dungeon}
         {gearCount}
+        {machineLoadout}
         meleeParams={swingParams}
         meleeTrailSettings={trailSettings}
         onAdvanceFloor={advanceFloor}
@@ -562,15 +590,7 @@
   {/if}
 
   {#if settingsOpen}
-    <dialog
-      class="settings-dialog"
-      open
-      onclick={(event) => {
-        if (event.target === event.currentTarget) {
-          closeSettings();
-        }
-      }}
-    >
+    <AppModalShell onClose={closeSettings} open={settingsOpen}>
       <SettingsPanel
         {debugEnabled}
         bind:settings
@@ -579,29 +599,22 @@
         onOpenMainMenu={openMainMenu}
         onResetDefaults={resetDefaults}
       />
-    </dialog>
+    </AppModalShell>
   {/if}
 
   {#if demoCompleteOpen}
-    <dialog
-      class="demo-dialog"
-      open
-      onclick={(event) => {
-        if (event.target === event.currentTarget) {
-          closeDemoComplete();
-        }
-      }}
+    <AppModalShell
+      describedby="end-demo-copy"
+      labelledby="end-demo-title"
+      onClose={closeDemoComplete}
+      open={demoCompleteOpen}
     >
-      <div class="demo-panel">
-        <strong>End of the demo</strong>
-        <div class="demo-actions">
-          <button type="button" onclick={closeDemoComplete}>Close</button>
-          <button type="button" class="primary" onclick={openMainMenu}>
-            Main Menu
-          </button>
-        </div>
-      </div>
-    </dialog>
+      <EndDemoModal
+        onClose={closeDemoComplete}
+        onOpenMainMenu={openMainMenu}
+        open={demoCompleteOpen}
+      />
+    </AppModalShell>
   {/if}
 
   <MachineBayModal
@@ -612,7 +625,6 @@
     onClose={() => (machineBayOpen = false)}
     onEjectModule={ejectModule}
     onInstallModule={installModule}
-    onScrapModule={scrapModule}
     open={machineBayOpen}
   />
 </main>
@@ -652,207 +664,9 @@
     backdrop-filter: blur(8px);
   }
 
-  .demo-dialog {
-    position: fixed;
-    inset: 0;
-    z-index: 120;
-    display: grid;
-    place-items: center;
-    inline-size: 100%;
-    block-size: 100%;
-    padding: 1.5rem;
-    color: #f6fbff;
-    background: rgba(2, 5, 9, 0.68);
-    border: 0;
-    backdrop-filter: blur(10px);
-  }
-
-  .demo-panel {
-    display: grid;
-    gap: 1.2rem;
-    inline-size: min(28rem, 100%);
-    padding: 1.4rem;
-    background: rgba(10, 16, 20, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    box-shadow: 0 24px 72px rgba(0, 0, 0, 0.42);
-  }
-
-  .demo-panel strong {
-    font-size: 1.35rem;
-    line-height: 1.15;
-  }
-
-  .demo-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.65rem;
-    justify-content: flex-end;
-  }
-
-  .demo-actions button {
-    min-inline-size: 7.5rem;
-    padding: 0.68rem 0.9rem;
-    font: inherit;
-    font-weight: 800;
-    color: rgba(246, 251, 255, 0.88);
-    cursor: pointer;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 6px;
-  }
-
-  .demo-actions button.primary {
-    color: #061018;
-    background: #f7c66b;
-    border-color: rgba(247, 198, 107, 0.72);
-  }
-
   .pane-fallback {
     right: 1rem;
     bottom: 1rem;
     z-index: 12;
-  }
-
-  .settings-dialog {
-    position: fixed;
-    inset: 0;
-    z-index: 20;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    inline-size: 100vw;
-    max-inline-size: 100vw;
-    block-size: 100dvh;
-    max-block-size: 100dvh;
-    padding: 1.5rem;
-    margin: 0;
-    background: transparent;
-    border: 0;
-  }
-
-  @media (max-width: 700px) {
-    .settings-dialog {
-      padding: 1rem;
-    }
-  }
-
-  .settings-dialog::backdrop {
-    background:
-      radial-gradient(
-        circle at 50% 18%,
-        rgba(219, 188, 118, 0.12),
-        transparent 22%
-      ),
-      radial-gradient(
-        circle at 50% 100%,
-        rgba(45, 76, 112, 0.14),
-        transparent 44%
-      ),
-      rgba(3, 8, 16, 0.74);
-    backdrop-filter: blur(18px);
-  }
-
-  :global(.settings-dialog .panel) {
-    display: grid;
-    gap: 1.05rem;
-    inline-size: min(100%, 36rem);
-    max-block-size: calc(100dvh - 3rem);
-    padding: 1.55rem 1.5rem 1.4rem;
-    margin: 0;
-    overflow-y: auto;
-    color: #eff7ff;
-    background:
-      radial-gradient(
-        circle at 50% 0,
-        rgba(219, 188, 118, 0.14),
-        transparent 26%
-      ),
-      linear-gradient(180deg, rgba(18, 16, 24, 0.94), rgba(6, 9, 17, 0.99)),
-      repeating-linear-gradient(
-        90deg,
-        transparent 0 28px,
-        rgba(212, 190, 132, 0.03) 28px 29px
-      );
-    border: 1px solid rgba(212, 190, 132, 0.16);
-    border-radius: 1.25rem;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 243, 217, 0.05),
-      0 24px 60px rgba(0, 0, 0, 0.34);
-  }
-
-  @media (max-width: 700px) {
-    :global(.settings-dialog .panel) {
-      gap: 1rem;
-      inline-size: min(100%, 20rem);
-      max-block-size: calc(100dvh - 2.5rem);
-      padding: 1.4rem 1.25rem 1.25rem;
-      overflow-y: auto;
-      border-radius: 1rem;
-    }
-
-    :global(.settings-dialog .panel .actions) {
-      gap: 0.7rem;
-      padding-top: 0.7rem;
-      margin-top: 0.4rem;
-    }
-
-    :global(.settings-dialog .panel .toggle) {
-      padding-block: 0.2rem;
-    }
-
-    :global(.settings-dialog .panel .menu-button) {
-      font-size: 1.05rem;
-    }
-  }
-
-  :global(.settings-dialog .eyebrow) {
-    font-size: 0.74rem;
-    font-weight: 800;
-    color: rgba(221, 200, 154, 0.68);
-    text-transform: uppercase;
-    letter-spacing: 0.22em;
-  }
-
-  :global(.settings-dialog .panel h1),
-  :global(.settings-dialog .panel h2),
-  :global(.settings-dialog .panel p) {
-    margin: 0;
-  }
-
-  :global(.settings-dialog .panel p) {
-    line-height: 1.5;
-    color: rgba(221, 205, 171, 0.72);
-  }
-
-  :global(.settings-dialog .panel label span) {
-    font-size: 0.74rem;
-    font-weight: 700;
-    color: rgba(221, 200, 154, 0.62);
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-  }
-
-  :global(.settings-dialog .panel label) {
-    display: grid;
-    gap: 0.4rem;
-  }
-
-  :global(.settings-dialog .panel select) {
-    font: inherit;
-  }
-
-  :global(.settings-dialog .panel select) {
-    padding: 0.72rem 0.9rem;
-    color: #f2e7c7;
-    background: rgba(10, 11, 16, 0.82);
-    border: 1px solid rgba(212, 190, 132, 0.14);
-    border-radius: 0.9rem;
-  }
-
-  :global(.settings-dialog .panel .toggle) {
-    grid-template-columns: auto 1fr;
-    align-items: center;
   }
 </style>

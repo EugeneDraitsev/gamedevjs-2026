@@ -4,6 +4,7 @@ import type { MusicCue, MusicTransitionOptions } from "$lib/audio/music";
 import type { SwingParams } from "$lib/combat/melee-swing";
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
 import type {
+  MachineLoadout,
   MachineModuleId,
   MachineModuleTemplate,
   MachineStats,
@@ -39,6 +40,7 @@ export interface GameSceneProps {
   floorReliefMaps?: boolean;
   floorReliefStrength?: number;
   gearCount?: number;
+  machineLoadout?: MachineLoadout;
   machineStats: MachineStats;
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;
@@ -113,6 +115,7 @@ export interface PlayerMeleeVisualsProps {
   meleeShowSword: boolean;
   meleeSwordOpacity: number;
   meleeTrailSettings: MeleeTrailSettings;
+  meleeWeaponForm?: "axe" | "sword";
   swingActiveFlare: number;
   swingBladeLength: number;
   swingBladeMidZ: number;

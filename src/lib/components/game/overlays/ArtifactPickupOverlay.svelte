@@ -40,7 +40,7 @@
       style:--rarity={rarityAccent}
       style:transform={`translateY(${(1 - artifactPickupStrength) * 18}px) scale(${0.97 + artifactPickupStrength * 0.03})`}
     >
-      <span>Machine Module Recovered</span>
+      <span>Loadout Module Recovered</span>
       <strong>{pickedArtifactTemplate.label}</strong>
       <small>{pickedArtifactTemplate.rarity}</small>
     </div>

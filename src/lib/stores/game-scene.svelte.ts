@@ -3,7 +3,9 @@ import type { SwingParams } from "$lib/combat/melee-swing";
 import { getHazardBrakeFactor } from "$lib/components/game/scene/utils";
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
 import {
+  createDefaultMachineLoadout,
   getMachineModule,
+  type MachineLoadout,
   type MachineModuleTemplate,
   type MachineStats,
 } from "$lib/config/machine-modules";
@@ -44,6 +46,7 @@ interface GameSceneStoreInput {
   dungeon: DungeonLayout;
   floorReliefMaps: boolean;
   floorReliefStrength: number;
+  machineLoadout: MachineLoadout;
   machineStats: MachineStats;
   meleeParams: SwingParams;
   meleeTrailSettings: MeleeTrailSettings;
@@ -65,6 +68,7 @@ export class GameSceneStore {
   dungeon = $state.raw<DungeonLayout>(null as never);
   floorReliefMaps = $state(true);
   floorReliefStrength = $state(1.4);
+  machineLoadout = $state.raw<MachineLoadout>(createDefaultMachineLoadout());
   meleeParams = $state.raw<SwingParams>(null as never);
   meleeTrailSettings = $state.raw<MeleeTrailSettings>(null as never);
   machineStats = $state.raw<MachineStats>(null as never);
@@ -289,6 +293,7 @@ export class GameSceneStore {
     this.dungeon = input.dungeon;
     this.floorReliefMaps = input.floorReliefMaps;
     this.floorReliefStrength = input.floorReliefStrength;
+    this.machineLoadout = input.machineLoadout;
     this.machineStats = input.machineStats;
     this.meleeParams = input.meleeParams;
     this.meleeTrailSettings = input.meleeTrailSettings;

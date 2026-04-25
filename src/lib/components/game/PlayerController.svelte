@@ -125,6 +125,9 @@
   const meleeParams = $derived(scene.meleeParams);
   const meleeCooldownMs = $derived(settings.meleeCooldownMs);
   const meleeTrailSettings = $derived(scene.meleeTrailSettings);
+  const meleeWeaponForm = $derived(
+    scene.machineLoadout["utility-c"] === "cleaver-axe-head" ? "axe" : "sword"
+  );
 
   const meleeHitboxParams = $derived<SwingParams>({
     ...meleeParams,
@@ -1081,7 +1084,13 @@
 </T.Group>
 
 <T.Group bind:ref={shellGroup}>
-  <OrbKnight scale={0.55} autoRotate={false} hitFlash={scene.playerHitFlash} />
+  <OrbKnight
+    scale={0.55}
+    autoRotate={false}
+    hitFlash={scene.playerHitFlash}
+    machineLoadout={scene.machineLoadout}
+    showWeaponAttachment={false}
+  />
 
   {#if laserChargeActive}
     <T.PointLight
@@ -1154,6 +1163,7 @@
   {meleeParams}
   meleeShowSword={settings.meleeShowSword}
   meleeSwordOpacity={settings.meleeSwordOpacity}
+  {meleeWeaponForm}
   {meleeTrailSettings}
   {swingActiveFlare}
   {swingBladeLength}

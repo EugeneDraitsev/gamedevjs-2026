@@ -58,7 +58,7 @@
   });
 </script>
 
-<svelte:head> <title>Settings | Warden's Trial</title> </svelte:head>
+<svelte:head> <title>Settings | Orb Knight</title> </svelte:head>
 
 <main class="settings-route">
   <SettingsPanel

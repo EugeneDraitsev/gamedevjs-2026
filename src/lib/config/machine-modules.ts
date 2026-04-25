@@ -17,7 +17,8 @@ export type MachineModuleId =
   | "ammo-hopper"
   | "overclock-governor"
   | "salvage-magnet"
-  | "parry-reflector";
+  | "parry-reflector"
+  | "cleaver-axe-head";
 
 export type MachineModuleKind = "attack" | "body" | "sword" | "utility";
 export type MachineModuleRarity = "common" | "uncommon" | "rare";
@@ -85,7 +86,9 @@ interface MachineStatDraft {
   cooldownMultiplier: number;
   damageMultiplier: number;
   magazineBonus: number;
+  magazineSizeOverride: number | null;
   maxHealthBonus: number;
+  meleeDamageMultiplier: number;
   pickupRadiusBonus: number;
   reflectedShotsSeekEnemies: boolean;
   reloadMultiplier: number;
@@ -107,7 +110,7 @@ export const machineSlots: Array<{
   { id: "body", kind: "body", label: "Body Module" },
   { id: "utility-a", kind: "utility", label: "Utility Module" },
   { id: "utility-b", kind: "utility", label: "Utility Module" },
-  { id: "utility-c", kind: "sword", label: "Sword Module" },
+  { id: "utility-c", kind: "sword", label: "Weapon Module" },
 ];
 
 export const machineModuleTemplates: MachineModuleTemplate[] = [
@@ -140,15 +143,16 @@ export const machineModuleTemplates: MachineModuleTemplate[] = [
   {
     accent: "#f43f5e",
     description:
-      "A sealed pressure nozzle that vents the chamber as a cutting lance.",
-    effect: "Beam/lance attack with high damage and a smaller magazine.",
+      "A focused laser emitter that charges before cutting through targets.",
+    effect:
+      "Charged laser beam attack with high damage and a one-shot magazine.",
     id: "pressure-lance-nozzle",
     kind: "attack",
-    label: "Pressure Lance Nozzle",
+    label: "Lase Beam",
     rarity: "rare",
     scrapValue: 6,
-    shortLabel: "Lance",
-    statLines: ["beam mode", "high damage"],
+    shortLabel: "Lase",
+    statLines: ["laser beam", "1 magazine"],
   },
   {
     accent: "#f59e0b",
@@ -217,16 +221,29 @@ export const machineModuleTemplates: MachineModuleTemplate[] = [
   },
   {
     accent: "#38bdf8",
-    description:
-      "A blade relay that catches hostile charge and throws it back downrange.",
-    effect: "Deflected enemy shots turn into homing counter-shots.",
+    description: "A simple holographic sword relay mounted to the side arm.",
+    effect: "Keeps the standard melee blade shape without changing shots.",
     id: "parry-reflector",
     kind: "sword",
-    label: "Parry Reflector",
-    rarity: "rare",
-    scrapValue: 6,
-    shortLabel: "Parry",
-    statLines: ["shot reflect", "homing counter"],
+    label: "Energy Sword",
+    rarity: "common",
+    scrapValue: 0,
+    shortLabel: "Sword",
+    statLines: ["sword blade", "default melee"],
+  },
+  {
+    accent: "#38bdf8",
+    description:
+      "A simple holographic axe head that catches shots on the swing edge.",
+    effect:
+      "Melee hits bite harder and reflected shots turn back into enemies.",
+    id: "cleaver-axe-head",
+    kind: "sword",
+    label: "Cleaver Axe Head",
+    rarity: "uncommon",
+    scrapValue: 4,
+    shortLabel: "Axe",
+    statLines: ["axe cleave", "shot reflect", "++melee"],
   },
 ];
 
@@ -237,6 +254,7 @@ export const machineModuleIds = machineModuleTemplates.map(
 export const starterMachineModuleIds: MachineModuleId[] = [
   "rivet-press-core",
   "gyro-servo-frame",
+  "parry-reflector",
 ];
 
 export const machineRewardModuleIds = machineModuleIds.filter(
@@ -252,7 +270,7 @@ export const createDefaultMachineLoadout = (): MachineLoadout => ({
   body: "gyro-servo-frame",
   "utility-a": null,
   "utility-b": null,
-  "utility-c": null,
+  "utility-c": "parry-reflector",
 });
 
 export const createDefaultModuleInventory = (): MachineModuleId[] => [];
@@ -315,6 +333,10 @@ export const normalizeMachineLoadout = (
     next.body = fallback.body;
   }
 
+  if (!next["utility-c"]) {
+    next["utility-c"] = fallback["utility-c"];
+  }
+
   return next;
 };
 
@@ -325,7 +347,9 @@ const createStatDraft = (): MachineStatDraft => ({
   cooldownMultiplier: 1,
   damageMultiplier: 1,
   magazineBonus: 0,
+  magazineSizeOverride: null,
   maxHealthBonus: 0,
+  meleeDamageMultiplier: 1,
   pickupRadiusBonus: 0,
   reflectedShotsSeekEnemies: false,
   reloadMultiplier: 1,
@@ -361,7 +385,7 @@ const applyModuleToDraft = (
       );
       draft.cooldownMultiplier *= 1.18;
       draft.damageMultiplier *= 2.1;
-      draft.magazineBonus -= 2;
+      draft.magazineSizeOverride = 1;
       draft.reloadMultiplier *= 1.12;
       break;
     case "boiler-plate-frame":
@@ -389,6 +413,9 @@ const applyModuleToDraft = (
       draft.scrapYieldBonus += 1;
       break;
     case "parry-reflector":
+      break;
+    case "cleaver-axe-head":
+      draft.meleeDamageMultiplier *= 1.65;
       draft.reflectedShotsSeekEnemies = true;
       break;
     default:
@@ -448,13 +475,16 @@ const createCompiledWeaponBuild = (compiledNodes: CompiledWeaponNode[]) => {
 
 const applyDamageMultiplier = (
   weaponBuild: WeaponBuild,
-  damageMultiplier: number
+  damageMultiplier: number,
+  meleeDamageMultiplier = 1
 ): WeaponBuild => {
   const damage = Math.max(1, Math.round(weaponBuild.damage * damageMultiplier));
   const burstDamage = Math.max(1, Math.round(damage * weaponBuild.pelletCount));
   const meleeDamage = Math.max(
     1,
-    Math.round(weaponBuild.meleeDamage * damageMultiplier)
+    Math.round(
+      weaponBuild.meleeDamage * damageMultiplier * meleeDamageMultiplier
+    )
   );
 
   return {
@@ -476,7 +506,8 @@ export const computeMachineStats = (loadout: MachineLoadout): MachineStats => {
 
   const weaponBuild = applyDamageMultiplier(
     createCompiledWeaponBuild(draft.weaponNodes),
-    draft.damageMultiplier
+    draft.damageMultiplier,
+    draft.meleeDamageMultiplier
   );
   const shootCooldownMs = Math.round(
     clamp(baseShootCooldownMs * draft.cooldownMultiplier, 120, 620)
@@ -484,9 +515,9 @@ export const computeMachineStats = (loadout: MachineLoadout): MachineStats => {
   const reloadDurationMs = Math.round(
     clamp(baseReloadDurationMs * draft.reloadMultiplier, 420, 1600)
   );
-  const magazineSize = Math.round(
-    clamp(baseMagazineSize + draft.magazineBonus, 3, 20)
-  );
+  const magazineSize =
+    draft.magazineSizeOverride ??
+    Math.round(clamp(baseMagazineSize + draft.magazineBonus, 3, 20));
   const maxHealth = Math.round(
     clamp(baseMachineHealth + draft.maxHealthBonus, 4, 12)
   );

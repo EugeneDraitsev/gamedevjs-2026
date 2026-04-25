@@ -1,7 +1,8 @@
 <script lang="ts">
   import { T } from "@threlte/core";
-  import { AdditiveBlending, GreaterDepth } from "three";
+  import { AdditiveBlending, DoubleSide, GreaterDepth } from "three";
   import { meleeHeightOffset } from "$lib/components/game/player/melee-trail";
+  import { createHolographicAxeBladeShape } from "$lib/game/holographic-axe";
   import type { PlayerMeleeVisualsProps } from "$lib/types/game-components";
 
   let {
@@ -9,6 +10,7 @@
     meleeParams,
     meleeShowSword,
     meleeSwordOpacity,
+    meleeWeaponForm = "sword",
     meleeTrailSettings,
     swingActiveFlare,
     swingBladeLength,
@@ -31,6 +33,15 @@
   );
   const trailVisibleOpacity = $derived(
     isSwingingVisual ? 0.24 * swingLingerFade : 0
+  );
+  const axeBladeShape = createHolographicAxeBladeShape();
+  const axeShaftLength = $derived(swingBladeLength * 1.02);
+  const axeShaftMidZ = $derived(
+    meleeParams.innerRadius + axeShaftLength / 2 + 0.02
+  );
+  const axeHeadZ = $derived(meleeParams.innerRadius + axeShaftLength + 0.14);
+  const axeShaftEndZ = $derived(
+    meleeParams.innerRadius + axeShaftLength + 0.08
   );
 </script>
 
@@ -71,48 +82,174 @@
     />
   </T.Mesh>
 
-  <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
-    <T.CylinderGeometry args={[0.026, 0.055, swingBladeLength, 20]} />
-    <T.MeshBasicMaterial
-      color="#eaffff"
-      opacity={swordVisibleOpacity}
-      toneMapped={false}
-      transparent
-    />
-  </T.Mesh>
+  {#if meleeWeaponForm === "axe"}
+    <T.Mesh position={[0, 0, axeShaftMidZ]} rotation={[Math.PI / 2, 0, 0]}>
+      <T.CylinderGeometry args={[0.03, 0.05, axeShaftLength, 8]} />
+      <T.MeshBasicMaterial
+        color="#eaffff"
+        opacity={0.82 * swordVisibleOpacity}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
 
-  <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
-    <T.CylinderGeometry args={[0.08, 0.12, swingBladeLength + 0.1, 20]} />
-    <T.MeshBasicMaterial
-      color="#eaffff"
-      depthFunc={GreaterDepth}
-      depthWrite={false}
-      opacity={0.38 * swordVisibleOpacity}
-      transparent
-    />
-  </T.Mesh>
+    <T.Mesh
+      position={[0, 0.014, axeShaftMidZ]}
+      scale={[0.1, 0.032, axeShaftLength]}
+    >
+      <T.BoxGeometry args={[1, 1, 1]} />
+      <T.MeshBasicMaterial
+        blending={AdditiveBlending}
+        color="#5ee9ff"
+        depthWrite={false}
+        opacity={0.32 * swordVisibleOpacity}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
 
-  <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
-    <T.CylinderGeometry args={[0.09, 0.13, swingBladeLength + 0.03, 24]} />
-    <T.MeshBasicMaterial
-      blending={AdditiveBlending}
-      color="#56efff"
-      depthWrite={false}
-      opacity={0.28 * swordVisibleOpacity * (0.5 + swingActiveFlare * 0.6)}
-      toneMapped={false}
-      transparent
-    />
-  </T.Mesh>
+    <T.Mesh position={[0, 0, axeShaftMidZ]} rotation={[Math.PI / 2, 0, 0]}>
+      <T.CylinderGeometry args={[0.07, 0.1, axeShaftLength + 0.06, 12]} />
+      <T.MeshBasicMaterial
+        color="#56efff"
+        depthFunc={GreaterDepth}
+        depthWrite={false}
+        opacity={0.38 * swordVisibleOpacity}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
 
-  <T.Mesh position={[0, 0, swingBladeTipZ]} rotation={[Math.PI / 2, 0, 0]}>
-    <T.ConeGeometry args={[0.055, 0.16, 20]} />
-    <T.MeshBasicMaterial
-      color="#eaffff"
-      opacity={swordVisibleOpacity}
-      toneMapped={false}
-      transparent
-    />
-  </T.Mesh>
+    <T.Mesh
+      position={[0, 0, axeShaftEndZ - 0.08]}
+      rotation={[Math.PI / 2, 0, 0]}
+    >
+      <T.CylinderGeometry args={[0.09, 0.09, 0.18, 8]} />
+      <T.MeshBasicMaterial
+        color="#56efff"
+        opacity={0.62 * swordVisibleOpacity}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh
+      position={[0, 0.02, axeHeadZ]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      scale={[0.66, 0.76, 0.66]}
+    >
+      <T.ShapeGeometry args={[axeBladeShape, 8]} />
+      <T.MeshBasicMaterial
+        blending={AdditiveBlending}
+        color="#5ee9ff"
+        depthWrite={false}
+        opacity={0.5 * swordVisibleOpacity * (0.64 + swingActiveFlare * 0.36)}
+        side={DoubleSide}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh
+      position={[0, 0.04, axeHeadZ]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      scale={[0.74, 0.84, 0.74]}
+    >
+      <T.ShapeGeometry args={[axeBladeShape, 8]} />
+      <T.MeshBasicMaterial
+        blending={AdditiveBlending}
+        color="#eaffff"
+        depthWrite={false}
+        opacity={0.24 * swordVisibleOpacity}
+        side={DoubleSide}
+        toneMapped={false}
+        transparent
+        wireframe
+      />
+    </T.Mesh>
+
+    <T.Mesh position={[0, 0.05, axeHeadZ]}>
+      <T.CylinderGeometry args={[0.16, 0.18, 0.06, 8]} />
+      <T.MeshBasicMaterial
+        blending={AdditiveBlending}
+        color="#eaffff"
+        depthWrite={false}
+        opacity={0.55 * swordVisibleOpacity}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh position={[0, 0.09, axeHeadZ]} rotation={[0, 0, Math.PI / 4]}>
+      <T.BoxGeometry args={[0.16, 0.035, 0.16]} />
+      <T.MeshBasicMaterial
+        blending={AdditiveBlending}
+        color="#eaffff"
+        depthWrite={false}
+        opacity={0.65 * swordVisibleOpacity}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh
+      position={[0, 0.02, axeHeadZ + 0.22]}
+      rotation={[Math.PI / 2, 0, 0]}
+    >
+      <T.ConeGeometry args={[0.07, 0.15, 4]} />
+      <T.MeshBasicMaterial
+        blending={AdditiveBlending}
+        color="#56efff"
+        depthWrite={false}
+        opacity={0.42 * swordVisibleOpacity}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+  {:else}
+    <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
+      <T.CylinderGeometry args={[0.026, 0.055, swingBladeLength, 20]} />
+      <T.MeshBasicMaterial
+        color="#eaffff"
+        opacity={swordVisibleOpacity}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
+      <T.CylinderGeometry args={[0.08, 0.12, swingBladeLength + 0.1, 20]} />
+      <T.MeshBasicMaterial
+        color="#eaffff"
+        depthFunc={GreaterDepth}
+        depthWrite={false}
+        opacity={0.38 * swordVisibleOpacity}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh position={[0, 0, swingBladeMidZ]} rotation={[Math.PI / 2, 0, 0]}>
+      <T.CylinderGeometry args={[0.09, 0.13, swingBladeLength + 0.03, 24]} />
+      <T.MeshBasicMaterial
+        blending={AdditiveBlending}
+        color="#56efff"
+        depthWrite={false}
+        opacity={0.28 * swordVisibleOpacity * (0.5 + swingActiveFlare * 0.6)}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh position={[0, 0, swingBladeTipZ]} rotation={[Math.PI / 2, 0, 0]}>
+      <T.ConeGeometry args={[0.055, 0.16, 20]} />
+      <T.MeshBasicMaterial
+        color="#eaffff"
+        opacity={swordVisibleOpacity}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+  {/if}
 
   <T.PointLight
     color="#62f4ff"

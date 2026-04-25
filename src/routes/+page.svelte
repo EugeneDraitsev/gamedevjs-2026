@@ -50,7 +50,7 @@
   };
 </script>
 
-<svelte:head> <title>Warden's Trial</title> </svelte:head>
+<svelte:head> <title>Orb Knight</title> </svelte:head>
 
 <MainMenu
   {canResume}

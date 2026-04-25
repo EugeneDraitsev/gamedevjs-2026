@@ -29,12 +29,12 @@
   ></div>
 
   <div class="menu-content">
-    <div class="menu-kicker">Clockwork Descent</div>
+    <div class="menu-kicker">Clockwork Escape</div>
     <h1>
-      <span>Warden's</span>
-      <span>Trial</span>
+      <span>Orb</span>
+      <span>Knight</span>
     </h1>
-    <p class="menu-tagline">Descend into the sealed engine below.</p>
+    <p class="menu-tagline">Break out of the machine. Reach the castle road.</p>
 
     <nav class="menu-actions" aria-label="Main menu">
       {#if canResume && onContinue}

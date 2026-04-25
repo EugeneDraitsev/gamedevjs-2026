@@ -19,6 +19,11 @@
 
   const scene = getGameSceneContext();
   const { combat, pickups, player, timing } = scene;
+  const outsideFinaleResolved = $derived(
+    scene.currentRoomTemplate.id === "outside-start" &&
+      scene.room.clearedSet.has(scene.currentRoom.id)
+  );
+  const combatActorsVisible = $derived(!outsideFinaleResolved);
   const enemyWarmups: ActiveEnemy[] = [
     "scrap-runner",
     "coil-sentry",
@@ -94,7 +99,7 @@
   const gateLaserWarmups: ActiveGateLaser[] = [
     {
       arcSpan: 1.96,
-      center: [0, -80, 0],
+      center: [0, 0, 0],
       color: "#ff8f38",
       core: "#ffe0a0",
       createdAt: 0,
@@ -159,7 +164,11 @@
   ] as [number, number, number]);
 </script>
 
-<T.Group visible={actorWarmupVisible} position={[0, -80, 0]}>
+<T.Group
+  visible={actorWarmupVisible}
+  position={[0, 0.02, 0]}
+  scale={[0.001, 0.001, 0.001]}
+>
   {#each enemyWarmups as enemy (enemy.id)}
     <EnemyActor animationNow={0} {enemy} />
   {/each}
@@ -203,55 +212,61 @@
   {/each}
 </T.Group>
 
-{#each combat.enemies as enemy (enemy.id)}
-  <EnemyActor animationNow={timing.now} {enemy} />
-{/each}
-
-{#if scene.currentRoomTemplate.layout === "outside-yard"}
-  <WaterWake position={scene.player.lastPosition} radius={0.62} />
-
-  {#each combat.enemies as enemy (enemy.id)}
-    <WaterWake opacity={0.2} position={enemy.position} radius={enemy.radius} />
-  {/each}
-{/if}
-
-{#each combat.bombs as bomb (bomb.id)}
-  <BombActor animationNow={timing.now} {bomb} />
-{/each}
-
 {#each pickups.items as pickup (pickup.id)}
   <PickupActor animationNow={timing.now} {pickup} />
 {/each}
 
-{#each combat.enemyShots as shot (shot.id)}
-  <T.Group position={shot.position}>
-    <T.Mesh renderOrder={28} scale={[1.35, 1.35, 1.35]}>
-      <T.SphereGeometry args={[shot.radius, 16, 16]} />
-      <T.MeshBasicMaterial
-        color="#ff8068"
-        depthFunc={GreaterDepth}
-        depthWrite={false}
-        opacity={0.36}
-        transparent
-      />
-    </T.Mesh>
+<T.Group visible={combatActorsVisible}>
+  {#each combat.enemies as enemy (enemy.id)}
+    <EnemyActor animationNow={timing.now} {enemy} />
+  {/each}
 
-    <T.Mesh castShadow>
-      <T.SphereGeometry args={[shot.radius, 16, 16]} />
-      <T.MeshStandardMaterial
-        color={shot.color}
-        emissive={shot.color}
-        emissiveIntensity={0.7}
-        metalness={0.08}
-        roughness={0.16}
-      />
-    </T.Mesh>
-  </T.Group>
-{/each}
+  {#if scene.currentRoomTemplate.layout === "outside-yard"}
+    <WaterWake position={scene.player.lastPosition} radius={0.62} />
 
-{#each combat.gateLasers as laser (laser.id)}
-  <GateKeeperArcLaser animationNow={timing.now} {laser} />
-{/each}
+    {#each combat.enemies as enemy (enemy.id)}
+      <WaterWake
+        opacity={0.2}
+        position={enemy.position}
+        radius={enemy.radius}
+      />
+    {/each}
+  {/if}
+
+  {#each combat.bombs as bomb (bomb.id)}
+    <BombActor animationNow={timing.now} {bomb} />
+  {/each}
+
+  {#each combat.enemyShots as shot (shot.id)}
+    <T.Group position={shot.position}>
+      <T.Mesh renderOrder={28} scale={[1.35, 1.35, 1.35]}>
+        <T.SphereGeometry args={[shot.radius, 16, 16]} />
+        <T.MeshBasicMaterial
+          color="#ff8068"
+          depthFunc={GreaterDepth}
+          depthWrite={false}
+          opacity={0.36}
+          transparent
+        />
+      </T.Mesh>
+
+      <T.Mesh castShadow>
+        <T.SphereGeometry args={[shot.radius, 16, 16]} />
+        <T.MeshStandardMaterial
+          color={shot.color}
+          emissive={shot.color}
+          emissiveIntensity={0.7}
+          metalness={0.08}
+          roughness={0.16}
+        />
+      </T.Mesh>
+    </T.Group>
+  {/each}
+
+  {#each combat.gateLasers as laser (laser.id)}
+    <GateKeeperArcLaser animationNow={timing.now} {laser} />
+  {/each}
+</T.Group>
 
 {#each scene.deflectBurstsRendered as burst (burst.id)}
   <T.Group position={burst.position}>

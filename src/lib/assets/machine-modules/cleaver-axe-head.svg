@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Cleaver Axe Head">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="46%" r="55%">
+      <stop stop-color="#56efff" stop-opacity=".4"/>
+      <stop offset=".66" stop-color="#38bdf8" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#111827" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="metal" x1="70" x2="190" y1="54" y2="188" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#effcff"/>
+      <stop offset=".48" stop-color="#b7eff7"/>
+      <stop offset="1" stop-color="#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="blue-core" x1="82" x2="161" y1="63" y2="218" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#eaffff"/>
+      <stop offset=".52" stop-color="#56efff"/>
+      <stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="42" fill="#07111f"/>
+  <circle cx="128" cy="128" r="96" fill="url(#glow)"/>
+  <path d="M88 216 166 67" stroke="url(#blue-core)" stroke-width="18" stroke-linecap="round"/>
+  <path d="M76 185 114 206" stroke="#0f172a" stroke-width="12" stroke-linecap="round"/>
+  <path d="M149 48h45l26 36-30 58h-58l19-50z" fill="url(#metal)" stroke="#f8fafc" stroke-opacity=".5" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M138 105h72" stroke="#56efff" stroke-width="13" stroke-linecap="round"/>
+  <path d="M67 52h38l27 28-32 34-36-23z" fill="#38bdf8" fill-opacity=".9"/>
+</svg>

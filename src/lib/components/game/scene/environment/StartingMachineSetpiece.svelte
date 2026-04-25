@@ -1,3 +1,16 @@
+<script module lang="ts">
+  import {
+    type CanvasTexture as CachedCanvasTexture,
+    type Texture as CachedTexture,
+    TextureLoader as CachedTextureLoader,
+  } from "three";
+
+  let cachedInstructionTexture: CachedCanvasTexture | null = null;
+  let cachedCrackTextureLight: CachedTexture | null = null;
+  let cachedCrackTextureHeavy: CachedTexture | null = null;
+  const crackLoader = new CachedTextureLoader();
+</script>
+
 <script lang="ts">
   import { T } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
@@ -8,13 +21,13 @@
     LinearFilter,
     SRGBColorSpace,
     type Texture,
-    TextureLoader,
   } from "three";
   import crackHeavyUrl from "$lib/assets/generated/core-prison-dome-crack-heavy.png?url";
   import crackLightUrl from "$lib/assets/generated/core-prison-dome-crack-light.png?url";
   import type { Vec3 } from "$lib/types/game";
 
   interface Props {
+    active?: boolean;
     animationAge?: number;
     breakAge?: number;
     locked?: boolean;
@@ -27,7 +40,19 @@
     rotationY: number;
   }
 
+  interface DomeShard {
+    angle: number;
+    lift: number;
+    radius: number;
+    size: number;
+    spin: number;
+    tilt: number;
+    travel: number;
+    y: number;
+  }
+
   let {
+    active = true,
     animationAge = 0,
     breakAge = 999,
     locked = true,
@@ -45,8 +70,130 @@
     { position: [-1.52, 1.08, 0], rotationY: -Math.PI / 2 },
     { position: [-1.08, 1.08, 1.08], rotationY: -Math.PI / 4 },
   ];
+  const domeShards: DomeShard[] = [
+    {
+      angle: -2.78,
+      lift: 0.62,
+      radius: 0.86,
+      size: 0.32,
+      spin: -1.9,
+      tilt: -0.82,
+      travel: 1.12,
+      y: 1.1,
+    },
+    {
+      angle: -2.25,
+      lift: 0.82,
+      radius: 1.02,
+      size: 0.25,
+      spin: 1.45,
+      tilt: 0.64,
+      travel: 1.34,
+      y: 1.35,
+    },
+    {
+      angle: -1.72,
+      lift: 0.68,
+      radius: 1.14,
+      size: 0.36,
+      spin: -1.16,
+      tilt: 0.9,
+      travel: 1.26,
+      y: 1.02,
+    },
+    {
+      angle: -1.18,
+      lift: 0.96,
+      radius: 0.92,
+      size: 0.28,
+      spin: 2.1,
+      tilt: -0.54,
+      travel: 1.44,
+      y: 1.44,
+    },
+    {
+      angle: -0.58,
+      lift: 0.58,
+      radius: 1.18,
+      size: 0.34,
+      spin: -1.72,
+      tilt: 0.72,
+      travel: 1.22,
+      y: 0.86,
+    },
+    {
+      angle: -0.08,
+      lift: 0.88,
+      radius: 0.78,
+      size: 0.3,
+      spin: 1.88,
+      tilt: -0.7,
+      travel: 1.52,
+      y: 1.32,
+    },
+    {
+      angle: 0.48,
+      lift: 0.7,
+      radius: 1.08,
+      size: 0.27,
+      spin: -1.32,
+      tilt: 0.58,
+      travel: 1.28,
+      y: 1.0,
+    },
+    {
+      angle: 1.02,
+      lift: 1.0,
+      radius: 0.94,
+      size: 0.35,
+      spin: 1.6,
+      tilt: -0.92,
+      travel: 1.46,
+      y: 1.42,
+    },
+    {
+      angle: 1.56,
+      lift: 0.56,
+      radius: 1.22,
+      size: 0.26,
+      spin: -2.08,
+      tilt: 0.46,
+      travel: 1.18,
+      y: 0.88,
+    },
+    {
+      angle: 2.08,
+      lift: 0.84,
+      radius: 0.88,
+      size: 0.33,
+      spin: 1.22,
+      tilt: -0.62,
+      travel: 1.38,
+      y: 1.26,
+    },
+    {
+      angle: 2.62,
+      lift: 0.66,
+      radius: 1.16,
+      size: 0.29,
+      spin: -1.54,
+      tilt: 0.86,
+      travel: 1.2,
+      y: 1.06,
+    },
+    {
+      angle: 3.06,
+      lift: 0.92,
+      radius: 0.98,
+      size: 0.31,
+      spin: 1.94,
+      tilt: -0.76,
+      travel: 1.5,
+      y: 1.5,
+    },
+  ];
   const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
-  const breakFadeSeconds = 2.1;
+  const breakFadeSeconds = 1.35;
   const glow = $derived(
     0.22 + Math.max(0, 1 - clamp01((animationAge - 0.1) / 1.45)) * 0.78
   );
@@ -60,22 +207,54 @@
     Math.max(0, 1 - clamp01((animationAge - 0.2) / 1.4))
   );
   const breakProgress = $derived(clamp01(breakAge / breakFadeSeconds));
-  const brokenShardOpacity = $derived(
-    locked ? 0 : Math.max(0, 1 - breakAge / 2)
+  const breakScatter = $derived(locked ? 0 : 1 - (1 - breakProgress) ** 3);
+  const breakShardLift = $derived(breakProgress * (1.42 - breakProgress));
+  const breakShardOpacity = $derived(
+    locked ? 0 : Math.max(0, 1 - breakProgress)
   );
+  const activeOpacity = $derived(active ? 1 : 0);
+  const colliderSensor = $derived(!(active && locked));
   const restraintOpacity = $derived(
-    locked ? 1 : Math.max(0, 1 - breakProgress)
+    activeOpacity * (locked ? 1 : Math.max(0, 1 - breakProgress))
   );
   const domeOpacity = $derived(
-    locked
-      ? 0.28 + sealPulse * 0.08 - sealRatio * 0.04
-      : Math.max(0, 0.26 * (1 - breakProgress))
+    activeOpacity *
+      (locked
+        ? 0.28 + sealPulse * 0.08 - sealRatio * 0.04
+        : Math.max(0, 0.26 * (1 - breakProgress)))
   );
+  const crackLightBaseOpacity = $derived.by(() => {
+    if (sealHits <= 0) {
+      return 0;
+    }
+
+    return sealHits > 1 ? 0.96 : 0.84;
+  });
+  const crackHeavyBaseOpacity = $derived.by(() => {
+    if (sealHits <= 1) {
+      return 0;
+    }
+
+    return sealHits > 2 ? 0.96 : 0.78;
+  });
+  const crackLightOpacity = $derived(crackLightBaseOpacity * restraintOpacity);
+  const crackHeavyOpacity = $derived(crackHeavyBaseOpacity * restraintOpacity);
   let instructionTexture = $state<CanvasTexture | null>(null);
   let crackTextureLight = $state<Texture | null>(null);
   let crackTextureHeavy = $state<Texture | null>(null);
 
   onMount(() => {
+    if (
+      cachedInstructionTexture &&
+      cachedCrackTextureLight &&
+      cachedCrackTextureHeavy
+    ) {
+      instructionTexture = cachedInstructionTexture;
+      crackTextureLight = cachedCrackTextureLight;
+      crackTextureHeavy = cachedCrackTextureHeavy;
+      return;
+    }
+
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
 
@@ -361,16 +540,16 @@
       7
     );
     drawKey("E", columns[4], 815, 132, 48);
-    drawText("INVENTORY", columns[4], 940, 42);
+    drawText("LOADOUT", columns[4], 940, 42);
 
     const texture = new CanvasTexture(canvas);
 
     texture.colorSpace = SRGBColorSpace;
     texture.minFilter = LinearFilter;
     texture.magFilter = LinearFilter;
+    cachedInstructionTexture = texture;
     instructionTexture = texture;
 
-    const crackLoader = new TextureLoader();
     const lightTexture = crackLoader.load(crackLightUrl);
     const heavyTexture = crackLoader.load(crackHeavyUrl);
 
@@ -380,14 +559,10 @@
       crackTexture.magFilter = LinearFilter;
     }
 
+    cachedCrackTextureLight = lightTexture;
+    cachedCrackTextureHeavy = heavyTexture;
     crackTextureLight = lightTexture;
     crackTextureHeavy = heavyTexture;
-
-    return () => {
-      texture.dispose();
-      crackTextureLight?.dispose();
-      crackTextureHeavy?.dispose();
-    };
   });
 </script>
 
@@ -396,7 +571,8 @@
     <T.PlaneGeometry args={[10.4, 3.68]} />
     <T.MeshBasicMaterial
       map={instructionTexture}
-      opacity={0.9}
+      depthWrite={false}
+      opacity={0.9 * activeOpacity}
       transparent
       toneMapped={false}
     />
@@ -404,25 +580,31 @@
 {/if}
 
 <T.Group position={[0, 0, 0.48]}>
-  {#if locked}
-    {#each domeColliderSegments as segment}
-      <T.Group position={segment.position} rotation={[0, segment.rotationY, 0]}>
-        <RigidBody type="fixed">
-          <Collider shape="cuboid" args={[0.78, 1.34, 0.12]} />
-        </RigidBody>
-      </T.Group>
-    {/each}
-    <T.Group position={[0, 1.74, 0]}>
+  {#each domeColliderSegments as segment}
+    <T.Group position={segment.position} rotation={[0, segment.rotationY, 0]}>
       <RigidBody type="fixed">
-        <Collider shape="cuboid" args={[1.14, 0.16, 1.14]} />
+        <Collider
+          shape="cuboid"
+          args={[0.78, 1.34, 0.12]}
+          sensor={colliderSensor}
+        />
       </RigidBody>
     </T.Group>
-  {/if}
+  {/each}
+  <T.Group position={[0, 1.74, 0]}>
+    <RigidBody type="fixed">
+      <Collider
+        shape="cuboid"
+        args={[1.14, 0.16, 1.14]}
+        sensor={colliderSensor}
+      />
+    </RigidBody>
+  </T.Group>
 
   <T.PointLight
     color="#8ff7ff"
     distance={5.4}
-    intensity={0.95 + glow * 1.2}
+    intensity={(0.95 + glow * 1.2) * restraintOpacity}
     position={[0, 1.05, 0.24]}
   />
 
@@ -434,7 +616,8 @@
     <T.CircleGeometry args={[1.56, 64]} />
     <T.MeshBasicMaterial
       color="#0a43a8"
-      opacity={0.075 + sealPulse * 0.04}
+      depthWrite={false}
+      opacity={(0.075 + sealPulse * 0.04) * restraintOpacity}
       transparent
     />
   </T.Mesh>
@@ -447,6 +630,7 @@
     <T.RingGeometry args={[1.18, 1.33, 64]} />
     <T.MeshBasicMaterial
       color="#42dfff"
+      depthWrite={false}
       opacity={(0.42 + sealPulse * 0.22) * restraintOpacity}
       transparent
     />
@@ -460,6 +644,7 @@
     <T.RingGeometry args={[1.47, 1.53, 64]} />
     <T.MeshBasicMaterial
       color="#ffd166"
+      depthWrite={false}
       opacity={(0.22 + sealPulse * 0.1) * restraintOpacity}
       transparent
     />
@@ -473,21 +658,21 @@
       emissive="#148bff"
       emissiveIntensity={0.58 + sealPulse * 0.34}
       metalness={0.12}
-      opacity={domeOpacity + 0.04}
+      opacity={domeOpacity}
       roughness={0.1}
       side={DoubleSide}
       transparent
     />
   </T.Mesh>
 
-  {#if crackTextureLight && sealHits > 0}
+  {#if crackTextureLight}
     <T.Mesh position={[0, 1.34, 1.0]} rotation={[-0.58, 0, 0]} renderOrder={12}>
       <T.PlaneGeometry args={[2.56, 1.92]} />
       <T.MeshBasicMaterial
         map={crackTextureLight}
         depthTest={false}
         depthWrite={false}
-        opacity={(sealHits > 1 ? 0.96 : 0.84) * restraintOpacity}
+        opacity={crackLightOpacity}
         side={DoubleSide}
         toneMapped={false}
         transparent
@@ -495,7 +680,7 @@
     </T.Mesh>
   {/if}
 
-  {#if crackTextureHeavy && sealHits > 1}
+  {#if crackTextureHeavy}
     <T.Mesh
       position={[0, 1.35, 1.02]}
       rotation={[-0.58, 0, -0.08]}
@@ -506,7 +691,7 @@
         map={crackTextureHeavy}
         depthTest={false}
         depthWrite={false}
-        opacity={(sealHits > 2 ? 0.96 : 0.78) * restraintOpacity}
+        opacity={crackHeavyOpacity}
         side={DoubleSide}
         toneMapped={false}
         transparent
@@ -518,37 +703,58 @@
     <T.SphereGeometry args={[1.56, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
     <T.MeshBasicMaterial
       color="#8ff7ff"
+      depthWrite={false}
       opacity={0.035 * restraintOpacity}
       transparent
       wireframe
     />
   </T.Mesh>
 
-  {#each [0, 1, 2] as hitIndex}
-    <T.Mesh position={[(hitIndex - 1) * 0.32, 0.16, 1.34]}>
-      <T.SphereGeometry args={[0.095, 14, 10]} />
-      <T.MeshStandardMaterial
-        color={sealHits > hitIndex ? "#2a1811" : "#8ff7ff"}
-        emissive={sealHits > hitIndex ? "#ff8f42" : "#8ff7ff"}
-        emissiveIntensity={sealHits > hitIndex ? 0.18 : 0.72 + sealPulse}
-        metalness={0.36}
-        roughness={0.18}
-      />
-    </T.Mesh>
+  {#each domeShards as shard}
+    <T.Group
+      position={[
+          Math.cos(shard.angle) * (shard.radius + breakScatter * shard.travel),
+          shard.y + breakShardLift * shard.lift,
+          Math.sin(shard.angle) * (shard.radius + breakScatter * shard.travel),
+        ]}
+      rotation={[
+          -0.58 + breakScatter * shard.tilt,
+          -shard.angle + breakScatter * shard.spin,
+          breakScatter * shard.spin * 0.5,
+        ]}
+      scale={[
+          1 - breakProgress * 0.26,
+          1 - breakProgress * 0.18,
+          1 - breakProgress * 0.26,
+        ]}
+    >
+      <T.Mesh renderOrder={14}>
+        <T.CircleGeometry args={[shard.size, 3]} />
+        <T.MeshStandardMaterial
+          color="#6fe8ff"
+          depthWrite={false}
+          emissive="#21cfff"
+          emissiveIntensity={0.46}
+          metalness={0.1}
+          opacity={breakShardOpacity * activeOpacity * 0.5}
+          roughness={0.18}
+          side={DoubleSide}
+          transparent
+        />
+      </T.Mesh>
+      <T.Mesh renderOrder={15} scale={[1.05, 1.05, 1.05]}>
+        <T.CircleGeometry args={[shard.size, 3]} />
+        <T.MeshBasicMaterial
+          color="#e7fdff"
+          depthWrite={false}
+          opacity={breakShardOpacity * activeOpacity * 0.42}
+          side={DoubleSide}
+          transparent
+          wireframe
+        />
+      </T.Mesh>
+    </T.Group>
   {/each}
-
-  <T.Mesh position={[0, 0.78, 1.18]}>
-    <T.SphereGeometry args={[0.18, 18, 12]} />
-    <T.MeshStandardMaterial
-      color={locked ? "#8ff7ff" : "#ffd166"}
-      emissive={locked ? "#8ff7ff" : "#ffd166"}
-      emissiveIntensity={locked ? 0.72 + sealPulse : 1.4}
-      metalness={0.36}
-      opacity={locked ? 0.8 - sealRatio * 0.32 : brokenShardOpacity}
-      roughness={0.18}
-      transparent
-    />
-  </T.Mesh>
 </T.Group>
 
 <T.Mesh
@@ -559,7 +765,8 @@
   <T.RingGeometry args={[0.72, 0.96, 64]} />
   <T.MeshBasicMaterial
     color="#ffd166"
-    opacity={ringOpacity * 0.52}
+    depthWrite={false}
+    opacity={ringOpacity * activeOpacity * 0.52}
     transparent
   />
 </T.Mesh>

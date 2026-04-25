@@ -383,21 +383,21 @@
     topColor: { value: new Color("#d9e1d9") },
   };
   const outsideHazeVertex = `
-                                      varying vec2 vUv;
-                                      void main() {
-                                        vUv = uv;
-                                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                                      }
-                                    `;
+                                        varying vec2 vUv;
+                                        void main() {
+                                          vUv = uv;
+                                          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                                        }
+                                      `;
   const outsideHazeFragment = `
-                                      varying vec2 vUv;
-                                      uniform vec3 bottomColor;
-                                      uniform vec3 topColor;
-                                      void main() {
-                                        vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
-                                        gl_FragColor = vec4(color, 0.42);
-                                      }
-                                    `;
+                                        varying vec2 vUv;
+                                        uniform vec3 bottomColor;
+                                        uniform vec3 topColor;
+                                        void main() {
+                                          vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
+                                          gl_FragColor = vec4(color, 0.42);
+                                        }
+                                      `;
 
   let {
     animationNow = 0,
@@ -598,16 +598,31 @@
 
   <OutsideTerrain texture={outsideEarthTexture} />
 
-  <T.Mesh position={[0, 12, -112]} rotation={[-0.14, 0, 0]}>
-    <T.PlaneGeometry args={[150, 58]} />
-    <T.ShaderMaterial
-      depthWrite={false}
-      fragmentShader={outsideHazeFragment}
-      transparent
-      uniforms={outsideHazeUniforms}
-      vertexShader={outsideHazeVertex}
-    />
-  </T.Mesh>
+  {#if outsideGateUnlocked}
+    {#each [-1, 1] as side}
+      <T.Mesh position={[side * 47, 12, -112]} rotation={[-0.14, 0, 0]}>
+        <T.PlaneGeometry args={[56, 58]} />
+        <T.ShaderMaterial
+          depthWrite={false}
+          fragmentShader={outsideHazeFragment}
+          transparent
+          uniforms={outsideHazeUniforms}
+          vertexShader={outsideHazeVertex}
+        />
+      </T.Mesh>
+    {/each}
+  {:else}
+    <T.Mesh position={[0, 12, -112]} rotation={[-0.14, 0, 0]}>
+      <T.PlaneGeometry args={[150, 58]} />
+      <T.ShaderMaterial
+        depthWrite={false}
+        fragmentShader={outsideHazeFragment}
+        transparent
+        uniforms={outsideHazeUniforms}
+        vertexShader={outsideHazeVertex}
+      />
+    </T.Mesh>
+  {/if}
 
   <!-- Mountain ring is now carved directly into the terrain heightmap;
        we only need the invisible collider wall so the player can't walk
@@ -737,15 +752,14 @@
   />
 {/if}
 
-{#if environment === "core-prison"}
-  <StartingMachineSetpiece
-    animationAge={startAnimationAge}
-    breakAge={corePrisonSealBreakAge}
-    locked={corePrisonSealLocked}
-    sealHits={corePrisonSealHits}
-    sealHitsRequired={corePrisonSealHitsRequired}
-  />
-{/if}
+<StartingMachineSetpiece
+  active={environment === "core-prison"}
+  animationAge={startAnimationAge}
+  breakAge={corePrisonSealBreakAge}
+  locked={environment === "core-prison" && corePrisonSealLocked}
+  sealHits={corePrisonSealHits}
+  sealHitsRequired={corePrisonSealHitsRequired}
+/>
 
 {#if environment === "training-range"}
   <T.Group position={[2.9, 0.65, -1.6]} rotation={[0, 0, -0.32]}>

@@ -1,11 +1,14 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { Button, Folder, List, Pane } from "svelte-tweakpane-ui";
+  import AppModalShell from "$lib/components/app/AppModalShell.svelte";
+  import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import GameScene from "$lib/components/game/GameScene.svelte";
   import {
     createSceneSettings,
     type SceneSettings,
   } from "$lib/config/scene-settings";
+  import { isEditableTarget } from "$lib/game/dom";
   import { cheats } from "$lib/stores/cheats.svelte";
   import {
     buildPlaygroundDungeon,
@@ -14,6 +17,7 @@
     type CombatPreset,
     combatPresets,
     noop,
+    playgroundMachineLoadout,
     playgroundMachineStats,
     playgroundWeaponBuild,
   } from "./playground-scene";
@@ -25,6 +29,7 @@
   let { initialPresetId = combatPresets[0].id }: Props = $props();
 
   let settings = $state<SceneSettings>(createSceneSettings());
+  let settingsOpen = $state(false);
   let presetId = $state(combatPresets[0].id);
   let restartTick = $state(0);
   let DebugPane = $state<
@@ -47,12 +52,21 @@
   const trailSettings = $derived(buildPlaygroundTrailSettings(settings));
 
   const restart = () => {
+    settingsOpen = false;
     restartTick += 1;
   };
 
   const resetDefaults = () => {
     Object.assign(settings, createSceneSettings());
     restart();
+  };
+
+  const closeSettings = () => {
+    settingsOpen = false;
+  };
+
+  const openSettings = () => {
+    settingsOpen = true;
   };
 
   $effect(() => {
@@ -67,6 +81,21 @@
     import("$lib/components/debug/DebugPane.svelte").then((module) => {
       DebugPane = module.default;
     });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Escape" || isEditableTarget(event.target)) {
+        return;
+      }
+
+      settingsOpen = !settingsOpen;
+      event.preventDefault();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   });
 
   onDestroy(() => {
@@ -78,13 +107,14 @@
   {#key sceneKey}
     <GameScene
       collectedArtifactRoomIds={[]}
-      controlsLocked={false}
+      controlsLocked={settingsOpen}
       {dungeon}
       {meleeParams}
       meleeTrailSettings={trailSettings}
+      machineLoadout={playgroundMachineLoadout}
       machineStats={playgroundMachineStats}
       onCollectArtifact={noop}
-      onOpenSettings={noop}
+      onOpenSettings={openSettings}
       onOpenWeaponLab={noop}
       {settings}
       weaponBuild={playgroundWeaponBuild}
@@ -108,6 +138,16 @@
       onResetLevel={restart}
       onResetScene={restart}
     />
+  {/if}
+
+  {#if settingsOpen}
+    <AppModalShell onClose={closeSettings} open={settingsOpen}>
+      <SettingsPanel
+        bind:settings
+        onBack={closeSettings}
+        onResetDefaults={resetDefaults}
+      />
+    </AppModalShell>
   {/if}
 </main>
 

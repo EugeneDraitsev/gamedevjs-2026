@@ -100,6 +100,7 @@ export const buildPlaygroundDungeon = (
 export const playgroundMachineStats = computeMachineStats(
   createDefaultMachineLoadout()
 );
+export const playgroundMachineLoadout = createDefaultMachineLoadout();
 export const playgroundWeaponBuild = playgroundMachineStats.weaponBuild;
 
 const buildGraphWeapon = (types: WeaponNodeType[]): WeaponBuild => {
@@ -184,7 +185,7 @@ export const weaponPlaygroundPresets: WeaponPlaygroundPreset[] = [
     ...buildGraphPreset(["lob-common"]),
   },
   {
-    description: "Charged beam from the Pressure Lance module.",
+    description: "Charged beam from the Lase Beam module.",
     id: "laser",
     label: "Laser",
     ...buildMachinePreset("pressure-lance-nozzle"),

@@ -568,6 +568,10 @@
         on:click={() => cheats.requestRevealMap()}
         title="Reveal Entire Map"
       />
+      <Button
+        on:click={() => cheats.requestGiveAllModules()}
+        title="Give All Modules"
+      />
       <Button on:click={() => cheats.reset()} title="Reset cheat defaults" />
     </Folder>
 

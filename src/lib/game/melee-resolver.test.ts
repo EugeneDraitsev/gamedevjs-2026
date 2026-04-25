@@ -47,7 +47,7 @@ describe("applyMeleeDeflects", () => {
     const combat = createCombatStub();
     const weaponBuild = computeMachineStats({
       ...createDefaultMachineLoadout(),
-      "utility-c": "parry-reflector",
+      "utility-c": "cleaver-axe-head",
     }).weaponBuild;
 
     applyMeleeDeflects({

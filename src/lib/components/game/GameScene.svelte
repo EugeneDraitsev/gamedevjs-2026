@@ -19,6 +19,7 @@
   import SceneRendererConfig from "$lib/components/game/SceneRendererConfig.svelte";
   import GameSceneActors from "$lib/components/game/scene/GameSceneActors.svelte";
   import GameSceneEnvironment from "$lib/components/game/scene/GameSceneEnvironment.svelte";
+  import { createDefaultMachineLoadout } from "$lib/config/machine-modules";
   import { roomTemplateById } from "$lib/config/room-templates";
   import { stepEnemies } from "$lib/game/enemy-stepper";
   import {
@@ -43,6 +44,8 @@
     floorExitTriggerHalfWidth,
     floorExitTriggerZ,
     getRoomBounds,
+    outsideGateTriggerHalfWidth,
+    outsideGateTriggerZ,
   } from "$lib/game/scene-layout";
   import {
     deflectBurstDurationMs,
@@ -63,6 +66,7 @@
     floorReliefMaps = true,
     floorReliefStrength = 1.4,
     gearCount = 0,
+    machineLoadout = createDefaultMachineLoadout(),
     machineStats,
     meleeParams,
     meleeTrailSettings,
@@ -86,6 +90,7 @@
       dungeon,
       floorReliefMaps,
       floorReliefStrength,
+      machineLoadout,
       machineStats,
       meleeParams,
       meleeTrailSettings,
@@ -362,8 +367,8 @@
 
     const inOutsideGateTrigger =
       scene.currentRoomTemplate.layout === "outside-yard" &&
-      Math.abs(position[0]) < 5 &&
-      position[2] < -scene.roomBounds.transitionInsetZ;
+      Math.abs(position[0]) < outsideGateTriggerHalfWidth &&
+      position[2] < outsideGateTriggerZ;
     const outsideGateUnlocked =
       scene.currentRoomTemplate.layout === "outside-yard" &&
       scene.room.clearedSet.has(scene.currentRoom.id);

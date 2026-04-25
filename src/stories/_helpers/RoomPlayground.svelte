@@ -19,6 +19,7 @@
     buildPlaygroundMeleeParams,
     buildPlaygroundTrailSettings,
     noop,
+    playgroundMachineLoadout,
     playgroundMachineStats,
     playgroundWeaponBuild,
   } from "./playground-scene";
@@ -98,6 +99,7 @@
       {floorReliefStrength}
       {meleeParams}
       meleeTrailSettings={trailSettings}
+      machineLoadout={playgroundMachineLoadout}
       machineStats={playgroundMachineStats}
       onCollectArtifact={noop}
       onOpenSettings={noop}

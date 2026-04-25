@@ -98,6 +98,9 @@ export const outsideRoomBounds: RoomBounds = {
   wallHalfWidth: 34,
 };
 
+export const outsideGateTriggerHalfWidth = 6.6;
+export const outsideGateTriggerZ = -outsideRoomBounds.transitionInsetZ;
+
 export const getRoomBounds = (layout: RoomTemplate["layout"]): RoomBounds =>
   layout === "outside-yard" ? outsideRoomBounds : defaultRoomBounds;
 

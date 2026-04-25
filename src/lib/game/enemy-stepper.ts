@@ -1195,13 +1195,16 @@ const stepActiveEnemies = (
 
 const keepOriginBoundActorsAlive = (
   combat: CombatStore,
-  nextEnemies: ActiveEnemy[]
+  nextEnemies: ActiveEnemy[],
+  options: { keepGateKeeperActors?: boolean } = {}
 ) => {
   const livingIds = new Set(nextEnemies.map((entry) => entry.id));
+  const isKeptFinaleActor = (originId: string) =>
+    Boolean(options.keepGateKeeperActors && originId.endsWith("-gate-keeper"));
 
   if (combat.bombs.length > 0) {
-    const survivingBombs = combat.bombs.filter((bomb) =>
-      livingIds.has(bomb.originId)
+    const survivingBombs = combat.bombs.filter(
+      (bomb) => livingIds.has(bomb.originId) || isKeptFinaleActor(bomb.originId)
     );
 
     if (survivingBombs.length !== combat.bombs.length) {
@@ -1210,8 +1213,9 @@ const keepOriginBoundActorsAlive = (
   }
 
   if (combat.gateLasers.length > 0) {
-    const survivingGateLasers = combat.gateLasers.filter((laser) =>
-      livingIds.has(laser.originId)
+    const survivingGateLasers = combat.gateLasers.filter(
+      (laser) =>
+        livingIds.has(laser.originId) || isKeptFinaleActor(laser.originId)
     );
 
     if (survivingGateLasers.length !== combat.gateLasers.length) {
@@ -1256,6 +1260,19 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
     doorWasLocked &&
     room.unlockingRoomId === currentRoomId &&
     room.doorOpenAmount > 0.001;
+  const outsideFinaleResolved =
+    currentRoomTemplate.id === "outside-start" &&
+    currentRoomTemplate.layout === "outside-yard" &&
+    room.clearedSet.has(currentRoomId);
+
+  if (outsideFinaleResolved) {
+    return {
+      doorStartedOpening,
+      lootSpawned,
+      nextHealth,
+      roomCleared: false,
+    };
+  }
 
   nextHealth = Math.max(0, nextHealth - applyHazardDamage(ctx, now));
   nextHealth = Math.max(0, nextHealth - stepGateLasers(ctx, now));
@@ -1274,8 +1291,19 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
   );
   nextHealth = Math.max(0, nextHealth - steppedEnemies.playerDamage);
 
+  const outsideGateKeeperCleared =
+    isCurrentRoomCombat &&
+    currentRoomTemplate.id === "outside-start" &&
+    currentRoomTemplate.layout === "outside-yard" &&
+    !room.clearedSet.has(currentRoomId) &&
+    !steppedEnemies.nextEnemies.some(
+      (enemy) => enemy.templateId === "gate-keeper"
+    );
+
   combat.enemies = steppedEnemies.nextEnemies;
-  keepOriginBoundActorsAlive(combat, steppedEnemies.nextEnemies);
+  keepOriginBoundActorsAlive(combat, steppedEnemies.nextEnemies, {
+    keepGateKeeperActors: outsideGateKeeperCleared,
+  });
 
   if (steppedEnemies.spawnedEnemyShots.length > 0) {
     combat.enemyShots.push(...steppedEnemies.spawnedEnemyShots);
@@ -1291,21 +1319,38 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
 
   combat.removeProjectiles(spentProjectiles);
 
-  let roomCleared =
-    combat.enemies.length === 0 &&
-    isCurrentRoomCombat &&
-    !room.clearedSet.has(currentRoomId) &&
-    (currentRoomTemplate.layout === "outside-yard" ||
-      !room.releasedSet.has(currentRoomId)) &&
-    room.unlockingRoomId !== currentRoomId;
-
-  if (
-    steppedEnemies.gateKeeperDefeated &&
-    currentRoomTemplate.layout === "outside-yard" &&
-    !room.clearedSet.has(currentRoomId)
-  ) {
-    roomCleared = true;
+  if (outsideGateKeeperCleared) {
+    combat.bombs = combat.bombs.map((bomb) =>
+      bomb.originId.endsWith("-gate-keeper")
+        ? {
+            ...bomb,
+            armAt: Number.POSITIVE_INFINITY,
+            damage: 0,
+            velocity: [0, 0, 0],
+          }
+        : bomb
+    );
+    combat.enemyShots = combat.enemyShots.map((shot) => ({
+      ...shot,
+      damage: 0,
+      velocity: [0, 0, 0],
+    }));
+    combat.gateLasers = combat.gateLasers.map((laser) =>
+      laser.originId.endsWith("-gate-keeper") ? { ...laser, damage: 0 } : laser
+    );
   }
+
+  const roomCleared =
+    ((combat.enemies.length === 0 &&
+      isCurrentRoomCombat &&
+      !room.clearedSet.has(currentRoomId) &&
+      (currentRoomTemplate.layout === "outside-yard" ||
+        !room.releasedSet.has(currentRoomId))) ||
+      outsideGateKeeperCleared ||
+      (steppedEnemies.gateKeeperDefeated &&
+        currentRoomTemplate.layout === "outside-yard" &&
+        !room.clearedSet.has(currentRoomId))) &&
+    room.unlockingRoomId !== currentRoomId;
 
   if (roomCleared) {
     lootSpawned = pickups.dropRoom(currentRoomId, currentRoomTemplate, now) > 0;

@@ -3,7 +3,7 @@
   import MachineBayShowcase from "../_helpers/MachineBayShowcase.svelte";
 
   const { Story } = defineMeta({
-    title: "UI/Machine Bay",
+    title: "UI/Loadout",
     component: MachineBayShowcase,
     parameters: {
       layout: "fullscreen",
@@ -12,18 +12,15 @@
       gearCount: { control: { type: "range", min: 0, max: 99, step: 1 } },
       variant: {
         control: "select",
-        options: ["starter", "inventory", "five-installed"],
+        options: ["starter", "loadout", "five-installed"],
       },
     },
   });
 </script>
 
-<Story
-  args={{ gearCount: 2, variant: "starter" }}
-  name="Starter Empty Inventory"
-/>
+<Story args={{ gearCount: 2, variant: "starter" }} name="Starter Loadout" />
 
-<Story args={{ gearCount: 8, variant: "inventory" }} name="Recovered Modules" />
+<Story args={{ gearCount: 8, variant: "loadout" }} name="Recovered Modules" />
 
 <Story
   args={{ gearCount: 14, variant: "five-installed" }}

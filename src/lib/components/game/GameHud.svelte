@@ -45,7 +45,7 @@
     <button
       type="button"
       class="hud-icon-button"
-      aria-label="Open Warden Chassis"
+      aria-label="Open Loadout"
       onclick={onOpenWeaponLab}
     >
       <img class="hud-icon" src={orbKnightIconUrl} alt="" aria-hidden="true">
