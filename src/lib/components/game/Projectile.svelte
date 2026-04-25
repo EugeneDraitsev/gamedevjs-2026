@@ -1,17 +1,89 @@
+<script module lang="ts">
+  import {
+    AdditiveBlending,
+    ConeGeometry,
+    CylinderGeometry,
+    GreaterDepth,
+    MeshBasicMaterial,
+    SphereGeometry,
+  } from "three";
+
+  const laserCoreColor = "#9be6ff";
+  const laserShellColor = "#66d9ff";
+  const laserGlowColor = "#3aa7ff";
+
+  const projectileHaloGeometry = new CylinderGeometry(0.82, 0.58, 3.84, 12);
+  const projectileTrailGeometry = new CylinderGeometry(0.48, 0.21, 2.85, 12);
+  const projectileCoreGeometry = new CylinderGeometry(0.26, 0.32, 2.64, 12);
+  const projectileHeadGeometry = new ConeGeometry(0.36, 1.38, 12);
+  const projectileParticleGeometry = new SphereGeometry(0.12, 8, 6);
+  const rocketGlowGeometry = new CylinderGeometry(0.72, 0.84, 4.9, 12);
+  const rocketBodyGeometry = new CylinderGeometry(0.42, 0.58, 3.2, 12);
+
+  const laserHaloMaterial = new MeshBasicMaterial({
+    blending: AdditiveBlending,
+    color: laserGlowColor,
+    depthFunc: GreaterDepth,
+    depthWrite: false,
+    opacity: 0.34,
+    toneMapped: false,
+    transparent: true,
+  });
+  const laserTrailMaterial = new MeshBasicMaterial({
+    blending: AdditiveBlending,
+    color: laserShellColor,
+    depthWrite: false,
+    opacity: 0.62,
+    toneMapped: false,
+    transparent: true,
+  });
+  const laserCoreMaterial = new MeshBasicMaterial({
+    blending: AdditiveBlending,
+    color: laserCoreColor,
+    depthWrite: false,
+    opacity: 0.92,
+    toneMapped: false,
+    transparent: true,
+  });
+  const laserHeadMaterial = new MeshBasicMaterial({
+    blending: AdditiveBlending,
+    color: "#dffcff",
+    depthWrite: false,
+    opacity: 0.96,
+    toneMapped: false,
+    transparent: true,
+  });
+  const laserParticleMaterial = new MeshBasicMaterial({
+    blending: AdditiveBlending,
+    color: laserShellColor,
+    depthWrite: false,
+    opacity: 0.58,
+    toneMapped: false,
+    transparent: true,
+  });
+  const rocketGlowMaterial = new MeshBasicMaterial({
+    color: "#dffcff",
+    depthFunc: GreaterDepth,
+    depthWrite: false,
+    opacity: 0.34,
+    transparent: true,
+  });
+</script>
+
 <script lang="ts">
   import type { RigidBody as RapierRigidBody } from "@dimforge/rapier3d-compat";
   import { T, useTask } from "@threlte/core";
-  import { Collider, RigidBody } from "@threlte/rapier";
+  import { Collider, RigidBody, type SensorEnterEvent } from "@threlte/rapier";
   import { onMount } from "svelte";
-  import { GreaterDepth, MathUtils, Vector3 } from "three";
-  import { getDamageAtDistance } from "$lib/config/weapon-graph";
+  import { MathUtils, Vector3 } from "three";
   import type { Vec3 } from "$lib/types/game";
   import type { ProjectileProps } from "$lib/types/game-components";
 
+  type SensorEnterPayload = Parameters<NonNullable<SensorEnterEvent>>[0];
+
   const projectileVelocity = new Vector3();
-  const fallbackImpulse = new Vector3();
   const currentPosition = new Vector3();
-  const spawnPosition = new Vector3();
+  const impactPosition = new Vector3();
   const lateralDirection = new Vector3();
   const desiredDirection = new Vector3();
   const homingTarget = new Vector3();
@@ -22,10 +94,15 @@
   let ttlTimer = 0;
   let armed = false;
   let visualYaw = $state(0);
-  let trailOpacity = $state(0.7);
-  let trailStretch = $state(1.5);
+  let trailBackOffset = $state(1.38);
 
-  let { data, enemyTargets = [], onExpire, onMove }: ProjectileProps = $props();
+  let {
+    data,
+    enemyTargets = [],
+    onExpire,
+    onImpact,
+    onMove,
+  }: ProjectileProps = $props();
 
   const expireProjectile = () => {
     if (hasExpired) {
@@ -34,6 +111,48 @@
 
     hasExpired = true;
     onExpire?.(data.id);
+  };
+
+  const impactProjectile = () => {
+    if (hasExpired) {
+      return;
+    }
+
+    const translation = rigidBody?.translation();
+    const velocity = rigidBody?.linvel();
+    const impactVelocity: Vec3 = [
+      velocity?.x ?? data.velocity[0],
+      velocity?.y ?? data.velocity[1],
+      velocity?.z ?? data.velocity[2],
+    ];
+
+    currentPosition.set(
+      translation?.x ?? data.position[0],
+      translation?.y ?? data.position[1],
+      translation?.z ?? data.position[2]
+    );
+    projectileVelocity.set(
+      impactVelocity[0],
+      impactVelocity[1],
+      impactVelocity[2]
+    );
+    impactPosition.copy(currentPosition);
+
+    if (projectileVelocity.lengthSq() > 0) {
+      impactPosition.addScaledVector(
+        projectileVelocity.normalize(),
+        -data.build.radius * 0.38
+      );
+    }
+
+    onImpact?.({
+      color: laserGlowColor,
+      core: laserCoreColor,
+      position: [impactPosition.x, impactPosition.y, impactPosition.z],
+      radius: Math.max(0.26, data.build.radius * 1.35),
+      velocity: impactVelocity,
+    });
+    expireProjectile();
   };
 
   onMount(() => {
@@ -62,8 +181,6 @@
       },
       true
     );
-
-    spawnPosition.set(data.position[0], data.position[1], data.position[2]);
   });
 
   const applyHomingVelocity = (delta: number) => {
@@ -122,26 +239,21 @@
     }
 
     flightTime += delta;
-    armed ||= flightTime > 0.06;
+    armed ||= flightTime > 0.05;
 
     const velocity = body.linvel();
     projectileVelocity.set(velocity.x, velocity.y, velocity.z);
     const translation = body.translation();
     currentPosition.set(translation.x, translation.y, translation.z);
     visualYaw = Math.atan2(projectileVelocity.x, projectileVelocity.z);
-    const speed = Math.hypot(projectileVelocity.x, projectileVelocity.z);
 
-    trailStretch = MathUtils.lerp(
-      trailStretch,
-      Math.min(3.1, 1.35 + speed / 15),
+    trailBackOffset = MathUtils.lerp(
+      trailBackOffset,
+      1.5 + Math.sin(flightTime * 34) * 0.083,
       Math.min(1, delta * 16)
     );
-    trailOpacity =
-      0.42 +
-      (0.24 + Math.min(0.16, speed * 0.008)) *
-        (0.5 + 0.5 * Math.sin(flightTime * 42));
 
-    onMove?.(data.id, [translation.x, translation.y, translation.z]);
+    onMove?.(data.id, translation.x, translation.y, translation.z);
 
     const dragFactor =
       data.build.homingTurn > 0
@@ -184,60 +296,16 @@
     );
   });
 
-  const handleCollisionEnter = ({
-    targetRigidBody,
-  }: {
-    targetRigidBody: RapierRigidBody | null;
-  }) => {
-    if (hasExpired) {
+  const handleSensorEnter = ({ targetCollider }: SensorEnterPayload) => {
+    if (hasExpired || !armed || data.build.homingTurn > 0) {
       return;
     }
 
-    if (data.build.homingTurn > 0) {
+    if (targetCollider.isSensor()) {
       return;
     }
 
-    if (!armed) {
-      return;
-    }
-
-    const velocity = rigidBody?.linvel();
-    projectileVelocity.set(
-      velocity?.x ?? data.velocity[0],
-      velocity?.y ?? data.velocity[1],
-      velocity?.z ?? data.velocity[2]
-    );
-
-    const translation = rigidBody?.translation();
-
-    currentPosition.set(
-      translation?.x ?? data.position[0],
-      translation?.y ?? data.position[1],
-      translation?.z ?? data.position[2]
-    );
-
-    const distanceMultiplier = getDamageAtDistance(
-      data.build.damageProfile,
-      currentPosition.distanceTo(spawnPosition)
-    );
-    const impulseStrength = data.build.knockback * distanceMultiplier;
-
-    if (projectileVelocity.lengthSq() > 0) {
-      projectileVelocity.normalize().multiplyScalar(impulseStrength);
-    } else {
-      fallbackImpulse.set(0, 0, -impulseStrength);
-      projectileVelocity.copy(fallbackImpulse);
-    }
-
-    if (targetRigidBody) {
-      const targetType = targetRigidBody.bodyType();
-
-      if (targetType === 0 || targetType === 2) {
-        targetRigidBody.applyImpulse(projectileVelocity, true);
-      }
-    }
-
-    expireProjectile();
+    impactProjectile();
   };
 </script>
 
@@ -249,7 +317,6 @@
     gravityScale={data.build.gravity * 0.14}
     linearDamping={0}
     angularDamping={0.4}
-    oncollisionenter={handleCollisionEnter}
     type="dynamic"
   >
     <Collider
@@ -257,8 +324,9 @@
       args={[data.build.radius]}
       density={data.build.mass}
       friction={0.08}
-      restitution={0.18}
-      sensor={data.build.homingTurn > 0}
+      onsensorenter={handleSensorEnter}
+      restitution={0}
+      sensor
     />
 
     {#if data.build.homingTurn > 0}
@@ -269,23 +337,28 @@
           0,
         ]}
       >
-        <T.Mesh renderOrder={28} rotation={[Math.PI / 2, 0, 0]}>
-          <T.CylinderGeometry
-            args={[data.build.radius * 0.72, data.build.radius * 0.84, data.build.radius * 4.9, 12]}
-          />
-          <T.MeshBasicMaterial
-            color="#dffcff"
-            depthFunc={GreaterDepth}
-            depthWrite={false}
-            opacity={0.34}
-            transparent
-          />
-        </T.Mesh>
+        <T.Mesh
+          geometry={rocketGlowGeometry}
+          material={rocketGlowMaterial}
+          renderOrder={28}
+          rotation={[Math.PI / 2, 0, 0]}
+          scale={[
+            data.build.radius,
+            data.build.radius,
+            data.build.radius,
+          ]}
+        />
 
-        <T.Mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
-          <T.CylinderGeometry
-            args={[data.build.radius * 0.42, data.build.radius * 0.58, data.build.radius * 3.2, 12]}
-          />
+        <T.Mesh
+          geometry={rocketBodyGeometry}
+          castShadow
+          rotation={[Math.PI / 2, 0, 0]}
+          scale={[
+            data.build.radius,
+            data.build.radius,
+            data.build.radius,
+          ]}
+        >
           <T.MeshStandardMaterial
             color="#ff9a54"
             emissive="#ff6b3d"
@@ -331,75 +404,92 @@
     {:else}
       <T.Group rotation={[0, visualYaw, 0]}>
         <T.Mesh
+          geometry={projectileHaloGeometry}
+          material={laserHaloMaterial}
           renderOrder={28}
-          position={[0, 0, data.build.radius * 0.2]}
+          position={[0, 0, data.build.radius * 0.24]}
           rotation={[Math.PI / 2, 0, 0]}
-          scale={[1, 1, trailStretch]}
-        >
-          <T.CylinderGeometry
-            args={[data.build.radius * 0.86, data.build.radius * 0.42, data.build.radius * 4.3, 12]}
-          />
-          <T.MeshBasicMaterial
-            color="#dffcff"
-            depthFunc={GreaterDepth}
-            depthWrite={false}
-            opacity={0.34}
-            transparent
-          />
-        </T.Mesh>
+          scale={[
+            data.build.radius,
+            data.build.radius,
+            data.build.radius,
+          ]}
+        />
 
         <T.Mesh
-          position={[0, 0, -data.build.radius * (1.2 + trailStretch * 0.52)]}
+          geometry={projectileTrailGeometry}
+          material={laserTrailMaterial}
+          renderOrder={29}
+          position={[0, 0, -data.build.radius * trailBackOffset]}
           rotation={[Math.PI / 2, 0, 0]}
-          scale={[1, 1, trailStretch]}
-        >
-          <T.CylinderGeometry
-            args={[data.build.radius * 0.74, data.build.radius * 0.18, data.build.radius * 3.8, 12]}
-          />
-          <T.MeshStandardMaterial
-            color={data.build.colors.shell}
-            emissive={data.build.colors.glow}
-            emissiveIntensity={1.45}
-            metalness={0.02}
-            opacity={trailOpacity}
-            roughness={0.16}
-            transparent
-          />
-        </T.Mesh>
+          scale={[
+            data.build.radius,
+            data.build.radius,
+            data.build.radius,
+          ]}
+        />
 
         <T.Mesh
-          castShadow
-          position={[0, 0, data.build.radius * 1.1]}
+          geometry={projectileCoreGeometry}
+          material={laserCoreMaterial}
+          renderOrder={30}
+          position={[0, 0, data.build.radius * 0.84]}
           rotation={[Math.PI / 2, 0, 0]}
-        >
-          <T.CylinderGeometry
-            args={[data.build.radius * 0.2, data.build.radius * 0.34, data.build.radius * 2.7, 12]}
-          />
-          <T.MeshStandardMaterial
-            color={data.build.colors.core}
-            emissive={data.build.colors.shell}
-            emissiveIntensity={1.2}
-            metalness={0.08}
-            roughness={0.14}
-          />
-        </T.Mesh>
+          scale={[
+            data.build.radius,
+            data.build.radius,
+            data.build.radius,
+          ]}
+        />
 
         <T.Mesh
-          castShadow
-          position={[0, 0, data.build.radius * 2.2]}
+          geometry={projectileHeadGeometry}
+          material={laserHeadMaterial}
+          renderOrder={31}
+          position={[0, 0, data.build.radius * 2.16]}
           rotation={[Math.PI / 2, 0, 0]}
-        >
-          <T.ConeGeometry
-            args={[data.build.radius * 0.4, data.build.radius * 1.05, 12]}
-          />
-          <T.MeshStandardMaterial
-            color="#fff2c4"
-            emissive={data.build.colors.core}
-            emissiveIntensity={0.78}
-            metalness={0.04}
-            roughness={0.16}
-          />
-        </T.Mesh>
+          scale={[
+            data.build.radius,
+            data.build.radius,
+            data.build.radius,
+          ]}
+        />
+
+        <T.Mesh
+          geometry={projectileParticleGeometry}
+          material={laserParticleMaterial}
+          renderOrder={32}
+          position={[data.build.radius * 0.42, 0, -data.build.radius * 1.38]}
+          scale={[
+            data.build.radius * 0.72,
+            data.build.radius * 0.72,
+            data.build.radius * 0.72,
+          ]}
+        />
+
+        <T.Mesh
+          geometry={projectileParticleGeometry}
+          material={laserParticleMaterial}
+          renderOrder={32}
+          position={[-data.build.radius * 0.34, 0, -data.build.radius * 1.89]}
+          scale={[
+            data.build.radius * 0.52,
+            data.build.radius * 0.52,
+            data.build.radius * 0.52,
+          ]}
+        />
+
+        <T.Mesh
+          geometry={projectileParticleGeometry}
+          material={laserParticleMaterial}
+          renderOrder={32}
+          position={[data.build.radius * 0.14, 0, -data.build.radius * 2.43]}
+          scale={[
+            data.build.radius * 0.38,
+            data.build.radius * 0.38,
+            data.build.radius * 0.38,
+          ]}
+        />
       </T.Group>
     {/if}
   </RigidBody>

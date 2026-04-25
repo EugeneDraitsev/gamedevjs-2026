@@ -8,12 +8,23 @@
     Pane,
     Slider,
   } from "svelte-tweakpane-ui";
+  import { gameMusic } from "$lib/audio/music";
+  import { gameSfx } from "$lib/audio/sfx";
+  import AppModalShell from "$lib/components/app/AppModalShell.svelte";
+  import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import GameScene from "$lib/components/game/GameScene.svelte";
+  import {
+    type MachineModuleId,
+    machineModuleTemplates,
+  } from "$lib/config/machine-modules";
   import { type RoomTemplate, roomTemplates } from "$lib/config/room-templates";
   import {
     createSceneSettings,
+    loadSceneSettings,
     type SceneSettings,
+    saveSceneSettings,
   } from "$lib/config/scene-settings";
+  import { isEditableTarget } from "$lib/game/dom";
   import {
     buildPlaygroundDungeon,
     buildPlaygroundMeleeParams,
@@ -39,14 +50,19 @@
   const templateById = Object.fromEntries(
     roomTemplates.map((template) => [template.id, template])
   ) as Record<string, RoomTemplate>;
+  const moduleOptions: Record<string, string> = Object.fromEntries(
+    machineModuleTemplates.map((module) => [module.label, module.id])
+  );
 
   let settings = $state<SceneSettings>({
-    ...createSceneSettings(),
+    ...loadSceneSettings(),
     cameraFov: 80,
     cameraMode: "orbit",
   });
+  let settingsOpen = $state(false);
   let floorReliefMaps = $state(true);
   let floorReliefStrength = $state(1.4);
+  let artifactModuleId = $state<MachineModuleId>("ammo-hopper");
   let templateId = $state("normal-furnace");
   let restartTick = $state(0);
   let DebugPane = $state<
@@ -56,14 +72,18 @@
   const currentTemplate = $derived(
     templateById[templateId] ?? templateById["normal-furnace"]
   );
-  const sceneKey = $derived(`${currentTemplate.id}-${restartTick}`);
+  const sceneKey = $derived(
+    `${currentTemplate.id}-${artifactModuleId}-${restartTick}`
+  );
   const dungeon = $derived(
-    buildPlaygroundDungeon(currentTemplate.id, sceneKey, true)
+    buildPlaygroundDungeon(currentTemplate.id, sceneKey, true, artifactModuleId)
   );
   const meleeParams = $derived(buildPlaygroundMeleeParams(settings));
   const trailSettings = $derived(buildPlaygroundTrailSettings(settings));
+  const showPlayer = $derived(currentTemplate.kind !== "treasure");
 
   const restart = () => {
+    settingsOpen = false;
     restartTick += 1;
   };
 
@@ -76,6 +96,20 @@
     restart();
   };
 
+  const closeSettings = () => {
+    settingsOpen = false;
+  };
+
+  const openSettings = () => {
+    settingsOpen = true;
+  };
+
+  $effect(() => {
+    saveSceneSettings(settings);
+    gameMusic.syncMix(settings);
+    gameSfx.syncMix(settings);
+  });
+
   $effect(() => {
     if (templateById[initialTemplateId]) {
       templateId = initialTemplateId;
@@ -86,6 +120,21 @@
     import("$lib/components/debug/DebugPane.svelte").then((module) => {
       DebugPane = module.default;
     });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Escape" || isEditableTarget(event.target)) {
+        return;
+      }
+
+      settingsOpen = !settingsOpen;
+      event.preventDefault();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   });
 </script>
 
@@ -102,9 +151,10 @@
       machineLoadout={playgroundMachineLoadout}
       machineStats={playgroundMachineStats}
       onCollectArtifact={noop}
-      onOpenSettings={noop}
+      onOpenSettings={openSettings}
       onOpenWeaponLab={noop}
       {settings}
+      {showPlayer}
       weaponBuild={playgroundWeaponBuild}
     />
   {/key}
@@ -113,6 +163,13 @@
     <Pane position="inline" title="Room Preview" width={300}>
       <Folder title="Room">
         <List bind:value={templateId} label="Template" options={roomOptions} />
+        {#if currentTemplate.kind === "treasure"}
+          <List
+            bind:value={artifactModuleId}
+            label="Pedestal"
+            options={moduleOptions}
+          />
+        {/if}
         <Checkbox bind:value={floorReliefMaps} label="Relief maps" />
         <Slider
           bind:value={floorReliefStrength}
@@ -137,6 +194,16 @@
       onResetLevel={restart}
       onResetScene={restart}
     />
+  {/if}
+
+  {#if settingsOpen}
+    <AppModalShell onClose={closeSettings} open={settingsOpen}>
+      <SettingsPanel
+        bind:settings
+        onBack={closeSettings}
+        onResetDefaults={resetDefaults}
+      />
+    </AppModalShell>
   {/if}
 </main>
 

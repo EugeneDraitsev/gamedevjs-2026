@@ -110,6 +110,7 @@ export interface VegetationInstance {
 }
 
 export interface ShopkeeperLocation {
+  offerPositions: [number, number, number][];
   rotationY: number;
   x: number;
   y: number;

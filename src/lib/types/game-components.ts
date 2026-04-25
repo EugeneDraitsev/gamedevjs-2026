@@ -23,6 +23,7 @@ import type {
   MeleeTrailSettings,
   MinimapBounds,
   ProjectileData,
+  ProjectileImpactBurst,
   RenderedDeflectBurst,
   RoomHazard,
   RoomPlatform,
@@ -50,15 +51,25 @@ export interface GameSceneProps {
   onCollectArtifact?: (roomId: string, type: MachineModuleId) => void;
   onEndDemo?: () => void;
   onGearCountChange?: (gearCount: number) => void;
+  onLoadProgress?: (progress: SceneLoadProgress) => void;
   onMusicCue?: (cue: MusicCue, options?: MusicTransitionOptions) => void;
   onOpenSettings?: () => void;
   onOpenWeaponLab?: () => void;
   onPlayerDeath?: () => void;
   onPurchaseShopOffer?: (offer: ShopOffer) => void;
+  onReady?: () => void;
   purchasedShopOfferIds?: string[];
   revivalNonce?: number;
   settings: SceneSettings;
+  showLoader?: boolean;
+  showPlayer?: boolean;
   weaponBuild: WeaponBuild;
+}
+
+export interface SceneLoadProgress {
+  detail?: string;
+  label: string;
+  progress: number;
 }
 
 export interface GameSceneEnvironmentProps {
@@ -148,5 +159,6 @@ export interface ProjectileProps {
   data: ProjectileData;
   enemyTargets?: Vec3[];
   onExpire?: (id: string) => void;
-  onMove?: (id: string, position: Vec3) => void;
+  onImpact?: (impact: Omit<ProjectileImpactBurst, "createdAt" | "id">) => void;
+  onMove?: (id: string, x: number, y: number, z: number) => void;
 }

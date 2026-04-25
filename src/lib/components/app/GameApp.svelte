@@ -14,8 +14,8 @@
   import DeathModal from "$lib/components/app/DeathModal.svelte";
   import EndDemoModal from "$lib/components/app/EndDemoModal.svelte";
   import FloorAdvanceTransition from "$lib/components/app/FloorAdvanceTransition.svelte";
+  import SceneLoadingOverlay from "$lib/components/app/SceneLoadingOverlay.svelte";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
-  import GameScene from "$lib/components/game/GameScene.svelte";
   import MobileControls from "$lib/components/game/MobileControls.svelte";
   import MachineBayModal from "$lib/components/machine-bay/MachineBayModal.svelte";
   import { createDungeonLayout } from "$lib/config/dungeon-layout";
@@ -58,6 +58,10 @@
   import { cheats } from "$lib/stores/cheats.svelte";
   import { mobileInput } from "$lib/stores/mobile-input.svelte";
   import type { MeleeTrailSettings } from "$lib/types/game";
+  import type {
+    GameSceneProps,
+    SceneLoadProgress,
+  } from "$lib/types/game-components";
 
   interface GameAppProps {
     seed: string;
@@ -68,9 +72,19 @@
   const floorAdvanceCloseMs = 620;
   const floorAdvanceHoldMs = 520;
   const floorAdvanceOpenMs = 760;
+  let gameSceneImport: Promise<Component<GameSceneProps>> | null = null;
+
+  const loadGameSceneComponent = () => {
+    gameSceneImport ??= import("$lib/components/game/GameScene.svelte").then(
+      (module) => module.default
+    );
+
+    return gameSceneImport;
+  };
 
   let { seed }: GameAppProps = $props();
 
+  let GameSceneComponent = $state<Component<GameSceneProps> | null>(null);
   let DebugPane = $state<Component<{
     currentFloor: number;
     onResetDefaults: () => void;
@@ -93,6 +107,14 @@
   let floorAdvanceTimers: number[] = [];
   let gearCount = $state(0);
   let runReady = $state(page.url.searchParams.get("continue") !== "1");
+  let sceneBootReady = $state(false);
+  let sceneLoadFailed = $state(false);
+  let sceneLoadProgress = $state<SceneLoadProgress>({
+    detail: "Preparing run",
+    label: "Loading",
+    progress: 0,
+  });
+  let sceneReady = $state(false);
   let touchControls = $state(false);
   let machineLoadout = $state<MachineLoadout>(createDefaultMachineLoadout());
   let moduleInventory = $state<MachineModuleId[]>(
@@ -118,6 +140,8 @@
       playerDeathPending ||
       floorAdvancePhase !== "idle"
   );
+  const runtimeControlsLocked = $derived(controlsLocked || !sceneReady);
+  const sceneInstanceKey = $derived(`${dungeon.seed}:${sceneResetKey}`);
   const debugEnabled = $derived(page.url.searchParams.get("debug") === "true");
 
   const swingParams = $derived<SwingParams>({
@@ -263,7 +287,7 @@
     cue: MusicCue,
     options: MusicTransitionOptions
   ): MusicTransitionOptions => {
-    if (cue === "boss") {
+    if (cue === "boss" || cue === "boss-catacombs") {
       return { fadeInMs: 2600, fadeOutMs: 1900, startDelayMs: 420 };
     }
 
@@ -272,6 +296,14 @@
         fadeInMs: options.restart ? 2200 : 1900,
         fadeOutMs: options.restart ? 1700 : 1500,
         startDelayMs: options.restart ? 420 : 260,
+      };
+    }
+
+    if (cue === "outside") {
+      return {
+        fadeInMs: options.restart ? 2600 : 2100,
+        fadeOutMs: options.restart ? 1900 : 1600,
+        startDelayMs: options.restart ? 460 : 280,
       };
     }
 
@@ -309,7 +341,7 @@
   };
   const sceneKey = () => {
     setOutsideChunkSeed(`outside-${dungeon.seed}`);
-    return `${dungeon.seed}:${sceneResetKey}`;
+    return sceneInstanceKey;
   };
 
   const openMainMenu = async () => {
@@ -502,7 +534,9 @@
     const restart = musicFloorIndex !== null && musicFloorIndex !== floorIndex;
 
     musicFloorIndex = floorIndex;
-    handleMusicCue("level", { restart });
+    handleMusicCue(floorIndex >= outsideFloor ? "outside" : "level", {
+      restart,
+    });
   });
 
   $effect(() => {
@@ -554,6 +588,52 @@
     seed;
     resetFloorAdvanceTransition();
     applyRunState(createDefaultRunState());
+  });
+
+  $effect(() => {
+    sceneInstanceKey;
+
+    if (!runReady) {
+      sceneBootReady = false;
+      sceneReady = false;
+      return;
+    }
+
+    let canceled = false;
+    let firstFrame = 0;
+    let secondFrame = 0;
+
+    sceneBootReady = false;
+    sceneLoadFailed = false;
+    sceneLoadProgress = {
+      detail: "Preparing run",
+      label: "Loading",
+      progress: 0,
+    };
+    sceneReady = false;
+
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        loadGameSceneComponent()
+          .then((component) => {
+            if (!canceled) {
+              GameSceneComponent = component;
+              sceneBootReady = true;
+            }
+          })
+          .catch(() => {
+            if (!canceled) {
+              sceneLoadFailed = true;
+            }
+          });
+      });
+    });
+
+    return () => {
+      canceled = true;
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
   });
 
   onMount(() => {
@@ -640,7 +720,7 @@
   });
 
   $effect(() => {
-    if (controlsLocked) {
+    if (runtimeControlsLocked) {
       mobileInput.reset();
     }
   });
@@ -655,11 +735,11 @@
 </svelte:head>
 
 <main class="stage">
-  {#if runReady}
+  {#if runReady && sceneBootReady && GameSceneComponent}
     {#key sceneKey()}
-      <GameScene
+      <GameSceneComponent
         collectedArtifactRoomIds={collectedArtifactRooms}
-        {controlsLocked}
+        controlsLocked={runtimeControlsLocked}
         {dungeon}
         {gearCount}
         inventoryModuleIds={moduleInventory}
@@ -671,24 +751,34 @@
         onEndDemo={openDemoComplete}
         onGearCountChange={(value) => (gearCount = value)}
         onMusicCue={handleMusicCue}
+        onLoadProgress={(progress) => (sceneLoadProgress = progress)}
         onOpenSettings={openSettings}
         onOpenWeaponLab={openMachineBay}
         onPlayerDeath={handlePlayerDeath}
         onPurchaseShopOffer={purchaseShopOffer}
+        onReady={() => (sceneReady = true)}
         {purchasedShopOfferIds}
         {revivalNonce}
         {settings}
+        showLoader={false}
         {machineStats}
         weaponBuild={machineStats.weaponBuild}
       />
     {/key}
   {/if}
 
-  <MobileControls visible={touchControls && !controlsLocked} />
+  <MobileControls visible={touchControls && !runtimeControlsLocked} />
 
   <FloorAdvanceTransition
     nextFloor={floorAdvanceTarget}
     phase={floorAdvancePhase}
+  />
+
+  <SceneLoadingOverlay
+    active={!sceneReady && floorAdvancePhase === "idle"}
+    detail={sceneLoadFailed ? "Could not initialize scene" : sceneLoadProgress.detail}
+    label="Loading"
+    progress={sceneLoadFailed ? null : sceneLoadProgress.progress}
   />
 
   {#if debugEnabled && DebugPane}
@@ -762,7 +852,10 @@
 
   .stage {
     position: relative;
-    min-block-size: 100vh;
+    inline-size: 100%;
+    block-size: 100dvh;
+    min-block-size: 100dvh;
+    overflow: hidden;
     background:
       radial-gradient(circle at top, rgba(88, 166, 201, 0.16), transparent 35%),
       linear-gradient(180deg, #040816, #060d18 48%, #08101c);

@@ -325,6 +325,7 @@ const enemyHitSlapVariants = [
 
 class GameSfxManager {
   readonly #lastFiredAt = new Map<string, number>();
+  #laserWarmupKey = "";
   #mix: SfxMixSettings = defaultSfxMix;
   #output: GainNode | null = null;
   readonly #perSoundLevel = new Map<string, number>(
@@ -368,6 +369,63 @@ class GameSfxManager {
 
     Howler.volume(this.#mix.masterSoundEnabled ? this.#mix.masterVolume : 0);
     this.#applyOutputVolume();
+  }
+
+  warmupLaser(chargeTimeMs = 520) {
+    if (
+      typeof window === "undefined" ||
+      !this.#mix.masterSoundEnabled ||
+      !this.#mix.sfxSoundEnabled ||
+      this.#mix.masterVolume <= 0 ||
+      this.#mix.sfxVolume <= 0
+    ) {
+      return;
+    }
+
+    const duration = Math.max(0.18, Math.min(0.9, chargeTimeMs / 1000));
+    const key = `${Math.round(duration * 1000)}`;
+
+    if (this.#laserWarmupKey === key) {
+      return;
+    }
+
+    const context = this.#getContext();
+    const output = this.#getOutput();
+
+    if (!(context && output)) {
+      return;
+    }
+
+    this.#laserWarmupKey = key;
+    const noiseBuffer = getSharedNoiseBuffer(context);
+
+    const root = context.createGain();
+    const tone = context.createOscillator();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    const panner = context.createStereoPanner();
+    const noise = context.createBufferSource();
+
+    root.gain.setValueAtTime(silentLevel, context.currentTime);
+    gain.gain.setValueAtTime(silentLevel, context.currentTime);
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(1800, context.currentTime);
+    filter.Q.setValueAtTime(8, context.currentTime);
+    noise.buffer = noiseBuffer;
+    noise.loop = true;
+
+    tone.connect(filter);
+    filter.connect(gain);
+    noise.connect(gain);
+    gain.connect(panner);
+    panner.connect(root);
+    root.connect(output);
+    tone.disconnect();
+    filter.disconnect();
+    noise.disconnect();
+    gain.disconnect();
+    panner.disconnect();
+    root.disconnect();
   }
 
   playArtifactPickup() {

@@ -30,6 +30,9 @@ import type {
   Vec3,
 } from "$lib/types/game";
 
+const projectileImpactColor = "#3aa7ff";
+const projectileImpactCore = "#9be6ff";
+
 interface StepContext {
   combat: CombatStore;
   currentRoomId: string;
@@ -203,6 +206,13 @@ const applyProjectileHits = (
 
     nextHp -= damage;
     nextLastHitAt = now;
+    combat.popProjectileImpact({
+      color: projectileImpactColor,
+      core: projectileImpactCore,
+      position: combat.projectilePositions.get(projectile.id) ?? position,
+      radius: Math.max(0.28, projectile.build.radius * 1.55),
+      velocity: projectile.velocity,
+    });
     combat.popDamage(
       damage,
       [position[0], position[1] + enemy.radius + 0.34, position[2]],
@@ -907,6 +917,13 @@ const applyProjectileHitsToBomb = (
 
     hp -= damage;
     lastHitAt = now;
+    combat.popProjectileImpact({
+      color: projectileImpactColor,
+      core: projectileImpactCore,
+      position: projectilePosition,
+      radius: Math.max(0.26, projectile.build.radius * 1.45),
+      velocity: projectile.velocity,
+    });
     combat.popDamage(
       damage,
       [position[0], position[1] + bomb.radius + 0.28, position[2]],

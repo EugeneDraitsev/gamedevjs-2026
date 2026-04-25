@@ -16,6 +16,7 @@
     corePrisonSealHits?: number;
     corePrisonSealHitsRequired?: number;
     corePrisonSealLocked?: boolean;
+    outsideDetailLevel?: number;
   }
 
   let {
@@ -23,6 +24,7 @@
     corePrisonSealHits = 0,
     corePrisonSealHitsRequired = 2,
     corePrisonSealLocked = true,
+    outsideDetailLevel = 3,
   }: Props = $props();
 
   const scene = getGameSceneContext();
@@ -134,6 +136,7 @@
   environment={scene.roomEnvironment}
   floorExitOpenAmount={scene.floorExitOpenAmount}
   {outsideGateUnlocked}
+  {outsideDetailLevel}
   startAnimationAt={timing.floorIntroStartedAt}
   outsideEarthDecalTexture={textures.outsideEarthDecals}
   outsideEarthTexture={textures.outsideEarth}

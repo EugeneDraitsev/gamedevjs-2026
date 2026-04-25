@@ -10,6 +10,7 @@ import type {
   DeflectBurst,
   HealBurst,
   MeleeFrame,
+  ProjectileImpactBurst,
   Vec3,
 } from "$lib/types/game";
 
@@ -21,6 +22,7 @@ export class CombatStore {
   gateLasers = $state<ActiveGateLaser[]>([]);
   projectiles = $state<ActiveProjectile[]>([]);
   deflectBursts = $state<DeflectBurst[]>([]);
+  projectileImpactBursts = $state<ProjectileImpactBurst[]>([]);
   healBursts = $state<HealBurst[]>([]);
   damagePopups = $state<DamagePopup[]>([]);
 
@@ -60,6 +62,21 @@ export class CombatStore {
     });
   }
 
+  popProjectileImpact(impact: Omit<ProjectileImpactBurst, "createdAt" | "id">) {
+    this.projectileImpactBursts.push({
+      ...impact,
+      createdAt: performance.now(),
+      id: crypto.randomUUID(),
+    });
+
+    if (this.projectileImpactBursts.length > 24) {
+      this.projectileImpactBursts.splice(
+        0,
+        this.projectileImpactBursts.length - 24
+      );
+    }
+  }
+
   addBeams(beams: ActiveBeam[]) {
     if (beams.length > 0) {
       this.beams = [...this.beams, ...beams];
@@ -93,8 +110,17 @@ export class CombatStore {
     );
   }
 
-  handleProjectileMove(id: string, position: Vec3) {
-    this.projectilePositions.set(id, position);
+  handleProjectileMove(id: string, x: number, y: number, z: number) {
+    const position = this.projectilePositions.get(id);
+
+    if (position) {
+      position[0] = x;
+      position[1] = y;
+      position[2] = z;
+      return;
+    }
+
+    this.projectilePositions.set(id, [x, y, z]);
   }
 
   pruneExpired(
@@ -102,6 +128,7 @@ export class CombatStore {
     beamDurationMs: number,
     popupDurationMs: number,
     burstDurationMs: number,
+    projectileImpactBurstDurationMs: number,
     healBurstDurationMs: number
   ) {
     this.beams = this.beams.filter(
@@ -117,6 +144,9 @@ export class CombatStore {
     this.deflectBursts = this.deflectBursts.filter(
       (burst) => now - burst.createdAt < burstDurationMs
     );
+    this.projectileImpactBursts = this.projectileImpactBursts.filter(
+      (burst) => now - burst.createdAt < projectileImpactBurstDurationMs
+    );
     this.healBursts = this.healBursts.filter(
       (burst) => now - burst.createdAt < healBurstDurationMs
     );
@@ -131,6 +161,7 @@ export class CombatStore {
     this.projectiles = [];
     this.damagePopups = [];
     this.deflectBursts = [];
+    this.projectileImpactBursts = [];
     this.healBursts = [];
     this.projectilePositions.clear();
     this.meleeHitEnemies.clear();
@@ -145,6 +176,7 @@ export class CombatStore {
     this.gateLasers = [];
     this.projectiles = [];
     this.damagePopups = [];
+    this.projectileImpactBursts = [];
     this.healBursts = [];
     this.projectilePositions.clear();
   }

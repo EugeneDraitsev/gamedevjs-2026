@@ -52,6 +52,182 @@ const makeTexture = (
   return texture;
 };
 
+interface TextureAssignment {
+  critical?: boolean;
+  load: (store: TextureStore) => void;
+  outsideCritical?: boolean;
+}
+
+const waitForNextFrame = (signal?: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    if (signal?.aborted || typeof requestAnimationFrame === "undefined") {
+      resolve();
+      return;
+    }
+
+    let frame = 0;
+    const handleAbort = () => {
+      cancelAnimationFrame(frame);
+      resolve();
+    };
+
+    frame = requestAnimationFrame(() => {
+      signal?.removeEventListener("abort", handleAbort);
+      resolve();
+    });
+    signal?.addEventListener("abort", handleAbort, { once: true });
+  });
+
+const textureAssignments: TextureAssignment[] = [
+  {
+    critical: true,
+    load: (store) => {
+      if (!store.foundryFloor) {
+        store.foundryFloor = makeTexture(foundryFloorTextureUrl, 4);
+      }
+    },
+  },
+  {
+    critical: true,
+    load: (store) => {
+      if (!store.foundryFloorDecals) {
+        store.foundryFloorDecals = makeTexture(foundryFloorDecalsTextureUrl);
+      }
+    },
+  },
+  {
+    critical: true,
+    load: (store) => {
+      if (!store.foundryWall) {
+        store.foundryWall = makeTexture(foundryWallTextureUrl);
+      }
+    },
+  },
+  {
+    critical: true,
+    load: (store) => {
+      if (!store.lavaSurface) {
+        store.lavaSurface = makeTexture(lavaSurfaceTextureUrl);
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.bossBanner) {
+        store.bossBanner = makeTexture(bossBannerTextureUrl);
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.bossDoor) {
+        store.bossDoor = makeTexture(bossDoorTextureUrl);
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.bossFloor) {
+        store.bossFloor = makeTexture(bossFloorTextureUrl);
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.bossFloorHeight) {
+        store.bossFloorHeight = makeTexture(
+          bossFloorHeightTextureUrl,
+          1,
+          NoColorSpace
+        );
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.bossFloorNormal) {
+        store.bossFloorNormal = makeTexture(
+          bossFloorNormalTextureUrl,
+          1,
+          NoColorSpace
+        );
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.treasureFloor) {
+        store.treasureFloor = makeTexture(artifactFloorTextureUrl);
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.treasureFloorHeight) {
+        store.treasureFloorHeight = makeTexture(
+          artifactFloorHeightTextureUrl,
+          1,
+          NoColorSpace
+        );
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.treasureFloorNormal) {
+        store.treasureFloorNormal = makeTexture(
+          artifactFloorNormalTextureUrl,
+          1,
+          NoColorSpace
+        );
+      }
+    },
+  },
+  {
+    outsideCritical: true,
+    load: (store) => {
+      if (!store.outsideEarth) {
+        store.outsideEarth = makeTexture(outsideEarthTextureUrl);
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.outsideEarthDecals) {
+        store.outsideEarthDecals = makeTexture(outsideEarthDecalTextureUrl);
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.outsideRockDecals) {
+        store.outsideRockDecals = makeTexture(outsideRockDecalTextureUrl);
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.outsideRocks) {
+        store.outsideRocks = makeTexture(outsideRocksTextureUrl);
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.outsideWater) {
+        store.outsideWater = makeTexture(outsideWaterTextureUrl);
+      }
+    },
+  },
+  {
+    load: (store) => {
+      if (!store.outsideWaterDecals) {
+        store.outsideWaterDecals = makeTexture(outsideWaterDecalTextureUrl);
+      }
+    },
+  },
+];
+
 export class TextureStore {
   bossBanner = $state<Texture | null>(null);
   bossDoor = $state<Texture | null>(null);
@@ -74,41 +250,57 @@ export class TextureStore {
   treasureFloorNormal = $state<Texture | null>(null);
 
   load() {
-    this.bossBanner = makeTexture(bossBannerTextureUrl);
-    this.bossDoor = makeTexture(bossDoorTextureUrl);
-    this.bossFloor = makeTexture(bossFloorTextureUrl);
-    this.bossFloorHeight = makeTexture(
-      bossFloorHeightTextureUrl,
-      1,
-      NoColorSpace
-    );
-    this.bossFloorNormal = makeTexture(
-      bossFloorNormalTextureUrl,
-      1,
-      NoColorSpace
-    );
     this.environmentMap = null;
-    this.foundryFloor = makeTexture(foundryFloorTextureUrl, 4);
-    this.foundryFloorDecals = makeTexture(foundryFloorDecalsTextureUrl);
-    this.foundryWall = makeTexture(foundryWallTextureUrl);
-    this.lavaSurface = makeTexture(lavaSurfaceTextureUrl);
-    this.outsideEarth = makeTexture(outsideEarthTextureUrl);
-    this.outsideEarthDecals = makeTexture(outsideEarthDecalTextureUrl);
-    this.outsideRockDecals = makeTexture(outsideRockDecalTextureUrl);
-    this.outsideRocks = makeTexture(outsideRocksTextureUrl);
-    this.outsideWater = makeTexture(outsideWaterTextureUrl);
-    this.outsideWaterDecals = makeTexture(outsideWaterDecalTextureUrl);
-    this.treasureFloor = makeTexture(artifactFloorTextureUrl);
-    this.treasureFloorHeight = makeTexture(
-      artifactFloorHeightTextureUrl,
-      1,
-      NoColorSpace
-    );
-    this.treasureFloorNormal = makeTexture(
-      artifactFloorNormalTextureUrl,
-      1,
-      NoColorSpace
-    );
+
+    for (const assignment of textureAssignments) {
+      assignment.load(this);
+    }
+  }
+
+  loadGameplayCritical() {
+    this.environmentMap = null;
+
+    for (const assignment of textureAssignments) {
+      if (assignment.critical) {
+        assignment.load(this);
+      }
+    }
+  }
+
+  loadOutsideCritical() {
+    this.environmentMap = null;
+
+    for (const assignment of textureAssignments) {
+      if (assignment.outsideCritical) {
+        assignment.load(this);
+      }
+    }
+  }
+
+  async loadDeferred({
+    signal,
+    texturesPerFrame = 2,
+  }: {
+    signal?: AbortSignal;
+    texturesPerFrame?: number;
+  } = {}) {
+    this.environmentMap = null;
+
+    let loadedThisFrame = 0;
+
+    for (const assignment of textureAssignments) {
+      if (signal?.aborted) {
+        return;
+      }
+
+      assignment.load(this);
+      loadedThisFrame += 1;
+
+      if (loadedThisFrame >= texturesPerFrame) {
+        loadedThisFrame = 0;
+        await waitForNextFrame(signal);
+      }
+    }
   }
 
   advanceLava(delta: number) {

@@ -122,6 +122,7 @@ describe("stepEnemies outside gate clear", () => {
       healBursts: [],
       projectiles: [] as ActiveProjectile[],
       popDamage: vi.fn(),
+      popProjectileImpact: vi.fn(),
       removeProjectiles: vi.fn(),
     } as unknown as CombatStore;
     const player = {
@@ -238,6 +239,7 @@ describe("stepEnemies outside gate clear", () => {
       projectilePositions: new Map([["kill-shot", [0, 0.62, -5.6] as Vec3]]),
       projectiles: [projectile],
       popDamage: vi.fn(),
+      popProjectileImpact: vi.fn(),
       removeProjectiles: vi.fn(),
     } as unknown as CombatStore;
     const player = {

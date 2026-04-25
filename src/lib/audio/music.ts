@@ -1,6 +1,11 @@
 import { Howl, Howler } from "howler";
 
-export type MusicTrackId = "boss" | "level" | "menu";
+export type MusicTrackId =
+  | "boss"
+  | "boss-catacombs"
+  | "level"
+  | "menu"
+  | "outside";
 export type MusicCue = MusicTrackId | "silence";
 
 export interface AudioMixSettings {
@@ -33,6 +38,10 @@ const musicTracks: Record<MusicTrackId, MusicTrackConfig> = {
     baseVolume: 0.82,
     src: ["/audio/music/boss-cold-gear-override.mp3"],
   },
+  "boss-catacombs": {
+    baseVolume: 0.82,
+    src: ["/audio/music/boss-catacomb-orb.mp3"],
+  },
   level: {
     baseVolume: 0.78,
     src: ["/audio/music/level-industrial-ambient.mp3"],
@@ -40,6 +49,10 @@ const musicTracks: Record<MusicTrackId, MusicTrackConfig> = {
   menu: {
     baseVolume: 0.7,
     src: ["/audio/music/menu-colossal-weight.mp3"],
+  },
+  outside: {
+    baseVolume: 0.76,
+    src: ["/audio/music/forest-impulse.mp3"],
   },
 };
 

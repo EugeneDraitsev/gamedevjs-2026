@@ -1,3 +1,41 @@
+<script module lang="ts">
+  import {
+    AdditiveBlending as additiveBlending,
+    MeshBasicMaterial,
+    SphereGeometry,
+    TorusGeometry,
+  } from "three";
+
+  const laserChargeOuterRingGeometry = new TorusGeometry(0.64, 0.035, 10, 48);
+  const laserChargeInnerRingGeometry = new TorusGeometry(0.78, 0.02, 8, 42);
+  const laserChargeCoreGeometry = new SphereGeometry(0.18, 16, 16);
+
+  const laserChargeOuterRingMaterial = new MeshBasicMaterial({
+    blending: additiveBlending,
+    color: "#ff365f",
+    depthWrite: false,
+    opacity: 0,
+    toneMapped: false,
+    transparent: true,
+  });
+  const laserChargeInnerRingMaterial = new MeshBasicMaterial({
+    blending: additiveBlending,
+    color: "#ff1746",
+    depthWrite: false,
+    opacity: 0,
+    toneMapped: false,
+    transparent: true,
+  });
+  const laserChargeCoreMaterial = new MeshBasicMaterial({
+    blending: additiveBlending,
+    color: "#ff6b82",
+    depthWrite: false,
+    opacity: 0,
+    toneMapped: false,
+    transparent: true,
+  });
+</script>
+
 <script lang="ts">
   import type {
     RigidBody as RapierRigidBody,
@@ -82,6 +120,8 @@
   const groundProbeLength = 0.22;
   const groundedNormalThreshold = 0.35;
   const orbitKeyboardPanSpeed = 0.9;
+  const beamForwardOffset = 0.62;
+  const beamHeightOffset = 0.12;
   const projectileForwardOffset = 1.1;
   const projectileHeightOffset = 0.18;
   const DYNAMIC_BODY_TYPE: RigidBodyType = 0 as RigidBodyType;
@@ -187,6 +227,17 @@
     }
 
     applyMeleeTrailSettings(material, meleeTrailSettings);
+  });
+
+  $effect(() => {
+    const alpha = laserChargeActive ? 1 : 0;
+
+    laserChargeOuterRingMaterial.opacity =
+      alpha * (0.22 + laserChargeProgress * 0.46);
+    laserChargeInnerRingMaterial.opacity =
+      alpha * (0.38 + laserChargeProgress * 0.36);
+    laserChargeCoreMaterial.opacity =
+      alpha * (0.46 + laserChargeProgress * 0.42);
   });
 
   const { camera } = useThrelte();
@@ -387,6 +438,12 @@
     scene.weaponBuild.chargeTimeMs > 0;
   const weaponUsesAmmo = () => scene.weaponBuild.attackMode !== "beam";
 
+  $effect(() => {
+    if (isBeamChargeWeapon()) {
+      gameSfx.warmupLaser(scene.weaponBuild.chargeTimeMs);
+    }
+  });
+
   const outsideWaterDepth = (x: number, z: number) =>
     scene.currentRoomTemplate.layout === "outside-yard"
       ? Math.max(
@@ -510,6 +567,10 @@
     activeCamera: NonNullable<typeof camera.current>
   ) => {
     const translation = body.translation();
+    const isBeamShot = scene.weaponBuild.attackMode === "beam";
+    const shotHeightOffset = isBeamShot
+      ? beamHeightOffset
+      : projectileHeightOffset;
 
     activeCamera.updateMatrixWorld();
 
@@ -518,7 +579,7 @@
       -(mouseScreenY / window.innerHeight) * 2 + 1
     );
 
-    groundPlane.constant = -(translation.y + projectileHeightOffset);
+    groundPlane.constant = -(translation.y + shotHeightOffset);
     raycaster.setFromCamera(mouseNdc, activeCamera);
     const hit = raycaster.ray.intersectPlane(groundPlane, groundHit);
 
@@ -733,6 +794,10 @@
     now: number
   ) => {
     const translation = body.translation();
+    const isBeamShot = scene.weaponBuild.attackMode === "beam";
+    const shotHeightOffset = isBeamShot
+      ? beamHeightOffset
+      : projectileHeightOffset;
 
     activeCamera.updateMatrixWorld();
 
@@ -741,7 +806,7 @@
       -(mouseScreenY / window.innerHeight) * 2 + 1
     );
 
-    groundPlane.constant = -(translation.y + projectileHeightOffset);
+    groundPlane.constant = -(translation.y + shotHeightOffset);
     raycaster.setFromCamera(mouseNdc, activeCamera);
     const hit = raycaster.ray.intersectPlane(groundPlane, groundHit);
 
@@ -761,12 +826,13 @@
     }
 
     forwardDirection.normalize();
-    const projectileSpeed = Math.max(scene.weaponBuild.speed * 1.6, 28);
-    const spawnOffset =
-      projectileForwardOffset + scene.weaponBuild.radius * 2.4;
+    const projectileSpeed = Math.max(scene.weaponBuild.speed * 1.6, 28) * 0.6;
+    const spawnOffset = isBeamShot
+      ? beamForwardOffset
+      : projectileForwardOffset + scene.weaponBuild.radius * 2.4;
 
     shootSpawnPosition
-      .set(translation.x, translation.y + projectileHeightOffset, translation.z)
+      .set(translation.x, translation.y + shotHeightOffset, translation.z)
       .addScaledVector(forwardDirection, spawnOffset);
 
     if (weaponUsesAmmo() && !player.consumeAmmo()) {
@@ -1094,70 +1160,50 @@
     deathProgress={scene.timing.playerDeathAnimationProgress}
   />
 
-  {#if laserChargeActive}
-    <T.PointLight
-      color={scene.weaponBuild.colors.core}
-      distance={4.8}
-      intensity={laserChargeGlow * 1.7}
-      position={[0, 0.7, 0.35]}
-    />
+  <T.PointLight
+    color="#ff2d55"
+    distance={4.8}
+    intensity={laserChargeActive ? laserChargeGlow * 1.9 : 0}
+    position={[0, 0.7, 0.35]}
+  />
 
-    <T.Mesh
-      position={[0, 0.2, 0.05]}
-      rotation={[Math.PI / 2, 0, 0]}
-      scale={[
-        laserChargePulse + laserChargeProgress * 0.28,
-        laserChargePulse + laserChargeProgress * 0.28,
-        1,
-      ]}
-    >
-      <T.TorusGeometry args={[0.64, 0.035, 10, 48]} />
-      <T.MeshBasicMaterial
-        color={scene.weaponBuild.colors.shell}
-        depthWrite={false}
-        opacity={0.22 + laserChargeProgress * 0.46}
-        toneMapped={false}
-        transparent
-      />
-    </T.Mesh>
+  <T.Mesh
+    geometry={laserChargeOuterRingGeometry}
+    material={laserChargeOuterRingMaterial}
+    position={[0, 0.2, 0.05]}
+    renderOrder={38}
+    rotation={[Math.PI / 2, 0, 0]}
+    scale={[
+      laserChargePulse + laserChargeProgress * 0.28,
+      laserChargePulse + laserChargeProgress * 0.28,
+      1,
+    ]}
+  />
 
-    <T.Mesh
-      position={[0, 0.2, 0.05]}
-      rotation={[Math.PI / 2, 0, 0]}
-      scale={[
-        1.18 - laserChargeProgress * 0.34,
-        1.18 - laserChargeProgress * 0.34,
-        1,
-      ]}
-    >
-      <T.TorusGeometry args={[0.78, 0.02, 8, 42]} />
-      <T.MeshBasicMaterial
-        color={scene.weaponBuild.colors.core}
-        depthWrite={false}
-        opacity={0.38 + laserChargeProgress * 0.36}
-        toneMapped={false}
-        transparent
-      />
-    </T.Mesh>
+  <T.Mesh
+    geometry={laserChargeInnerRingGeometry}
+    material={laserChargeInnerRingMaterial}
+    position={[0, 0.2, 0.05]}
+    renderOrder={39}
+    rotation={[Math.PI / 2, 0, 0]}
+    scale={[
+      1.18 - laserChargeProgress * 0.34,
+      1.18 - laserChargeProgress * 0.34,
+      1,
+    ]}
+  />
 
-    <T.Mesh
-      position={[0, 0.36, 0.72]}
-      scale={[
-        0.52 + laserChargeProgress * 0.42,
-        0.52 + laserChargeProgress * 0.42,
-        0.52 + laserChargeProgress * 0.42,
-      ]}
-    >
-      <T.SphereGeometry args={[0.18, 16, 16]} />
-      <T.MeshBasicMaterial
-        color={scene.weaponBuild.colors.core}
-        depthWrite={false}
-        opacity={0.46 + laserChargeProgress * 0.42}
-        toneMapped={false}
-        transparent
-      />
-    </T.Mesh>
-  {/if}
+  <T.Mesh
+    geometry={laserChargeCoreGeometry}
+    material={laserChargeCoreMaterial}
+    position={[0, 0.36, 0.72]}
+    renderOrder={40}
+    scale={[
+      0.52 + laserChargeProgress * 0.42,
+      0.52 + laserChargeProgress * 0.42,
+      0.52 + laserChargeProgress * 0.42,
+    ]}
+  />
 </T.Group>
 
 <PlayerMeleeVisuals

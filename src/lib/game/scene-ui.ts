@@ -7,13 +7,16 @@ import type {
   HealBurst,
   MinimapBounds,
   ProjectedDamagePopup,
+  ProjectileImpactBurst,
   RenderedDeflectBurst,
   RenderedHealBurst,
+  RenderedProjectileImpactBurst,
   Vec3,
 } from "$lib/types/game";
 
 export const deflectBurstDurationMs = 240;
 export const healBurstDurationMs = 820;
+export const projectileImpactBurstDurationMs = 320;
 
 const deflectBurstShardCount = 4;
 const deflectBurstShardAngles = Array.from(
@@ -24,6 +27,11 @@ const healParticleCount = 14;
 const healParticleAngles = Array.from(
   { length: healParticleCount },
   (_unused, index) => (index / healParticleCount) * Math.PI * 2
+);
+const projectileImpactSparkCount = 6;
+const projectileImpactSparkAngles = Array.from(
+  { length: projectileImpactSparkCount },
+  (_unused, index) => (index / projectileImpactSparkCount) * Math.PI * 2
 );
 const popupProjection = new Vector3();
 
@@ -125,6 +133,57 @@ export const renderHealBursts = (
             Math.sin(spin) * radius,
           ] as Vec3,
           scale: burst.radius * (0.06 + fade * 0.06),
+        };
+      }),
+    };
+  });
+
+export const renderProjectileImpactBursts = (
+  projectileImpactBursts: ProjectileImpactBurst[],
+  animationNow: number
+): RenderedProjectileImpactBurst[] =>
+  projectileImpactBursts.map((burst) => {
+    const age = Math.min(
+      1,
+      (animationNow - burst.createdAt) / projectileImpactBurstDurationMs
+    );
+    const fade = 1 - age;
+    const speed = Math.hypot(burst.velocity[0], burst.velocity[2]) || 1;
+    const forwardX = burst.velocity[0] / speed;
+    const forwardZ = burst.velocity[2] / speed;
+    const baseYaw = Math.atan2(forwardX, forwardZ);
+    const scatter = burst.radius * (0.18 + age * 1.85);
+
+    return {
+      ...burst,
+      age,
+      fade,
+      ringScale: burst.radius * (0.72 + age * 2.15),
+      sparks: projectileImpactSparkAngles.map((angle, index) => {
+        const side = Math.cos(angle) * scatter * (0.25 + (index % 3) * 0.12);
+        const back = burst.radius * age * (1.3 + (index % 4) * 0.24);
+        const lift = burst.radius * (0.08 + age * (0.35 + (index % 2) * 0.18));
+        const sidewaysX = Math.cos(baseYaw) * side;
+        const sidewaysZ = -Math.sin(baseYaw) * side;
+
+        return {
+          color: index % 3 === 0 ? burst.core : burst.color,
+          opacity: fade * (0.46 + (index % 4) * 0.11),
+          position: [
+            -forwardX * back + sidewaysX,
+            lift + Math.sin(angle * 1.7) * scatter * 0.2,
+            -forwardZ * back + sidewaysZ,
+          ] as Vec3,
+          rotation: [
+            angle * 0.22 + age * 2.8,
+            baseYaw + angle * 0.35,
+            age * 4.2 + index,
+          ] as Vec3,
+          scale: [
+            burst.radius * (0.34 + fade * 0.38),
+            burst.radius * (0.045 + fade * 0.035),
+            burst.radius * (0.045 + fade * 0.035),
+          ] as Vec3,
         };
       }),
     };

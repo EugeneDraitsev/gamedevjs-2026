@@ -15,6 +15,10 @@ import type { SceneSettings } from "$lib/config/scene-settings";
 import { createShopOffers, type ShopOffer } from "$lib/config/shop-offers";
 import type { WeaponBuild } from "$lib/config/weapon-graph";
 import {
+  DEFAULT_CHUNK_CONFIG,
+  getOutsideChunkPlan,
+} from "$lib/game/outside-chunk/plan";
+import {
   createDoorMarkers,
   createDoorSeals,
   createRoomWalls,
@@ -32,6 +36,7 @@ import {
   projectDamagePopups,
   renderDeflectBursts,
   renderHealBursts,
+  renderProjectileImpactBursts,
 } from "$lib/game/scene-ui";
 import { CombatStore } from "$lib/stores/combat.svelte";
 import { CrosshairStore } from "$lib/stores/crosshair.svelte";
@@ -158,14 +163,38 @@ export class GameSceneStore {
     return set;
   });
   readonly currentShopOffers = $derived.by<ShopOffer[]>(() => {
-    if (this.currentRoom.kind !== "shop") {
+    const excludedModules = Array.from(this.inventoryModuleIdSet);
+
+    if (this.currentRoom.kind === "shop") {
+      return createShopOffers(
+        this.dungeon.seed,
+        this.currentRoom.id,
+        excludedModules
+      );
+    }
+
+    if (this.currentRoomTemplate.layout !== "outside-yard") {
       return [];
     }
+
+    const plan = getOutsideChunkPlan({
+      ...DEFAULT_CHUNK_CONFIG,
+      seed: `outside-${this.dungeon.seed}`,
+    });
+    const shopkeeper = plan.shopkeeper;
+
+    if (!shopkeeper) {
+      return [];
+    }
+
     return createShopOffers(
       this.dungeon.seed,
-      this.currentRoom.id,
-      Array.from(this.inventoryModuleIdSet)
-    );
+      `${this.currentRoom.id}:outside-shop`,
+      excludedModules
+    ).map((offer, index) => ({
+      ...offer,
+      position: shopkeeper.offerPositions[index] ?? offer.position,
+    }));
   });
   readonly availableShopOffers = $derived(
     this.currentShopOffers.filter(
@@ -237,6 +266,12 @@ export class GameSceneStore {
   );
   readonly healBurstsRendered = $derived(
     renderHealBursts(this.combat.healBursts, this.timing.now)
+  );
+  readonly projectileImpactBurstsRendered = $derived(
+    renderProjectileImpactBursts(
+      this.combat.projectileImpactBursts,
+      this.timing.now
+    )
   );
   readonly overlays = $derived.by<SceneOverlayProps>(() => ({
     animationNow: this.timing.now,

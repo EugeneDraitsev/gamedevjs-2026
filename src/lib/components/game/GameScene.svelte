@@ -11,6 +11,7 @@
   } from "three";
   import type { OrbitControls as OrbitControlsInstance } from "three/examples/jsm/controls/OrbitControls.js";
   import { gameSfx } from "$lib/audio/sfx";
+  import SceneLoadingOverlay from "$lib/components/app/SceneLoadingOverlay.svelte";
   import GameHud from "$lib/components/game/GameHud.svelte";
   import GameMinimap from "$lib/components/game/GameMinimap.svelte";
   import GameSceneOverlays from "$lib/components/game/GameSceneOverlays.svelte";
@@ -47,6 +48,7 @@
   import {
     deflectBurstDurationMs,
     healBurstDurationMs,
+    projectileImpactBurstDurationMs,
   } from "$lib/game/scene-ui";
   import { cheats } from "$lib/stores/cheats.svelte";
   import { GameSceneStore } from "$lib/stores/game-scene.svelte";
@@ -72,19 +74,25 @@
     onCollectArtifact,
     onEndDemo,
     onGearCountChange,
+    onLoadProgress,
     onMusicCue,
     onOpenSettings,
     onOpenWeaponLab,
     onPlayerDeath,
     onPurchaseShopOffer,
+    onReady,
     purchasedShopOfferIds = [],
     revivalNonce = 0,
     settings,
+    showLoader = true,
+    showPlayer = true,
     weaponBuild,
   }: GameSceneProps = $props();
 
   const scene = new GameSceneStore();
   let sceneReady = $state(false);
+  let outsideDetailLevel = $state(0);
+  let outsideDetailFrame = 0;
   const syncSceneInputs = () =>
     scene.syncInputs({
       collectedArtifactRoomIds,
@@ -123,28 +131,107 @@
     scene.currentRoomTemplate.environment === "core-prison" &&
       corePrisonSealHits < corePrisonSealHitsRequired
   );
-  const preloadTextures = $derived([
-    textures.bossBanner,
-    textures.bossDoor,
-    textures.bossFloor,
-    textures.bossFloorHeight,
-    textures.bossFloorNormal,
-    textures.foundryFloor,
-    textures.foundryFloorDecals,
-    textures.foundryWall,
-    textures.lavaSurface,
-    textures.outsideEarth,
-    textures.outsideEarthDecals,
-    textures.outsideRockDecals,
-    textures.outsideRocks,
-    textures.outsideWater,
-    textures.outsideWaterDecals,
-    textures.treasureFloor,
-    textures.treasureFloorHeight,
-    textures.treasureFloorNormal,
-  ]);
+  const warmupPreloadTextures = $derived.by(() => {
+    if (outside) {
+      return [textures.outsideEarth];
+    }
+
+    return [
+      textures.bossBanner,
+      textures.bossDoor,
+      textures.bossFloor,
+      textures.bossFloorHeight,
+      textures.bossFloorNormal,
+      textures.foundryFloor,
+      textures.foundryFloorDecals,
+      textures.foundryWall,
+      textures.lavaSurface,
+      textures.outsideEarth,
+      textures.outsideEarthDecals,
+      textures.outsideRockDecals,
+      textures.outsideRocks,
+      textures.outsideWater,
+      textures.outsideWaterDecals,
+      textures.treasureFloor,
+      textures.treasureFloorHeight,
+      textures.treasureFloorNormal,
+    ];
+  });
+  const blockingPreloadTextures = $derived.by(() => {
+    if (outside) {
+      return [textures.outsideEarth];
+    }
+
+    if (
+      scene.currentRoomTemplate.layout === "boss-foundry" ||
+      scene.currentRoomTemplate.layout === "boss-crucible" ||
+      scene.currentRoomTemplate.layout === "boss-bomber"
+    ) {
+      return [
+        textures.bossBanner,
+        textures.bossDoor,
+        textures.bossFloor,
+        textures.bossFloorHeight,
+        textures.bossFloorNormal,
+        textures.foundryFloorDecals,
+        textures.foundryWall,
+      ];
+    }
+
+    if (scene.currentRoomTemplate.layout === "gear-floor") {
+      return [
+        textures.foundryFloorDecals,
+        textures.foundryWall,
+        textures.treasureFloor,
+        textures.treasureFloorHeight,
+        textures.treasureFloorNormal,
+      ];
+    }
+
+    return [
+      textures.foundryFloor,
+      textures.foundryFloorDecals,
+      textures.foundryWall,
+      textures.lavaSurface,
+    ];
+  });
   const markSceneReady = () => {
+    if (sceneReady) {
+      return;
+    }
+
     sceneReady = true;
+    onReady?.();
+    revealOutsideDetails();
+  };
+  const clearOutsideDetailFrame = () => {
+    if (outsideDetailFrame) {
+      window.cancelAnimationFrame(outsideDetailFrame);
+      outsideDetailFrame = 0;
+    }
+  };
+  const revealOutsideDetails = () => {
+    clearOutsideDetailFrame();
+
+    if (!outside) {
+      outsideDetailLevel = 3;
+      return;
+    }
+
+    const step = () => {
+      outsideDetailFrame = 0;
+      outsideDetailLevel = Math.min(3, outsideDetailLevel + 1);
+
+      if (outsideDetailLevel < 3) {
+        outsideDetailFrame = window.requestAnimationFrame(() => {
+          outsideDetailFrame = window.requestAnimationFrame(step);
+        });
+      }
+    };
+
+    outsideDetailFrame = window.requestAnimationFrame(() => {
+      outsideDetailFrame = window.requestAnimationFrame(step);
+    });
   };
 
   setGameSceneContext(scene);
@@ -152,6 +239,16 @@
   $effect(() => {
     syncSceneInputs();
     gameSfx.syncMix(settings);
+  });
+
+  $effect(() => {
+    dungeon.seed;
+    scene.currentRoom.id;
+    outsideDetailLevel = outside ? 0 : 3;
+
+    return () => {
+      clearOutsideDetailFrame();
+    };
   });
 
   $effect(() => {
@@ -218,11 +315,14 @@
     const currentRoom = scene.currentRoom;
 
     if (currentRoom.kind === "boss") {
-      onMusicCue?.(room.clearedSet.has(currentRoom.id) ? "silence" : "boss");
+      const bossCue =
+        currentRoom.templateId === "boss-bomber" ? "boss-catacombs" : "boss";
+
+      onMusicCue?.(room.clearedSet.has(currentRoom.id) ? "silence" : bossCue);
       return;
     }
 
-    onMusicCue?.("level");
+    onMusicCue?.(outside ? "outside" : "level");
   });
 
   $effect(() => {
@@ -405,7 +505,10 @@
       onGearCountChange?.(pickups.gears);
     }
 
-    if (scene.currentRoom.kind === "shop") {
+    if (
+      scene.currentRoom.kind === "shop" ||
+      scene.currentRoomTemplate.layout === "outside-yard"
+    ) {
       tryPurchaseAtPosition(position);
     }
 
@@ -495,6 +598,7 @@
       beamDurationMs,
       damagePopupDurationMs,
       deflectBurstDurationMs,
+      projectileImpactBurstDurationMs,
       healBurstDurationMs
     );
     textures.advanceLava(delta);
@@ -609,7 +713,16 @@
   };
 
   onMount(() => {
-    textures.load();
+    const textureLoadAbort = new AbortController();
+
+    if (outside) {
+      textures.loadOutsideCritical();
+    } else {
+      textures.loadGameplayCritical();
+    }
+    textures
+      .loadDeferred({ signal: textureLoadAbort.signal })
+      .catch(() => undefined);
 
     let frameId = 0;
     let previousTime = performance.now();
@@ -632,6 +745,8 @@
     frameId = window.requestAnimationFrame(frame);
 
     return () => {
+      textureLoadAbort.abort();
+      clearOutsideDetailFrame();
       window.cancelAnimationFrame(frameId);
     };
   });
@@ -641,10 +756,13 @@
   <Canvas shadows={PCFSoftShadowMap} dpr={2}>
     <SceneRendererConfig
       backgroundColor={outside ? "#c7d0c0" : "#050403"}
+      compileBeforeReady={!outside}
       environmentMap={textures.environmentMap}
       exposure={outside ? 0.82 : scene.settings.toneMappingExposure}
+      onProgress={onLoadProgress}
       onReady={markSceneReady}
-      {preloadTextures}
+      preloadTextures={blockingPreloadTextures}
+      warmupTextures={warmupPreloadTextures}
       showEnvironmentMap={!outside && scene.settings.showEnvironmentMap}
     />
     <T.Fog
@@ -716,23 +834,30 @@
         {corePrisonSealHits}
         {corePrisonSealHitsRequired}
         {corePrisonSealLocked}
+        {outsideDetailLevel}
       />
 
-      <GameSceneActors />
-
-      <PlayerController
-        {orbitControls}
-        onMeleeFrame={handleMelee}
-        onPositionChange={handlePositionChange}
-        onShoot={handleShoot}
+      <GameSceneActors
+        activeActorsVisible={!outside || sceneReady}
+        actorWarmupEnabled={!outside}
       />
+
+      {#if showPlayer}
+        <PlayerController
+          {orbitControls}
+          onMeleeFrame={handleMelee}
+          onPositionChange={handlePositionChange}
+          onShoot={handleShoot}
+        />
+      {/if}
 
       {#each combat.projectiles as projectile (projectile.id)}
         <Projectile
           data={projectile}
           enemyTargets={scene.activeEnemyTargets}
           onExpire={(id) => combat.removeProjectile(id)}
-          onMove={(id, pos) => combat.handleProjectileMove(id, pos)}
+          onImpact={(impact) => combat.popProjectileImpact(impact)}
+          onMove={(id, x, y, z) => combat.handleProjectileMove(id, x, y, z)}
         />
       {/each}
     </World>
@@ -746,12 +871,11 @@
     <GameHud {onOpenSettings} {onOpenWeaponLab} />
   {/if}
 
-  {#if !sceneReady}
-    <div class="scene-loader">
-      <div class="scene-loader-ring"></div>
-      <span>Loading Foundry</span>
-    </div>
-  {/if}
+  <SceneLoadingOverlay
+    active={showLoader && !sceneReady}
+    detail="Preparing renderer"
+    progress={sceneReady ? 1 : null}
+  />
 </div>
 
 <style>
@@ -759,36 +883,5 @@
     position: relative;
     inline-size: 100%;
     block-size: 100%;
-  }
-
-  .scene-loader {
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    display: grid;
-    gap: 0.8rem;
-    place-content: center;
-    justify-items: center;
-    font-size: 0.72rem;
-    font-weight: 800;
-    color: rgba(239, 247, 255, 0.9);
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    background: #050403;
-  }
-
-  .scene-loader-ring {
-    inline-size: 3.2rem;
-    block-size: 3.2rem;
-    border: 0.18rem solid rgba(255, 191, 118, 0.18);
-    border-top-color: #ffbd76;
-    border-radius: 999px;
-    animation: scene-loader-spin 0.8s linear infinite;
-  }
-
-  @keyframes scene-loader-spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
 </style>

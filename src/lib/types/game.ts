@@ -148,6 +148,16 @@ export interface DeflectBurst {
   radius: number;
 }
 
+export interface ProjectileImpactBurst {
+  color: string;
+  core: string;
+  createdAt: number;
+  id: string;
+  position: Vec3;
+  radius: number;
+  velocity: Vec3;
+}
+
 export interface HealBurst {
   createdAt: number;
   id: string;
@@ -166,6 +176,21 @@ export interface RenderedDeflectBurst extends DeflectBurst {
   age: number;
   fade: number;
   shards: DeflectBurstShard[];
+}
+
+export interface ProjectileImpactSpark {
+  color: string;
+  opacity: number;
+  position: Vec3;
+  rotation: Vec3;
+  scale: Vec3;
+}
+
+export interface RenderedProjectileImpactBurst extends ProjectileImpactBurst {
+  age: number;
+  fade: number;
+  ringScale: number;
+  sparks: ProjectileImpactSpark[];
 }
 
 export interface HealBurstParticle {

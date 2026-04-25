@@ -76,6 +76,7 @@
 
 <style>
   .catalog-shell {
+    box-sizing: border-box;
     min-block-size: 100vh;
     padding: clamp(1rem, 3vw, 2.4rem);
     font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
@@ -87,6 +88,12 @@
         transparent 30%
       ),
       linear-gradient(180deg, #101413, #03080b 70%);
+  }
+
+  .catalog-shell *,
+  .catalog-shell *::before,
+  .catalog-shell *::after {
+    box-sizing: inherit;
   }
 
   header {
@@ -145,16 +152,17 @@
 
   .module-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
     gap: 0.8rem;
   }
 
   .module-card {
     display: grid;
-    grid-template-columns: 4.2rem minmax(0, 1fr);
-    gap: 0.78rem;
-    min-block-size: 8rem;
-    padding: 0.85rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.82rem;
+    align-items: start;
+    min-block-size: 8.35rem;
+    padding: 0.9rem;
     background:
       linear-gradient(180deg, rgba(13, 22, 23, 0.96), rgba(5, 12, 15, 0.98)),
       linear-gradient(
@@ -173,9 +181,9 @@
     display: grid;
     place-items: center;
     align-self: start;
-    inline-size: 4.2rem;
-    block-size: 4.2rem;
-    padding: 0.58rem;
+    inline-size: 4.4rem;
+    block-size: 4.4rem;
+    padding: 0.54rem;
     background:
       radial-gradient(
         circle,
@@ -189,24 +197,27 @@
 
   .module-copy {
     display: grid;
-    gap: 0.52rem;
+    gap: 0.58rem;
     min-inline-size: 0;
+    min-block-size: 100%;
   }
 
   .module-copy > div {
-    display: grid;
-    gap: 0.12rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.18rem 0.5rem;
+    align-items: baseline;
+    justify-content: space-between;
   }
 
   .module-copy strong {
-    overflow: hidden;
-    text-overflow: ellipsis;
     font-size: 0.95rem;
     line-height: 1.1;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .module-copy small {
+    flex: none;
     font-size: 0.62rem;
     font-weight: 900;
     color: color-mix(in srgb, var(--rarity) 82%, white);
@@ -222,14 +233,17 @@
   }
 
   .tag-row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.2rem), 1fr));
     gap: 0.34rem;
     align-self: end;
   }
 
   .tag-row span {
+    min-inline-size: 0;
     padding: 0.16rem 0.42rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 0.62rem;
     font-weight: 900;
     color: color-mix(in srgb, var(--accent) 78%, white);
@@ -240,12 +254,14 @@
 
   @media (max-width: 540px) {
     .module-card {
-      grid-template-columns: 3.6rem minmax(0, 1fr);
+      gap: 0.7rem;
+      padding: 0.78rem;
     }
 
     .module-glyph-frame {
       inline-size: 3.6rem;
       block-size: 3.6rem;
+      padding: 0.45rem;
     }
   }
 </style>
