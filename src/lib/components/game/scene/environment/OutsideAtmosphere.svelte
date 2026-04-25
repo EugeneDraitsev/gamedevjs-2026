@@ -77,7 +77,6 @@
     const mesh = new InstancedMesh(bladeGeo, grassMat, grassCount);
     mesh.count = 0;
     mesh.receiveShadow = true;
-    mesh.frustumCulled = false;
     return mesh;
   };
 
@@ -125,6 +124,7 @@
     }
     grassMesh.count = placed;
     grassMesh.instanceMatrix.needsUpdate = true;
+    grassMesh.computeBoundingSphere();
   };
   setupGrass();
 

@@ -402,6 +402,7 @@
         mesh.setMatrixAt(i, dummy.matrix);
       });
       mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
       return mesh;
     });
   };

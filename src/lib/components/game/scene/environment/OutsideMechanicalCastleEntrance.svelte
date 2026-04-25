@@ -318,7 +318,6 @@
 
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    mesh.frustumCulled = false;
     mesh.count = materialVoxels.length;
 
     materialVoxels.forEach((voxel, index) => {
@@ -330,6 +329,7 @@
     });
 
     mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
     return mesh;
   };
 
