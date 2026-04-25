@@ -14,6 +14,7 @@
   import DeathModal from "$lib/components/app/DeathModal.svelte";
   import EndDemoModal from "$lib/components/app/EndDemoModal.svelte";
   import FloorAdvanceTransition from "$lib/components/app/FloorAdvanceTransition.svelte";
+  import HowToPlayPanel from "$lib/components/app/HowToPlayPanel.svelte";
   import SceneLoadingOverlay from "$lib/components/app/SceneLoadingOverlay.svelte";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import MobileControls from "$lib/components/game/MobileControls.svelte";
@@ -96,6 +97,7 @@
   let paneLoadFailed = $state(false);
   let settings = $state(loadSceneSettings());
   let settingsOpen = $state(false);
+  let howToPlayOpen = $state(false);
   let sceneResetKey = $state(0);
   let machineBayOpen = $state(false);
   let demoCompleteOpen = $state(false);
@@ -120,6 +122,7 @@
   let moduleInventory = $state<MachineModuleId[]>(
     createDefaultModuleInventory()
   );
+  let newModuleIds = $state<MachineModuleId[]>([]);
   let purchasedShopOfferIds = $state<string[]>([]);
   let playerDeathPending = $state(false);
   let deathModalOpen = $state(false);
@@ -201,23 +204,6 @@
     floorAdvancePhase = "idle";
   };
 
-  const getImmediateModuleInventory = (
-    loadout: MachineLoadout,
-    inventory: MachineModuleId[]
-  ) => {
-    const ownedModuleIds = new Set<MachineModuleId>([
-      ...Object.values(loadout).filter(
-        (moduleId): moduleId is MachineModuleId => Boolean(moduleId)
-      ),
-      ...inventory,
-    ]);
-
-    return [
-      ...inventory,
-      ...machineModuleIds.filter((moduleId) => !ownedModuleIds.has(moduleId)),
-    ];
-  };
-
   const applyRunState = (state: SavedRunState) => {
     collectedArtifactRooms = [...state.collectedArtifactRooms];
     demoCompleteOpen = false;
@@ -225,10 +211,8 @@
     floorAdvanceTarget = getNextRunFloor(state.floorIndex);
     gearCount = state.gearCount ?? 0;
     machineLoadout = { ...state.machineLoadout };
-    moduleInventory = getImmediateModuleInventory(
-      state.machineLoadout,
-      state.moduleInventory
-    );
+    moduleInventory = [...state.moduleInventory];
+    newModuleIds = [...(state.newModuleIds ?? [])];
     purchasedShopOfferIds = [...(state.purchasedShopOfferIds ?? [])];
     playerDeathPending = false;
     deathModalOpen = false;
@@ -265,6 +249,15 @@
 
   const closeSettings = () => {
     settingsOpen = false;
+    howToPlayOpen = false;
+  };
+
+  const closeHowToPlay = () => {
+    howToPlayOpen = false;
+  };
+
+  const openHowToPlay = () => {
+    howToPlayOpen = true;
   };
 
   const closeDemoComplete = () => {
@@ -280,7 +273,32 @@
   const openSettings = () => {
     demoCompleteOpen = false;
     machineBayOpen = false;
+    howToPlayOpen = false;
     settingsOpen = true;
+  };
+
+  const handleEscapeMenu = () => {
+    if (demoCompleteOpen) {
+      demoCompleteOpen = false;
+      return;
+    }
+
+    if (machineBayOpen) {
+      machineBayOpen = false;
+      return;
+    }
+
+    if (settingsOpen && howToPlayOpen) {
+      howToPlayOpen = false;
+      return;
+    }
+
+    if (settingsOpen) {
+      closeSettings();
+      return;
+    }
+
+    openSettings();
   };
 
   const getMusicTransitionDefaults = (
@@ -381,6 +399,14 @@
     return moduleId;
   };
 
+  const markModuleSeen = (moduleId: MachineModuleId) => {
+    if (!newModuleIds.includes(moduleId)) {
+      return;
+    }
+
+    newModuleIds = newModuleIds.filter((id) => id !== moduleId);
+  };
+
   const installModule = (moduleId: MachineModuleId, slotId: MachineSlotId) => {
     if (!moduleFitsSlot(moduleId, slotId)) {
       return;
@@ -395,6 +421,7 @@
     const previous = machineLoadout[slotId];
 
     machineLoadout = { ...machineLoadout, [slotId]: moduleId };
+    markModuleSeen(moduleId);
 
     if (previous) {
       moduleInventory = [...moduleInventory, previous];
@@ -428,6 +455,9 @@
         getMachineModule(type).scrapValue + machineStats.scrapYieldBonus;
     } else {
       moduleInventory = [...moduleInventory, type];
+      if (!newModuleIds.includes(type)) {
+        newModuleIds = [...newModuleIds, type];
+      }
     }
   };
 
@@ -553,6 +583,7 @@
       gearCount,
       machineLoadout,
       moduleInventory,
+      newModuleIds,
       purchasedShopOfferIds,
       version: 2,
     });
@@ -667,14 +698,8 @@
           event.preventDefault();
           return;
         }
-        if (demoCompleteOpen) {
-          demoCompleteOpen = false;
-        } else if (machineBayOpen) {
-          machineBayOpen = false;
-        } else {
-          settingsOpen = !settingsOpen;
-        }
 
+        handleEscapeMenu();
         event.preventDefault();
         return;
       }
@@ -798,15 +823,25 @@
   {/if}
 
   {#if settingsOpen}
-    <AppModalShell onClose={closeSettings} open={settingsOpen}>
-      <SettingsPanel
-        {debugEnabled}
-        bind:settings
-        onDebugEnabledChange={setDebugEnabled}
-        onBack={closeSettings}
-        onOpenMainMenu={openMainMenu}
-        onResetDefaults={resetDefaults}
-      />
+    <AppModalShell
+      describedby={howToPlayOpen ? "how-to-play-copy" : undefined}
+      labelledby={howToPlayOpen ? "how-to-play-title" : undefined}
+      onClose={howToPlayOpen ? closeHowToPlay : closeSettings}
+      open={settingsOpen}
+    >
+      {#if howToPlayOpen}
+        <HowToPlayPanel onBack={closeHowToPlay} />
+      {:else}
+        <SettingsPanel
+          {debugEnabled}
+          bind:settings
+          onDebugEnabledChange={setDebugEnabled}
+          onBack={closeSettings}
+          onOpenHowToPlay={openHowToPlay}
+          onOpenMainMenu={openMainMenu}
+          onResetDefaults={resetDefaults}
+        />
+      {/if}
     </AppModalShell>
   {/if}
 
@@ -830,9 +865,11 @@
     {machineLoadout}
     {machineStats}
     {moduleInventory}
+    {newModuleIds}
     onClose={() => (machineBayOpen = false)}
     onEjectModule={ejectModule}
     onInstallModule={installModule}
+    onMarkModuleSeen={markModuleSeen}
     open={machineBayOpen}
   />
 

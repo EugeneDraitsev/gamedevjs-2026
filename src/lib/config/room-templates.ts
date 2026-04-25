@@ -54,6 +54,7 @@ const enemyTemplateSchema = z
     bombDelivery: z.enum(["drop", "throw"]).optional(),
     bombExplosionRadius: z.number().positive().optional(),
     bombHp: z.number().positive().optional(),
+    bombInitialDelayMs: z.number().int().nonnegative().optional(),
     bombMaxActive: z.number().int().positive().optional(),
     bombRadius: z.number().positive().optional(),
     bombSpeed: z.number().positive().optional(),
@@ -70,8 +71,10 @@ const enemyTemplateSchema = z
       .regex(/^#[0-9a-f]{6}$/i)
       .optional(),
     shotDamage: z.number().positive().optional(),
+    shotInitialDelayMs: z.number().int().nonnegative().optional(),
     shotIntervalMs: z.number().int().positive().optional(),
     shotKind: z.enum(["energy", "wheel"]).optional(),
+    shotMaxActive: z.number().int().positive().optional(),
     shotSpeed: z.number().positive().optional(),
     stealthMoveSpeed: z.number().positive().optional(),
     stealthRevealMs: z.number().int().positive().optional(),

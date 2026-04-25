@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createDungeonLayout } from "$lib/config/dungeon-layout";
+import {
+  createDungeonLayout,
+  floor1NormalTemplateIds,
+  floor2NormalTemplateIds,
+  floor2RequiredNormalTemplateIds,
+} from "$lib/config/dungeon-layout";
 import { roomTemplateById } from "$lib/config/room-templates";
 
 describe("dungeon layout floors", () => {
@@ -46,5 +51,45 @@ describe("dungeon layout floors", () => {
     expect(dungeon.floor).toBe(0);
     expect(Object.values(dungeon.rooms)).toHaveLength(1);
     expect(dungeon.rooms[dungeon.startRoomId].templateId).toBe("outside-start");
+  });
+
+  it("includes new enemy rooms in normal generation pools", () => {
+    expect(floor1NormalTemplateIds).toContain("normal-ricochet");
+    expect(floor2RequiredNormalTemplateIds).toEqual([
+      "normal-ricochet",
+      "normal-veil",
+      "normal-bombers",
+    ]);
+    expect(floor2NormalTemplateIds).toEqual(
+      expect.arrayContaining([
+        "normal-ricochet",
+        "normal-veil",
+        "normal-bombers",
+      ])
+    );
+    expect(roomTemplateById["normal-ricochet"].enemyTemplateId).toBe(
+      "wheel-slinger"
+    );
+    expect(roomTemplateById["normal-veil"].enemyTemplateId).toBe(
+      "veil-stalker"
+    );
+    expect(roomTemplateById["normal-bombers"].enemyTemplateId).toBe(
+      "blast-runner"
+    );
+  });
+
+  it("guarantees new enemy rooms on floor -1", () => {
+    const dungeon = createDungeonLayout("test-seed-f-1", -1);
+    const templateIds = Object.values(dungeon.rooms).map(
+      (room) => room.templateId
+    );
+
+    expect(templateIds).toEqual(
+      expect.arrayContaining([
+        "normal-ricochet",
+        "normal-veil",
+        "normal-bombers",
+      ])
+    );
   });
 });

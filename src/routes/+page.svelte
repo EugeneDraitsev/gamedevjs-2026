@@ -8,19 +8,58 @@
   import { loadSceneSettings } from "$lib/config/scene-settings";
   import { loadRunSave } from "$lib/game/run-save";
 
-  const seed = "polygon-001";
+  const defaultSeed = "polygon-001";
+  const customSeedStorageKey = "warden-menu-custom-seed";
+  const useCustomSeedStorageKey = "warden-menu-use-custom-seed";
   let canResume = $state(false);
+  let customSeed = $state(defaultSeed);
   let floorIndex = $state(initialDungeonFloor);
+  let storageReady = $state(false);
+  let useCustomSeed = $state(false);
 
-  onMount(() => {
+  const normalizeMenuSeed = (value: string) => value.trim() || defaultSeed;
+  const seed = $derived(
+    useCustomSeed ? normalizeMenuSeed(customSeed) : defaultSeed
+  );
+
+  const syncResumeState = () => {
     const savedRun = loadRunSave(seed);
-    const settings = loadSceneSettings();
 
     canResume = Boolean(savedRun);
     floorIndex = savedRun?.floorIndex ?? initialDungeonFloor;
+  };
+
+  const gameRouteForSeed = (nextSeed: string, continueRun = false) => {
+    const encodedSeed = encodeURIComponent(nextSeed);
+    const suffix = continueRun ? "?continue=1" : "";
+
+    return `/game/${encodedSeed}${suffix}`;
+  };
+
+  onMount(() => {
+    const settings = loadSceneSettings();
+    const savedCustomSeed = localStorage.getItem(customSeedStorageKey);
+
+    if (savedCustomSeed !== null) {
+      customSeed = savedCustomSeed;
+    }
+
+    useCustomSeed = localStorage.getItem(useCustomSeedStorageKey) === "true";
+    storageReady = true;
+    syncResumeState();
     gameMusic.syncMix(settings);
     gameMusic.preload();
     gameMusic.playCue("menu", { fadeInMs: 1800, fadeOutMs: 1200 });
+  });
+
+  $effect(() => {
+    if (!storageReady) {
+      return;
+    }
+
+    localStorage.setItem(customSeedStorageKey, customSeed);
+    localStorage.setItem(useCustomSeedStorageKey, String(useCustomSeed));
+    syncResumeState();
   });
 
   const withDebugParam = (path: string) => {
@@ -56,10 +95,15 @@
 
 <MainMenu
   {canResume}
+  {customSeed}
   {floorIndex}
   onContinue={() =>
-    openGameRoute(withDebugParam(`/game/${seed}?continue=1`), floorIndex)}
+    openGameRoute(withDebugParam(gameRouteForSeed(seed, true)), floorIndex)}
+  onCustomSeedChange={(value) => (customSeed = value)}
   onOpenSettings={() => openRoute(withDebugParam("/settings"))}
-  onPlay={() => openGameRoute(withDebugParam(`/game/${seed}`), initialDungeonFloor)}
+  onPlay={() =>
+    openGameRoute(withDebugParam(gameRouteForSeed(seed)), initialDungeonFloor)}
+  onUseCustomSeedChange={(value) => (useCustomSeed = value)}
   {seed}
+  {useCustomSeed}
 />

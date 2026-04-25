@@ -1158,6 +1158,15 @@ export const createRoomEnemies = (
     template.spawnPattern === "outside"
       ? basePositions
       : pushSpawnsFromEntry(basePositions, currentEntryDirection);
+  const initialActionAt = (
+    intervalMs: number | undefined,
+    initialDelayMs: number | undefined,
+    staggerMs: number,
+    fallback: number
+  ) =>
+    typeof intervalMs === "number" && typeof initialDelayMs === "number"
+      ? now - intervalMs + initialDelayMs + staggerMs
+      : fallback;
 
   const makeEnemy = (
     nextEnemyTemplate: EnemyTemplate,
@@ -1180,6 +1189,7 @@ export const createRoomEnemies = (
       bombDelivery: nextEnemyTemplate.bombDelivery,
       bombExplosionRadius: nextEnemyTemplate.bombExplosionRadius,
       bombHp: nextEnemyTemplate.bombHp,
+      bombInitialDelayMs: nextEnemyTemplate.bombInitialDelayMs,
       bombMaxActive: nextEnemyTemplate.bombMaxActive,
       bombRadius: nextEnemyTemplate.bombRadius,
       bombSpeed: nextEnemyTemplate.bombSpeed,
@@ -1188,9 +1198,19 @@ export const createRoomEnemies = (
       hp: nextEnemyTemplate.hp,
       id: `${room.id}-${template.id}-${idSuffix}`,
       knockbackVelocity: [0, 0, 0],
-      lastBombAt: gateKeeper ? now - 3200 : now - index * 180,
+      lastBombAt: initialActionAt(
+        nextEnemyTemplate.bombCooldownMs,
+        nextEnemyTemplate.bombInitialDelayMs,
+        index * 180,
+        gateKeeper ? now - 3200 : now - index * 180
+      ),
       lastHitAt: 0,
-      lastShotAt: now - index * 180,
+      lastShotAt: initialActionAt(
+        nextEnemyTemplate.shotIntervalMs,
+        nextEnemyTemplate.shotInitialDelayMs,
+        index * 180,
+        now - index * 180
+      ),
       maxHp: nextEnemyTemplate.hp,
       moveSpeed: nextEnemyTemplate.moveSpeed,
       patrolCenter: outsidePatrol ? position : undefined,
@@ -1201,8 +1221,10 @@ export const createRoomEnemies = (
       radius: nextEnemyTemplate.radius,
       shotColor: nextEnemyTemplate.shotColor,
       shotDamage: nextEnemyTemplate.shotDamage,
+      shotInitialDelayMs: nextEnemyTemplate.shotInitialDelayMs,
       shotIntervalMs: nextEnemyTemplate.shotIntervalMs,
       shotKind: nextEnemyTemplate.shotKind,
+      shotMaxActive: nextEnemyTemplate.shotMaxActive,
       shotSpeed: nextEnemyTemplate.shotSpeed,
       stealthMode: nextEnemyTemplate.stealthRevealMs ? "hidden" : undefined,
       stealthMoveSpeed: nextEnemyTemplate.stealthMoveSpeed,

@@ -30,12 +30,14 @@
     machineLoadout: MachineLoadout;
     machineStats: MachineStats;
     moduleInventory: MachineModuleId[];
+    newModuleIds?: MachineModuleId[];
     onClose?: () => void;
     onEjectModule?: (slotId: MachineSlotId) => void;
     onInstallModule?: (
       moduleId: MachineModuleId,
       slotId: MachineSlotId
     ) => void;
+    onMarkModuleSeen?: (moduleId: MachineModuleId) => void;
     open?: boolean;
   }
 
@@ -88,9 +90,11 @@
     machineLoadout,
     machineStats,
     moduleInventory,
+    newModuleIds = [],
     onClose,
     onEjectModule,
     onInstallModule,
+    onMarkModuleSeen,
     open = false,
   }: MachineBayModalProps = $props();
 
@@ -133,6 +137,7 @@
   const slotById = Object.fromEntries(
     machineSlots.map((slot) => [slot.id, slot])
   ) as Record<MachineSlotId, (typeof machineSlots)[number]>;
+  const newModuleIdSet = $derived(new Set(newModuleIds));
 
   const getModuleOptionsForSlot = (slotId: MachineSlotId) => {
     const currentModuleId = machineLoadout[slotId];
@@ -152,6 +157,7 @@
       return {
         accent: template.accent,
         equipped: currentModuleId === moduleId,
+        isNew: newModuleIdSet.has(moduleId),
         moduleId,
         rarityAccent: getMachineModuleRarityAccent(template.rarity),
         template,
@@ -164,12 +170,14 @@
       const slot = slotById[slotId];
       const moduleId = machineLoadout[slotId];
       const template = moduleId ? getMachineModule(moduleId) : null;
+      const options = getModuleOptionsForSlot(slotId);
 
       return {
         accent: getMachineModuleKindAccent(slot.kind),
+        hasNew: options.some((option) => option.isNew),
         moduleId,
         moduleAccent: template?.accent ?? getMachineModuleKindAccent(slot.kind),
-        options: getModuleOptionsForSlot(slotId),
+        options,
         presentation: slotPresentation[slotId],
         rarityAccent: template
           ? getMachineModuleRarityAccent(template.rarity)
@@ -289,11 +297,17 @@
     selectedSlotId = selectedSlotId === slotId ? null : slotId;
   };
 
+  const viewModule = (moduleId: MachineModuleId) => {
+    viewingModuleId = moduleId;
+    onMarkModuleSeen?.(moduleId);
+  };
+
   const equipViewedModule = () => {
     if (!(selectedSlotId && viewingModuleId && selectedCanEquip)) {
       return;
     }
 
+    onMarkModuleSeen?.(viewingModuleId);
     onInstallModule?.(viewingModuleId, selectedSlotId);
   };
 
@@ -401,6 +415,9 @@
               aria-pressed={selectedSlotId === socket.slot.id}
               onclick={() => selectSlot(socket.slot.id)}
             >
+              {#if socket.hasNew}
+                <span class="new-badge socket-new">New</span>
+              {/if}
               <span class="socket-glyph" aria-hidden="true">
                 {#if socket.moduleId}
                   <MachineModuleGlyph
@@ -427,7 +444,12 @@
             <section class="drawer-grid">
               <div class="drawer-title">
                 <span>Available {selectedSocket.presentation.shortLabel}</span>
-                <small>{selectedOptions.length}</small>
+                <div>
+                  {#if selectedSocket.hasNew}
+                    <span class="new-badge">New</span>
+                  {/if}
+                  <small>{selectedOptions.length}</small>
+                </div>
               </div>
 
               {#if selectedOptions.length > 0}
@@ -441,8 +463,11 @@
                       type="button"
                       aria-label={option.template.label}
                       aria-pressed={viewingModuleId === option.moduleId}
-                      onclick={() => (viewingModuleId = option.moduleId)}
+                      onclick={() => viewModule(option.moduleId)}
                     >
+                      {#if option.isNew}
+                        <span class="new-badge module-new">New</span>
+                      {/if}
                       <MachineModuleGlyph
                         accent={option.accent}
                         moduleId={option.moduleId}
@@ -567,6 +592,8 @@
     display: grid;
     place-items: center;
     padding: clamp(0.45rem, 1.6vw, 1.2rem);
+    overflow: auto;
+    overscroll-behavior: contain;
     background:
       radial-gradient(
         circle at 50% 18%,
@@ -586,7 +613,8 @@
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     inline-size: min(1180px, 100%);
-    block-size: min(820px, calc(100vh - 1.4rem));
+    block-size: min(820px, calc(100dvh - 1.4rem));
+    min-block-size: 0;
     overflow: hidden;
     font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
     color: var(--bay-text);
@@ -869,6 +897,33 @@
     box-shadow: 0 0 0.35rem #22c55e;
   }
 
+  .new-badge {
+    display: inline-grid;
+    place-items: center;
+    min-inline-size: 1.75rem;
+    min-block-size: 0.88rem;
+    padding: 0 0.28rem;
+    font-size: 0.48rem;
+    font-weight: 900;
+    line-height: 1;
+    color: #061015;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+    background: color-mix(in srgb, var(--accent, #fbbf24) 74%, white);
+    border: 1px solid color-mix(in srgb, var(--accent, #fbbf24) 52%, white);
+    border-radius: 999px;
+    box-shadow: 0 0 0.55rem
+      color-mix(in srgb, var(--accent, #fbbf24) 26%, transparent);
+  }
+
+  .socket-new {
+    position: absolute;
+    inset-block-start: -0.38rem;
+    inset-inline-end: -0.44rem;
+    z-index: 2;
+  }
+
   .module-drawer {
     position: absolute;
     inset-block: 1rem;
@@ -878,6 +933,7 @@
     grid-template-rows: auto minmax(0, 1fr);
     gap: 0.8rem;
     inline-size: 20rem;
+    min-block-size: 0;
   }
 
   .drawer-grid,
@@ -913,8 +969,14 @@
     letter-spacing: 0.12em;
   }
 
-  .drawer-title span,
-  .detail-kicker span {
+  .drawer-title > div {
+    display: flex;
+    gap: 0.36rem;
+    align-items: center;
+  }
+
+  .drawer-title > span,
+  .detail-kicker > span {
     color: color-mix(in srgb, var(--accent) 72%, white);
   }
 
@@ -978,6 +1040,13 @@
     block-size: 0.42rem;
   }
 
+  .module-new {
+    position: absolute;
+    inset-block-start: 0.3rem;
+    inset-inline-start: 0.3rem;
+    z-index: 2;
+  }
+
   .empty-modules,
   .empty-detail {
     display: grid;
@@ -1018,6 +1087,8 @@
     grid-template-rows: auto minmax(0, 1fr);
     min-block-size: 0;
     padding: 1rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     border-color: color-mix(in srgb, var(--accent) 48%, #26313e);
   }
 
@@ -1205,6 +1276,16 @@
     }
   }
 
+  @media (min-width: 761px) and (max-height: 700px) {
+    .backdrop {
+      align-items: start;
+    }
+
+    .bay {
+      block-size: 820px;
+    }
+  }
+
   @media (max-width: 760px) {
     .backdrop {
       align-items: stretch;
@@ -1314,6 +1395,7 @@
       inset: auto;
       inline-size: 100%;
       margin-bottom: 0.65rem;
+      overflow: visible;
     }
 
     .hero-stage {

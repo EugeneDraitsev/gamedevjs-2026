@@ -164,4 +164,38 @@ describe("createRoomEnemies", () => {
       true
     );
   });
+
+  it("uses a fast first wheel-slinger shot before the long ricochet cooldown", () => {
+    const spawnNow = 10_000;
+    const enemies = createRoomEnemies(
+      roomWithDoors,
+      {
+        ...roomTemplateById["normal-line"],
+        enemyCount: 1,
+        enemyTemplateId: "wheel-slinger",
+      },
+      "south",
+      new Set(),
+      spawnNow
+    );
+
+    expect(enemies[0]?.lastShotAt).toBe(spawnNow - 3600 + 520);
+  });
+
+  it("uses a fast first blast-runner bomb before the long bomb cooldown", () => {
+    const spawnNow = 10_000;
+    const enemies = createRoomEnemies(
+      roomWithDoors,
+      {
+        ...roomTemplateById["normal-line"],
+        enemyCount: 1,
+        enemyTemplateId: "blast-runner",
+      },
+      "south",
+      new Set(),
+      spawnNow
+    );
+
+    expect(enemies[0]?.lastBombAt).toBe(spawnNow - 2500 + 520);
+  });
 });

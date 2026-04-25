@@ -9,6 +9,7 @@
     debugEnabled?: boolean;
     onBack: () => void;
     onDebugEnabledChange?: (enabled: boolean) => void;
+    onOpenHowToPlay?: () => void;
     onOpenMainMenu?: () => void;
     onResetDefaults: () => void;
     settings: SceneSettings;
@@ -18,6 +19,7 @@
     debugEnabled,
     onDebugEnabledChange,
     onBack,
+    onOpenHowToPlay,
     onOpenMainMenu,
     onResetDefaults,
     settings = $bindable(),
@@ -159,6 +161,11 @@
     <button type="button" class="menu-button primary" onclick={onBack}>
       {onOpenMainMenu ? "Return to Run" : "Back"}
     </button>
+    {#if onOpenHowToPlay}
+      <button type="button" class="menu-button" onclick={onOpenHowToPlay}>
+        How to Play
+      </button>
+    {/if}
     {#if onOpenMainMenu}
       <button
         type="button"

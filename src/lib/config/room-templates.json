@@ -130,6 +130,15 @@
     "enemyCount": 3
   },
   {
+    "id": "normal-ricochet",
+    "kind": "normal",
+    "label": "Ricochet",
+    "layout": "blocks",
+    "spawnPattern": "crossfire",
+    "enemyTemplateId": "wheel-slinger",
+    "enemyCount": 3
+  },
+  {
     "id": "normal-furnace",
     "kind": "normal",
     "label": "Foundry",
@@ -173,6 +182,24 @@
     "spawnPattern": "crossfire",
     "enemyTemplateId": "rail-hunter",
     "enemyCount": 4
+  },
+  {
+    "id": "normal-veil",
+    "kind": "normal",
+    "label": "Veil",
+    "layout": "hexes",
+    "spawnPattern": "pincer",
+    "enemyTemplateId": "veil-stalker",
+    "enemyCount": 2
+  },
+  {
+    "id": "normal-bombers",
+    "kind": "normal",
+    "label": "Minefield",
+    "layout": "lava-cross",
+    "spawnPattern": "arc",
+    "enemyTemplateId": "blast-runner",
+    "enemyCount": 2
   },
   {
     "id": "treasure-artifact",

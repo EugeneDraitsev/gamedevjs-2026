@@ -43,6 +43,7 @@
       <span>Loadout Module Recovered</span>
       <strong>{pickedArtifactTemplate.label}</strong>
       <small>{pickedArtifactTemplate.rarity}</small>
+      <em>Press E to equip</em>
     </div>
   </div>
 {/if}
@@ -109,7 +110,8 @@
   }
 
   .artifact-pickup-card span,
-  .artifact-pickup-card small {
+  .artifact-pickup-card small,
+  .artifact-pickup-card em {
     font-size: 0.72rem;
     font-weight: 800;
     text-transform: uppercase;
@@ -131,8 +133,13 @@
   }
 
   .artifact-pickup-card small {
-    margin-bottom: 0.08rem;
     color: color-mix(in srgb, var(--rarity) 84%, white);
     letter-spacing: 0.16em;
+  }
+
+  .artifact-pickup-card em {
+    margin-bottom: 0.08rem;
+    font-style: normal;
+    color: color-mix(in srgb, var(--accent) 70%, white);
   }
 </style>

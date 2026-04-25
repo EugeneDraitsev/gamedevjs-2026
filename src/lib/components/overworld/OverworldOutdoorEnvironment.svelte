@@ -32,8 +32,20 @@
 
   const spawnOverworldEnemies = () => {
     const now = performance.now();
+    const initialActionAt = (
+      intervalMs: number | undefined,
+      initialDelayMs: number | undefined,
+      staggerMs: number,
+      fallback: number
+    ) =>
+      typeof intervalMs === "number" && typeof initialDelayMs === "number"
+        ? now - intervalMs + initialDelayMs + staggerMs
+        : fallback;
+
     scene.combat.enemies = layout.encounters.map((encounter, index) => {
       const template = enemyTemplateById[encounter.templateId];
+      const staggerMs = index * 180;
+
       return {
         behavior: template.behavior,
         bombArmMs: template.bombArmMs,
@@ -43,6 +55,7 @@
         bombDamage: template.bombDamage,
         bombExplosionRadius: template.bombExplosionRadius,
         bombHp: template.bombHp,
+        bombInitialDelayMs: template.bombInitialDelayMs,
         bombMaxActive: template.bombMaxActive,
         bombRadius: template.bombRadius,
         bombSpeed: template.bombSpeed,
@@ -51,9 +64,19 @@
         hp: template.hp,
         id: encounter.id,
         knockbackVelocity: [0, 0, 0] as [number, number, number],
-        lastBombAt: now - index * 180,
+        lastBombAt: initialActionAt(
+          template.bombCooldownMs,
+          template.bombInitialDelayMs,
+          staggerMs,
+          now - staggerMs
+        ),
         lastHitAt: 0,
-        lastShotAt: now - index * 180,
+        lastShotAt: initialActionAt(
+          template.shotIntervalMs,
+          template.shotInitialDelayMs,
+          staggerMs,
+          now - staggerMs
+        ),
         maxHp: template.hp,
         moveSpeed: template.moveSpeed,
         position: [
@@ -65,7 +88,9 @@
         radius: template.radius,
         shotColor: template.shotColor,
         shotDamage: template.shotDamage,
+        shotInitialDelayMs: template.shotInitialDelayMs,
         shotIntervalMs: template.shotIntervalMs,
+        shotMaxActive: template.shotMaxActive,
         shotSpeed: template.shotSpeed,
         templateId: template.id,
         touchDamage: template.touchDamage,

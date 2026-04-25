@@ -333,6 +333,18 @@ const countActiveBombs = (combat: CombatStore, originId: string) => {
   return count;
 };
 
+const countActiveEnemyShots = (combat: CombatStore, originId: string) => {
+  let count = 0;
+
+  for (const shot of combat.enemyShots) {
+    if (shot.originId === originId) {
+      count += 1;
+    }
+  }
+
+  return count;
+};
+
 const gateKeeperLaserCooldownMs = 5400;
 const gateKeeperLaserTelegraphMs = 720;
 const gateKeeperLaserSweepMs = 1320;
@@ -510,6 +522,11 @@ const createEnemyRangedAttacks = (
   let shots: ActiveEnemyShot[] = [];
   let bombs: ActiveBomb[] = [];
   let gateLasers: ActiveGateLaser[] = [];
+  const shotMaxActive = enemy.shotMaxActive;
+  const shotCapacity =
+    typeof shotMaxActive === "number"
+      ? Math.max(0, shotMaxActive - countActiveEnemyShots(ctx.combat, enemy.id))
+      : Number.POSITIVE_INFINITY;
 
   if (enemy.stealthRevealMs) {
     return {
@@ -537,15 +554,19 @@ const createEnemyRangedAttacks = (
     (enemy.behavior === "shooter" || enemy.behavior === "bomber") &&
     enemy.shotIntervalMs &&
     now - nextLastShotAt >= enemy.shotIntervalMs &&
+    shotCapacity > 0 &&
     playerDistance <= (enemy.preferredRange ?? 6.5) + 3.2 &&
     !gateKeeperLaserRecovering
   ) {
-    shots = createEnemyShots(
+    const createdShots = createEnemyShots(
       enemy,
       position,
       playerPos[0] - position[0],
       playerPos[2] - position[2]
     );
+    shots = Number.isFinite(shotCapacity)
+      ? createdShots.slice(0, shotCapacity)
+      : createdShots;
 
     if (shots.length > 0) {
       nextLastShotAt = now;

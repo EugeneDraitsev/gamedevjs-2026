@@ -88,6 +88,7 @@ export interface ActiveEnemy {
   bombDelivery?: "drop" | "throw";
   bombExplosionRadius?: number;
   bombHp?: number;
+  bombInitialDelayMs?: number;
   bombMaxActive?: number;
   bombRadius?: number;
   bombSpeed?: number;
@@ -109,8 +110,10 @@ export interface ActiveEnemy {
   radius: number;
   shotColor?: string;
   shotDamage?: number;
+  shotInitialDelayMs?: number;
   shotIntervalMs?: number;
   shotKind?: "energy" | "wheel";
+  shotMaxActive?: number;
   shotSpeed?: number;
   stealthAimYaw?: number;
   stealthMode?: "hidden" | "aiming" | "relocating";

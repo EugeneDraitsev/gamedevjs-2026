@@ -10,7 +10,7 @@ import type { PickupStore } from "$lib/stores/pickups.svelte";
 import type { PlayerStore } from "$lib/stores/player.svelte";
 import type { RoomStore } from "$lib/stores/room.svelte";
 import type { TimingStore } from "$lib/stores/timing.svelte";
-import type { ActiveProjectile, Vec3 } from "$lib/types/game";
+import type { ActiveEnemyShot, ActiveProjectile, Vec3 } from "$lib/types/game";
 import { stepEnemies } from "./enemy-stepper";
 
 vi.mock("$lib/audio/sfx", () => ({
@@ -287,5 +287,209 @@ describe("stepEnemies outside gate clear", () => {
     expect(combat.gateLasers).toHaveLength(1);
     expect(combat.gateLasers[0]?.damage).toBe(0);
     expect(combat.gateLasers[0]?.fadeMs).toBeLessThanOrEqual(260);
+  });
+});
+
+describe("stepEnemies ranged shot caps", () => {
+  it("limits wheel-slinger to two active wheel shots per enemy", () => {
+    const nowSpy = vi.spyOn(performance, "now").mockReturnValue(10_000);
+    const template = {
+      ...roomTemplateById["normal-line"],
+      enemyCount: 1,
+      enemyTemplateId: "wheel-slinger",
+    };
+    const currentRoomId = "wheel-room";
+    const room = createRoomStub();
+    const [enemy] = createRoomEnemies(
+      {
+        exits: {},
+        grid: [0, 0],
+        id: currentRoomId,
+        kind: "normal",
+        label: "Wheel Room",
+        templateId: "normal-line",
+      },
+      template,
+      "south",
+      new Set(),
+      0
+    );
+    const wheelShot = (id: string): ActiveEnemyShot => ({
+      color: "#cfd8dc",
+      damage: 1,
+      id,
+      kind: "wheel",
+      originId: enemy?.id,
+      position: [8, 0.42, 8],
+      radius: 0.34,
+      ttlMs: 60_000,
+      velocity: [0, 0, 0],
+    });
+    const combat = {
+      beams: [],
+      bombs: [],
+      damagePopups: [],
+      deflectBursts: [],
+      enemies: [{ ...enemy, lastShotAt: 0, position: [0, 0.62, 0] }],
+      enemyShots: [wheelShot("existing-wheel")],
+      gateLasers: [],
+      healBursts: [],
+      projectiles: [] as ActiveProjectile[],
+      popDamage: vi.fn(),
+      popProjectileImpact: vi.fn(),
+      removeProjectiles: vi.fn(),
+    } as unknown as CombatStore;
+    const player = {
+      health: 6,
+      lastHitAt: 0,
+      lastPosition: [4, 1, 0] as Vec3,
+      lastTouchHitAt: 0,
+      pushImpact: vi.fn(),
+      triggerRecover: vi.fn(),
+    } as unknown as PlayerStore;
+    const pickups = {
+      dropRoom: vi.fn(() => 0),
+    } as unknown as PickupStore;
+    const timing = {
+      enemyWakeUntil: 0,
+      lastHazardAt: 0,
+    } as unknown as TimingStore;
+
+    try {
+      stepEnemies({
+        combat,
+        currentRoomId,
+        currentRoomTemplate: template,
+        delta: 0,
+        doorOpenDelayMs: 120,
+        doorOpenDurationMs: 520,
+        isCurrentRoomCombat: true,
+        pickups,
+        player,
+        room,
+        roomHazards: [],
+        roomPlatforms: [],
+        timing,
+      });
+
+      expect(combat.enemyShots).toHaveLength(2);
+
+      if (combat.enemies[0]) {
+        combat.enemies[0].lastShotAt = 0;
+      }
+
+      stepEnemies({
+        combat,
+        currentRoomId,
+        currentRoomTemplate: template,
+        delta: 0,
+        doorOpenDelayMs: 120,
+        doorOpenDurationMs: 520,
+        isCurrentRoomCombat: true,
+        pickups,
+        player,
+        room,
+        roomHazards: [],
+        roomPlatforms: [],
+        timing,
+      });
+
+      expect(combat.enemyShots).toHaveLength(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+});
+
+describe("stepEnemies bomber caps", () => {
+  it("lets blast-runner keep two active bombs per enemy", () => {
+    const nowSpy = vi.spyOn(performance, "now").mockReturnValue(10_520);
+    const template = {
+      ...roomTemplateById["normal-line"],
+      enemyCount: 1,
+      enemyTemplateId: "blast-runner",
+    };
+    const currentRoomId = "blast-room";
+    const room = createRoomStub();
+    const [enemy] = createRoomEnemies(
+      {
+        exits: {},
+        grid: [0, 0],
+        id: currentRoomId,
+        kind: "normal",
+        label: "Blast Room",
+        templateId: "normal-line",
+      },
+      template,
+      "south",
+      new Set(),
+      10_000
+    );
+    const combat = {
+      beams: [],
+      bombs: [],
+      damagePopups: [],
+      deflectBursts: [],
+      enemies: [{ ...enemy, position: [0, 0.62, 0] }],
+      enemyShots: [],
+      gateLasers: [],
+      healBursts: [],
+      projectiles: [] as ActiveProjectile[],
+      popDamage: vi.fn(),
+      popProjectileImpact: vi.fn(),
+      removeProjectiles: vi.fn(),
+    } as unknown as CombatStore;
+    const player = {
+      health: 6,
+      lastHitAt: 0,
+      lastPosition: [4, 1, 0] as Vec3,
+      lastTouchHitAt: 0,
+      pushImpact: vi.fn(),
+      triggerRecover: vi.fn(),
+      velocity: [0, 0, 0] as Vec3,
+    } as unknown as PlayerStore;
+    const pickups = {
+      dropRoom: vi.fn(() => 0),
+    } as unknown as PickupStore;
+    const timing = {
+      enemyWakeUntil: 0,
+      lastHazardAt: 0,
+    } as unknown as TimingStore;
+    const stepBlastRunner = () =>
+      stepEnemies({
+        combat,
+        currentRoomId,
+        currentRoomTemplate: template,
+        delta: 0,
+        doorOpenDelayMs: 120,
+        doorOpenDurationMs: 520,
+        isCurrentRoomCombat: true,
+        pickups,
+        player,
+        room,
+        roomHazards: [],
+        roomPlatforms: [],
+        timing,
+      });
+
+    try {
+      stepBlastRunner();
+      expect(combat.bombs).toHaveLength(1);
+
+      player.lastPosition = [-4, 1, 0];
+      nowSpy.mockReturnValue(13_020);
+      stepBlastRunner();
+      expect(combat.bombs).toHaveLength(2);
+
+      if (combat.enemies[0]) {
+        combat.enemies[0].lastBombAt = 10_520;
+      }
+
+      nowSpy.mockReturnValue(13_021);
+      stepBlastRunner();
+      expect(combat.bombs).toHaveLength(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });

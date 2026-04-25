@@ -93,8 +93,10 @@
     "preferredRange": 6.2,
     "shotColor": "#cfd8dc",
     "shotDamage": 1,
-    "shotIntervalMs": 1450,
+    "shotInitialDelayMs": 520,
+    "shotIntervalMs": 3600,
     "shotKind": "wheel",
+    "shotMaxActive": 2,
     "shotSpeed": 7.6
   },
   {
@@ -114,7 +116,7 @@
     "shotSpeed": 18,
     "stealthMoveSpeed": 14.5,
     "stealthRevealMs": 420,
-    "stealthWindupMs": 777
+    "stealthWindupMs": 1554
   },
   {
     "id": "iron-warden",
@@ -161,16 +163,17 @@
     "preferredRange": 7.2,
     "bombArmMs": 1155,
     "bombColor": "#ffbd62",
-    "bombCooldownMs": 2100,
-    "bombCount": 2,
+    "bombCooldownMs": 2500,
+    "bombCount": 1,
     "bombDamage": 1,
     "bombDelivery": "drop",
-    "bombExplosionRadius": 3.24,
+    "bombExplosionRadius": 1.35,
     "bombHp": 3,
-    "bombMaxActive": 4,
+    "bombInitialDelayMs": 520,
+    "bombMaxActive": 2,
     "bombRadius": 0.28,
     "bombSpeed": 4.8,
-    "bombTtlMs": 5200
+    "bombTtlMs": 9000
   },
   {
     "id": "mine-herald",

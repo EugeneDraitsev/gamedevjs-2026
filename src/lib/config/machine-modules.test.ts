@@ -134,6 +134,7 @@ describe("machine modules", () => {
       gearCount: 5,
       machineLoadout,
       moduleInventory: ["salvage-magnet"],
+      newModuleIds: ["salvage-magnet"],
       version: 2,
     });
 
@@ -142,6 +143,7 @@ describe("machine modules", () => {
       gearCount: 5,
       machineLoadout,
       moduleInventory: ["salvage-magnet"],
+      newModuleIds: ["salvage-magnet"],
     });
   });
 });

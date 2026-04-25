@@ -50,7 +50,7 @@ const oppositeDirection: Record<DungeonRoomDirection, DungeonRoomDirection> = {
   west: "east",
 };
 
-const floor1NormalTemplateIds = [
+export const floor1NormalTemplateIds = [
   "normal-line",
   "normal-pincer",
   "normal-crossfire",
@@ -61,16 +61,25 @@ const floor1NormalTemplateIds = [
   "normal-lava-cross",
   "normal-catwalk",
   "normal-zigzag",
+  "normal-ricochet",
 ] as const;
-const floor2NormalTemplateIds = [
+export const floor2NormalTemplateIds = [
   "normal-furnace",
   "normal-relay",
   "normal-gauntlet",
   "normal-blocks",
   "normal-hexes",
+  "normal-ricochet",
+  "normal-veil",
+  "normal-bombers",
   "normal-lava-bridge",
   "normal-lava-cross",
   "normal-zigzag",
+] as const;
+export const floor2RequiredNormalTemplateIds = [
+  "normal-ricochet",
+  "normal-veil",
+  "normal-bombers",
 ] as const;
 
 const getCellKey = ([x, y]: [number, number]) => `${x}:${y}`;
@@ -178,7 +187,16 @@ export const createDungeonLayout = (
     runFloor === initialDungeonFloor
       ? floor1NormalTemplateIds
       : floor2NormalTemplateIds;
+  const priorityNormalTemplateIds =
+    runFloor === initialDungeonFloor
+      ? []
+      : sampleUnique(
+          [...floor2RequiredNormalTemplateIds],
+          floor2RequiredNormalTemplateIds.length,
+          random
+        );
   const sampleNormalTemplateId = () =>
+    priorityNormalTemplateIds.shift() ??
     normalTemplatePool[Math.floor(random() * normalTemplatePool.length)];
   createRoom("polygon", [0, 1], "polygon-training");
   const start = createRoom(
