@@ -11,6 +11,7 @@
         "@threlte/rapier": "^3.4.2",
         "@xyflow/svelte": "^1.5.2",
         "howler": "^2.2.4",
+        "stats.js": "^0.17.0",
         "svelte-tweakpane-ui": "^1.5.16",
         "three": "^0.184.0",
         "zod": "^4.3.6",
@@ -24,6 +25,7 @@
         "@sveltejs/kit": "^2.57.0",
         "@sveltejs/vite-plugin-svelte": "^7.0.0",
         "@types/howler": "^2.2.12",
+        "@types/stats.js": "^0.17.4",
         "sharp": "^0.34.5",
         "storybook": "^10.3.5",
         "svelte": "^5.55.2",
@@ -701,6 +703,8 @@
     "source-map-js": ["source-map-js@1.2.1", "", {}, "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA=="],
 
     "stackback": ["stackback@0.0.2", "", {}, "sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw=="],
+
+    "stats.js": ["stats.js@0.17.0", "", {}, "sha512-hNKz8phvYLPEcRkeG1rsGmV5ChMjKDAWU7/OJJdDErPBNChQXxCo3WZurGpnWc6gZhAzEPFad1aVgyOANH1sMw=="],
 
     "std-env": ["std-env@3.10.0", "", {}, "sha512-5GS12FdOZNliM5mAOxFRg7Ir0pWz8MdpYm6AY6VPkGpbA7ZzmbzNcBJQ0GPvvyWgcY7QAhCgf9Uy89I03faLkg=="],
 
