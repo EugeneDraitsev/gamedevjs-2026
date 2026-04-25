@@ -21,7 +21,7 @@
 </script>
 
 <div class="orb-preview" role="img" aria-label="Machine chassis preview">
-  <Canvas dpr={2} shadows={PCFSoftShadowMap}>
+  <Canvas dpr={1} shadows={PCFSoftShadowMap}>
     <T.PerspectiveCamera fov={35} makeDefault position={[0, 0.48, 5.35]}>
       <OrbitControls
         enableDamping
