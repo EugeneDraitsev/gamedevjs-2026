@@ -258,6 +258,7 @@ const defaultPerSoundLevels: Record<string, number> = {
   gear: 1,
   hit: 2.2,
   laser: 0.1,
+  laserWindup: 0.16,
   loot: 1,
   reload: 0.32,
   repair: 1,
@@ -731,6 +732,103 @@ class GameSfxManager {
     this.#playRatchetClicks(context, root, start + 0.035, 4);
   }
 
+  playLaserWindup(chargeTimeMs = 520, intensity = 0.5) {
+    if (this.#shouldThrottle("laser-windup", 0.08)) {
+      return;
+    }
+
+    const duration = Math.max(0.18, Math.min(0.9, chargeTimeMs / 1000));
+    const shot = this.#beginOneShot(
+      this.#scaledGain("laserWindup", 1),
+      duration + 0.16,
+      0.002,
+      true
+    );
+
+    if (!shot) {
+      return;
+    }
+
+    const { context, root, start } = shot;
+    const power = clamp01(intensity);
+    const fundamental = 196 + power * 34;
+    const chargePeak = 1760 + power * 420;
+
+    playTone(context, root, {
+      duration,
+      filter: {
+        freq: { from: 520, over: duration, ramp: "exp", to: 4800 },
+        q: 11,
+        type: "bandpass",
+      },
+      freq: {
+        from: fundamental,
+        over: duration,
+        ramp: "exp",
+        to: chargePeak,
+      },
+      gain: { attack: 0.028, peak: 0.16 + power * 0.055, release: 0.08 },
+      pan: { from: -0.04, to: 0.04 },
+      start,
+      type: "triangle",
+    });
+
+    playTone(context, root, {
+      duration: duration * 0.82,
+      filter: {
+        freq: { from: 1100, over: duration * 0.72, ramp: "exp", to: 7200 },
+        q: 16,
+        type: "bandpass",
+      },
+      freq: {
+        from: fundamental * 1.5,
+        over: duration * 0.82,
+        ramp: "exp",
+        to: chargePeak * 1.5,
+      },
+      gain: { attack: 0.036, peak: 0.07 + power * 0.032, release: 0.06 },
+      pan: { from: 0.06, to: -0.04 },
+      start: start + duration * 0.08,
+      type: "sine",
+    });
+
+    playNoise(context, root, {
+      bufferDuration: duration + 0.08,
+      duration,
+      filter: [
+        { freq: 820, type: "highpass" },
+        {
+          freq: { from: 1600, over: duration, ramp: "exp", to: 8200 },
+          q: 7.8,
+          type: "bandpass",
+        },
+      ],
+      gain: { attack: 0.034, peak: 0.026 + power * 0.014, release: 0.08 },
+      playbackRate: 0.92,
+      start,
+    });
+
+    for (let index = 0; index < 4; index += 1) {
+      const chirpStart = start + duration * (0.24 + index * 0.16);
+      const chirpFreq = chargePeak * (1.15 + index * 0.18);
+
+      playTone(context, root, {
+        duration: 0.045 + index * 0.008,
+        filter: { freq: chirpFreq * 1.2, q: 20, type: "bandpass" },
+        freq: {
+          from: chirpFreq * 0.82,
+          over: 0.026,
+          ramp: "exp",
+          to: chirpFreq * 1.12,
+        },
+        gain: { attack: 0.001, peak: 0.026 + power * 0.014, release: 0.026 },
+        pan: index % 2 === 0 ? -0.14 : 0.14,
+        start: chirpStart,
+        type: "sine",
+      });
+    }
+  }
+
   playLaserShot(intensity = 0.5) {
     if (this.#shouldThrottle("laser", 0.06)) {
       return;
@@ -744,165 +842,166 @@ class GameSfxManager {
 
     const { context, root, start } = shot;
     const power = clamp01(intensity);
-    const pan = randomBetween(-0.12, 0.12);
+    const pan = randomBetween(-0.07, 0.07);
+    const beamRoot = 392 + power * 76;
 
     playTone(context, root, {
-      duration: 0.38,
+      duration: 0.44,
       filter: {
-        freq: { from: 140, over: 0.2, ramp: "exp", to: 42 },
+        freq: { from: 190, over: 0.18, ramp: "exp", to: 54 },
         type: "lowpass",
       },
-      freq: { from: 132, over: 0.22, ramp: "exp", to: 38 },
+      freq: { from: 116, over: 0.18, ramp: "exp", to: 44 },
       gain: {
-        attack: 0.004,
-        peak: 0.28 + power * 0.05,
-        release: 0.18,
+        attack: 0.0015,
+        peak: 0.18 + power * 0.04,
+        release: 0.24,
       },
       start,
       type: "sine",
     });
 
     playTone(context, root, {
-      duration: 0.28 + power * 0.04,
+      duration: 0.34 + power * 0.05,
       filter: {
-        freq: { from: 3400, ramp: "exp", to: 980 },
-        q: 8,
-        type: "bandpass",
-      },
-      freq: {
-        from: 2400 + power * 1100,
-        over: 0.18,
-        ramp: "exp",
-        to: 620,
-      },
-      gain: {
-        attack: 0.001,
-        peak: 0.2 + power * 0.05,
-        release: 0.1,
-      },
-      pan,
-      start,
-      type: "sawtooth",
-    });
-
-    playTone(context, root, {
-      duration: 0.24,
-      filter: {
-        freq: { from: 6200, ramp: "exp", to: 1800 },
+        freq: { from: 8800, over: 0.08, ramp: "exp", to: 2600 },
         q: 18,
         type: "bandpass",
       },
       freq: {
-        from: 5200 + power * 1400,
-        over: 0.15,
+        from: beamRoot * 8,
+        over: 0.12,
         ramp: "exp",
-        to: 1450,
+        to: beamRoot * 2,
+      },
+      gain: {
+        attack: 0.001,
+        peak: 0.17 + power * 0.055,
+        release: 0.16,
+      },
+      pan,
+      start,
+      type: "triangle",
+    });
+
+    playTone(context, root, {
+      duration: 0.3,
+      filter: {
+        freq: { from: 11_200, over: 0.07, ramp: "exp", to: 4200 },
+        q: 24,
+        type: "bandpass",
+      },
+      freq: {
+        from: beamRoot * 12,
+        over: 0.11,
+        ramp: "exp",
+        to: beamRoot * 3,
       },
       gain: {
         attack: 0.0008,
-        peak: 0.12 + power * 0.035,
-        release: 0.08,
+        peak: 0.105 + power * 0.04,
+        release: 0.1,
       },
       pan: -pan * 0.6,
       start: start + 0.002,
-      type: "sawtooth",
+      type: "sine",
     });
 
     playNoise(context, root, {
-      bufferDuration: 0.16,
-      duration: 0.11,
+      bufferDuration: 0.12,
+      duration: 0.075,
       filter: [
-        { freq: 1500, type: "highpass" },
+        { freq: 2800, type: "highpass" },
         {
-          freq: { from: 7600, ramp: "exp", to: 2600 },
-          q: 2.4,
+          freq: { from: 12_500, ramp: "exp", to: 4200 },
+          q: 4.2,
           type: "bandpass",
         },
       ],
-      gain: { attack: 0.0008, peak: 0.26 + power * 0.08, release: 0.06 },
+      gain: { attack: 0.0006, peak: 0.18 + power * 0.06, release: 0.045 },
       pan: -pan,
-      playbackRate: 1.65,
+      playbackRate: 1.95,
       start,
     });
 
     playTone(context, root, {
-      duration: 0.18,
+      duration: 0.22,
       filter: {
-        freq: { from: 4800, ramp: "exp", to: 1900 },
-        q: 13,
+        freq: { from: 6200, ramp: "exp", to: 2500 },
+        q: 18,
         type: "bandpass",
       },
       freq: {
-        from: 3100,
-        over: 0.1,
+        from: beamRoot * 4,
+        over: 0.12,
         ramp: "exp",
-        to: 980,
+        to: beamRoot,
       },
-      gain: { attack: 0.001, peak: 0.09, release: 0.08 },
+      gain: { attack: 0.0008, peak: 0.07 + power * 0.025, release: 0.09 },
       pan: pan * 0.4,
       start: start + 0.005,
-      type: "sawtooth",
+      type: "triangle",
     });
 
-    this.#playElectricBuzz(context, root, start + 0.012, 0.32, 0.2);
-    this.#playElectricBuzz(context, root, start + 0.045, 0.26, 0.13);
+    this.#playElectricBuzz(context, root, start + 0.018, 0.26, 0.12);
 
-    const branchCount = 7;
+    const branchCount = 4;
 
     for (let index = 0; index < branchCount; index += 1) {
-      const branchStart = start + 0.012 + randomBetween(0, 0.26);
-      const frequency = randomBetween(1800, 7200);
-      const branchDuration = randomBetween(0.035, 0.095);
+      const branchStart =
+        start + 0.018 + index * 0.038 + randomBetween(0, 0.012);
+      const frequency = beamRoot * [5, 6, 8, 10][index];
+      const branchDuration = 0.045 + index * 0.01;
 
       playTone(context, root, {
         duration: branchDuration,
         filter: {
-          freq: frequency * randomBetween(0.65, 1.15),
-          q: randomBetween(9, 18),
+          freq: frequency * 1.08,
+          q: 20,
           type: "bandpass",
         },
         freq: {
           from: frequency,
           over: branchDuration * 0.7,
           ramp: "exp",
-          to: frequency * randomBetween(0.28, 0.62),
+          to: frequency * 0.5,
         },
         gain: {
           attack: 0.0006,
-          peak: randomBetween(0.035, 0.075) + power * 0.02,
+          peak: 0.032 + power * 0.016,
           release: branchDuration * 0.45,
         },
-        pan: randomBetween(-0.55, 0.55),
+        pan: index % 2 === 0 ? -0.28 : 0.28,
         start: branchStart,
-        type: index % 2 === 0 ? "sawtooth" : "square",
+        type: "sine",
       });
     }
 
-    const crackleCount = 30;
+    const crackleCount = 12;
 
     for (let index = 0; index < crackleCount; index += 1) {
-      const popStart = start + 0.006 + randomBetween(0, 0.38);
-      const centerFreq = randomBetween(2400, 9800);
+      const popStart = start + 0.012 + randomBetween(0, 0.28);
+      const centerFreq = beamRoot * randomBetween(7, 18);
 
       playNoise(context, root, {
         bufferDuration: 0.035,
         duration: randomBetween(0.006, 0.02),
         filter: [
-          { freq: 1800, type: "highpass" },
-          { freq: centerFreq, q: randomBetween(5, 12), type: "bandpass" },
+          { freq: 2600, type: "highpass" },
+          { freq: centerFreq, q: randomBetween(8, 16), type: "bandpass" },
         ],
-        gain: { attack: 0.0005, peak: randomBetween(0.055, 0.14) },
-        pan: randomBetween(-0.65, 0.65),
-        playbackRate: randomBetween(1.35, 2.2),
+        gain: { attack: 0.0005, peak: randomBetween(0.025, 0.075) },
+        pan: randomBetween(-0.42, 0.42),
+        playbackRate: randomBetween(1.6, 2.35),
         start: popStart,
       });
     }
 
     playTone(context, root, {
-      duration: 0.16,
-      freq: { from: 78, over: 0.08, ramp: "exp", to: 30 },
-      gain: { attack: 0.002, peak: 0.12 },
-      start: start + 0.32,
+      duration: 0.18,
+      freq: { from: 92, over: 0.1, ramp: "exp", to: 34 },
+      gain: { attack: 0.002, peak: 0.09 + power * 0.035 },
+      start: start + 0.24,
       type: "sine",
     });
   }

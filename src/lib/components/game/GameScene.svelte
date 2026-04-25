@@ -58,6 +58,8 @@
     collectedArtifactRoomIds = [],
     controlsLocked = false,
     dungeon,
+    enemyAiPaused = false,
+    enemySpawnOverride,
     floorReliefMaps = true,
     floorReliefStrength = 1.4,
     gearCount = 0,
@@ -242,7 +244,9 @@
     spawnFrame = requestAnimationFrame(() => {
       combat.enemies = createRoomEnemies(
         currentRoom,
-        currentRoomTemplate,
+        enemySpawnOverride
+          ? { ...currentRoomTemplate, ...enemySpawnOverride }
+          : currentRoomTemplate,
         untrack(() => room.entryDirection),
         untrack(() => room.clearedSet)
       );
@@ -464,6 +468,7 @@
       delta,
       doorOpenDelayMs,
       doorOpenDurationMs,
+      enemyAiPaused,
       isCurrentRoomCombat: scene.isCurrentRoomCombat,
       pickups,
       player,

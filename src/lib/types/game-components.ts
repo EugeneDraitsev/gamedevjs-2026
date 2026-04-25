@@ -32,6 +32,10 @@ export interface GameSceneProps {
   collectedArtifactRoomIds?: string[];
   controlsLocked?: boolean;
   dungeon: DungeonLayout;
+  enemyAiPaused?: boolean;
+  enemySpawnOverride?: Partial<
+    Pick<RoomTemplate, "enemyCount" | "enemyTemplateId" | "spawnPattern">
+  >;
   floorReliefMaps?: boolean;
   floorReliefStrength?: number;
   gearCount?: number;

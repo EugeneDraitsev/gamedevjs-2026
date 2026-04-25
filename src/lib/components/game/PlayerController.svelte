@@ -116,6 +116,9 @@
   let swingCenter = $state<[number, number, number]>([0, 0, 0]);
   let trailGeometry = $state<BufferGeometry>();
   let trailMaterial = $state<ShaderMaterial>();
+  let laserChargeActive = $state(false);
+  let laserChargeProgress = $state(0);
+  let laserChargeStartedAt = 0;
   let previousCameraMode: CameraMode | undefined;
   let waterDip = 0;
 
@@ -138,6 +141,10 @@
   );
   const swingActiveFlare = $derived(
     isSwingActive(swingVisualT, meleeParams) ? 1 : 0.25
+  );
+  const laserChargeGlow = $derived(0.35 + laserChargeProgress * 0.65);
+  const laserChargePulse = $derived(
+    0.9 + Math.sin(laserChargeProgress * Math.PI * 8) * 0.08
   );
   const swingLingerFade = $derived(
     swingVisualT <= 1
@@ -220,6 +227,8 @@
       shootRequested = false;
       shootingHeld = false;
       meleeRequested = false;
+      laserChargeActive = false;
+      laserChargeProgress = 0;
       pressed.clear();
     }
   });
@@ -370,6 +379,11 @@
     );
   };
 
+  const isBeamChargeWeapon = () =>
+    scene.weaponBuild.attackMode === "beam" &&
+    scene.weaponBuild.chargeTimeMs > 0;
+  const weaponUsesAmmo = () => scene.weaponBuild.attackMode !== "beam";
+
   const outsideWaterDepth = (x: number, z: number) =>
     scene.currentRoomTemplate.layout === "outside-yard"
       ? Math.max(
@@ -392,14 +406,21 @@
       const translation = body.translation();
       const waterDepth = outsideWaterDepth(translation.x, translation.z);
       const waterSpeedFactor = waterDepth > 0.04 ? 0.5 : 1;
-      const desiredVelocity = getDesiredHorizontalVelocity(
-        velocity,
-        waterSpeedFactor
-      );
       waterDip = MathUtils.lerp(
         waterDip,
         waterDepth > 0.04 ? Math.min(0.38, 0.18 + waterDepth * 0.35) : 0,
         Math.min(1, delta * 9)
+      );
+
+      if (laserChargeActive) {
+        body.setLinvel({ x: 0, y: velocity.y, z: 0 }, true);
+        jumpRequested = false;
+        return;
+      }
+
+      const desiredVelocity = getDesiredHorizontalVelocity(
+        velocity,
+        waterSpeedFactor
       );
       const conveyor = isGroundedState
         ? getConveyorVelocity(
@@ -678,6 +699,15 @@
   const updateReload = () => {
     const now = performance.now();
 
+    if (!weaponUsesAmmo()) {
+      if (player.reloading) {
+        player.finishReload();
+      }
+
+      reloadRequested = false;
+      return;
+    }
+
     if (player.reloading) {
       if (now >= player.reloadUntil) {
         player.finishReload();
@@ -694,34 +724,11 @@
     reloadRequested = false;
   };
 
-  const tryShoot = (
+  const fireShot = (
     body: RapierRigidBody,
-    activeCamera: NonNullable<typeof camera.current>
+    activeCamera: NonNullable<typeof camera.current>,
+    now: number
   ) => {
-    if (
-      !shootRequested ||
-      settings.cameraMode === "orbit" ||
-      scene.sceneControlsLocked
-    ) {
-      shootRequested = false;
-      return;
-    }
-
-    if (player.reloading) {
-      return;
-    }
-
-    const now = performance.now();
-
-    if (player.ammo <= 0) {
-      player.startReload(now, scene.machineStats.reloadDurationMs);
-      return;
-    }
-
-    if (now - lastShotAt < scene.machineStats.shootCooldownMs) {
-      return;
-    }
-
     const translation = body.translation();
 
     activeCamera.updateMatrixWorld();
@@ -759,7 +766,8 @@
       .set(translation.x, translation.y + projectileHeightOffset, translation.z)
       .addScaledVector(forwardDirection, spawnOffset);
 
-    if (!player.consumeAmmo()) {
+    if (weaponUsesAmmo() && !player.consumeAmmo()) {
+      player.startReload(now, scene.machineStats.reloadDurationMs);
       return;
     }
 
@@ -778,11 +786,77 @@
 
     lastShotAt = now;
 
-    if (player.ammo <= 0) {
+    if (weaponUsesAmmo() && player.ammo <= 0) {
       player.startReload(now, scene.machineStats.reloadDurationMs);
     }
 
     shootRequested = shootingHeld;
+  };
+
+  const tryShoot = (
+    body: RapierRigidBody,
+    activeCamera: NonNullable<typeof camera.current>
+  ) => {
+    const now = performance.now();
+
+    if (settings.cameraMode === "orbit" || scene.sceneControlsLocked) {
+      laserChargeActive = false;
+      laserChargeProgress = 0;
+      shootRequested = false;
+      return;
+    }
+
+    if (laserChargeActive) {
+      const chargeTimeMs = Math.max(1, scene.weaponBuild.chargeTimeMs);
+
+      laserChargeProgress = Math.min(
+        1,
+        (now - laserChargeStartedAt) / chargeTimeMs
+      );
+
+      if (laserChargeProgress < 1) {
+        return;
+      }
+
+      laserChargeActive = false;
+      laserChargeProgress = 0;
+      fireShot(body, activeCamera, now);
+      return;
+    }
+
+    if (!shootRequested) {
+      return;
+    }
+
+    if (weaponUsesAmmo() && player.reloading) {
+      return;
+    }
+
+    if (weaponUsesAmmo() && player.ammo <= 0) {
+      player.startReload(now, scene.machineStats.reloadDurationMs);
+      return;
+    }
+
+    if (now - lastShotAt < scene.machineStats.shootCooldownMs) {
+      return;
+    }
+
+    if (isBeamChargeWeapon()) {
+      const intensity = scene.weaponBuild.damage / 22;
+
+      gameSfx.playLaserWindup(
+        scene.weaponBuild.chargeTimeMs,
+        Math.min(1, Math.max(0, intensity))
+      );
+      laserChargeActive = true;
+      laserChargeProgress = 0;
+      laserChargeStartedAt = now;
+      shootRequested = false;
+      body.setLinvel({ x: 0, y: body.linvel().y, z: 0 }, true);
+      return;
+    }
+
+    fireShot(body, activeCamera, now);
   };
 
   const updateOrbitKeyboardCamera = (
@@ -1008,6 +1082,71 @@
 
 <T.Group bind:ref={shellGroup}>
   <OrbKnight scale={0.55} autoRotate={false} hitFlash={scene.playerHitFlash} />
+
+  {#if laserChargeActive}
+    <T.PointLight
+      color={scene.weaponBuild.colors.core}
+      distance={4.8}
+      intensity={laserChargeGlow * 1.7}
+      position={[0, 0.7, 0.35]}
+    />
+
+    <T.Mesh
+      position={[0, 0.2, 0.05]}
+      rotation={[Math.PI / 2, 0, 0]}
+      scale={[
+        laserChargePulse + laserChargeProgress * 0.28,
+        laserChargePulse + laserChargeProgress * 0.28,
+        1,
+      ]}
+    >
+      <T.TorusGeometry args={[0.64, 0.035, 10, 48]} />
+      <T.MeshBasicMaterial
+        color={scene.weaponBuild.colors.shell}
+        depthWrite={false}
+        opacity={0.22 + laserChargeProgress * 0.46}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh
+      position={[0, 0.2, 0.05]}
+      rotation={[Math.PI / 2, 0, 0]}
+      scale={[
+        1.18 - laserChargeProgress * 0.34,
+        1.18 - laserChargeProgress * 0.34,
+        1,
+      ]}
+    >
+      <T.TorusGeometry args={[0.78, 0.02, 8, 42]} />
+      <T.MeshBasicMaterial
+        color={scene.weaponBuild.colors.core}
+        depthWrite={false}
+        opacity={0.38 + laserChargeProgress * 0.36}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+
+    <T.Mesh
+      position={[0, 0.36, 0.72]}
+      scale={[
+        0.52 + laserChargeProgress * 0.42,
+        0.52 + laserChargeProgress * 0.42,
+        0.52 + laserChargeProgress * 0.42,
+      ]}
+    >
+      <T.SphereGeometry args={[0.18, 16, 16]} />
+      <T.MeshBasicMaterial
+        color={scene.weaponBuild.colors.core}
+        depthWrite={false}
+        opacity={0.46 + laserChargeProgress * 0.42}
+        toneMapped={false}
+        transparent
+      />
+    </T.Mesh>
+  {/if}
 </T.Group>
 
 <PlayerMeleeVisuals

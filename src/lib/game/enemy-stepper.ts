@@ -34,6 +34,7 @@ interface StepContext {
   combat: CombatStore;
   currentRoomId: string;
   currentRoomTemplate: RoomTemplate;
+  enemyAiPaused?: boolean;
   isCurrentRoomCombat: boolean;
   obstacles: SolidObstacle[];
   pickups: PickupStore;
@@ -709,6 +710,40 @@ const stepEnemy = (
   };
 };
 
+const stepPausedEnemy = (
+  ctx: StepContext,
+  enemy: ActiveEnemy,
+  now: number,
+  spentProjectiles: Set<string>
+) => {
+  const { combat } = ctx;
+  const position = enemy.position;
+  let hp = enemy.hp;
+  let lastHitAt = enemy.lastHitAt;
+
+  ({ hp, lastHitAt } = applyProjectileHits(
+    combat,
+    enemy,
+    position,
+    [0, 0, 0],
+    hp,
+    now,
+    spentProjectiles
+  ));
+
+  if (hp <= 0) {
+    pushEnemyDeathBurst(combat, enemy, position, now);
+    return null;
+  }
+
+  return Object.assign(enemy, {
+    hp,
+    knockbackVelocity: [0, 0, 0] as Vec3,
+    lastHitAt,
+    position,
+  });
+};
+
 const applyHazardDamage = (ctx: StepContext, now: number) => {
   const { combat, player, roomHazards, timing } = ctx;
   const hazard = findActiveHazard(roomHazards, player.lastPosition);
@@ -1079,6 +1114,15 @@ interface StepEnemiesArgs extends Omit<StepContext, "obstacles"> {
   doorOpenDurationMs: number;
 }
 
+interface StepActiveEnemyResult {
+  bombs: ActiveBomb[];
+  enemy: ActiveEnemy | null;
+  gateKeeperDefeated: boolean;
+  gateLasers: ActiveGateLaser[];
+  playerDamage: number;
+  shots: ActiveEnemyShot[];
+}
+
 const stepActiveEnemies = (
   ctx: StepContext,
   enemiesSleeping: boolean,
@@ -1094,16 +1138,29 @@ const stepActiveEnemies = (
   let playerDamage = 0;
 
   for (const enemy of ctx.combat.enemies) {
-    const result = enemiesSleeping
-      ? {
-          enemy,
-          gateKeeperDefeated: false,
-          playerDamage: 0,
-          shots: [],
-          bombs: [],
-          gateLasers: [],
-        }
-      : stepEnemy(ctx, enemy, delta, now, spentProjectiles);
+    let result: StepActiveEnemyResult;
+
+    if (ctx.enemyAiPaused) {
+      result = {
+        enemy: stepPausedEnemy(ctx, enemy, now, spentProjectiles),
+        gateKeeperDefeated: false,
+        playerDamage: 0,
+        shots: [],
+        bombs: [],
+        gateLasers: [],
+      };
+    } else if (enemiesSleeping) {
+      result = {
+        enemy,
+        gateKeeperDefeated: false,
+        playerDamage: 0,
+        shots: [],
+        bombs: [],
+        gateLasers: [],
+      };
+    } else {
+      result = stepEnemy(ctx, enemy, delta, now, spentProjectiles);
+    }
 
     playerDamage += result.playerDamage;
 

@@ -87,6 +87,7 @@ export interface WeaponBuild {
   beamLength: number;
   beamWidth: number;
   burstDamage: number;
+  chargeTimeMs: number;
   colors: {
     core: string;
     glow: string;
@@ -810,6 +811,19 @@ export const computeWeaponBuild = (
     0.08,
     0.18
   );
+  const chargeTimeMs =
+    draft.attackMode === "beam"
+      ? Math.round(
+          clamp(
+            420 +
+              draft.damageFactor * 120 +
+              Math.max(0, draft.pelletCount - 1) * 90 -
+              (draft.speedFactor - 1) * 80,
+            420,
+            780
+          )
+        )
+      : 0;
   const burstDamage = Math.round(damage * draft.pelletCount);
   const knockback = clamp(damage * 0.045 + mass * 2.9, 0.8, 10);
   const damageShare = clamp(
@@ -849,6 +863,7 @@ export const computeWeaponBuild = (
     beamLength,
     beamWidth,
     burstDamage,
+    chargeTimeMs,
     colors: { core, glow, gradient, shell },
     connectedModifierCount: modifierNodes.length,
     curve: draft.curve,

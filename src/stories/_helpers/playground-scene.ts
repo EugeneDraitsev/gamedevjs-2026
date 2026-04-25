@@ -6,6 +6,16 @@ import {
 } from "$lib/config/machine-modules";
 import { roomTemplateById } from "$lib/config/room-templates";
 import type { SceneSettings } from "$lib/config/scene-settings";
+import {
+  computeWeaponBuild,
+  createDefaultWeaponGraph,
+  createWeaponEdge,
+  createWeaponFlowNode,
+  type WeaponBuild,
+  type WeaponNodeType,
+  weaponEntryNodeId,
+  weaponExitNodeId,
+} from "$lib/config/weapon-graph";
 import type { MeleeTrailSettings } from "$lib/types/game";
 
 export const playgroundRoomId = "playground-room";
@@ -91,6 +101,101 @@ export const playgroundMachineStats = computeMachineStats(
   createDefaultMachineLoadout()
 );
 export const playgroundWeaponBuild = playgroundMachineStats.weaponBuild;
+
+const buildGraphWeapon = (types: WeaponNodeType[]): WeaponBuild => {
+  const graph = createDefaultWeaponGraph();
+  const modifierNodes = types.map((type, index) =>
+    createWeaponFlowNode(type, { x: 230 + index * 150, y: 170 })
+  );
+  const chain = [
+    weaponEntryNodeId,
+    ...modifierNodes.map((node) => node.id),
+    weaponExitNodeId,
+  ];
+
+  return computeWeaponBuild(
+    [graph.nodes[0], ...modifierNodes, graph.nodes[1]],
+    chain
+      .slice(0, -1)
+      .map((source, index) => createWeaponEdge(source, chain[index + 1]))
+  );
+};
+
+export interface WeaponPlaygroundPreset {
+  description: string;
+  id: string;
+  label: string;
+  machineStats: typeof playgroundMachineStats;
+  weaponBuild: WeaponBuild;
+}
+
+const buildPresetMachineStats = (weaponBuild: WeaponBuild) => ({
+  ...playgroundMachineStats,
+  weaponBuild,
+});
+
+const buildMachinePreset = (
+  attack: NonNullable<ReturnType<typeof createDefaultMachineLoadout>["attack"]>
+) => {
+  const machineStats = computeMachineStats({
+    ...createDefaultMachineLoadout(),
+    attack,
+  });
+
+  return {
+    machineStats,
+    weaponBuild: machineStats.weaponBuild,
+  };
+};
+
+const buildGraphPreset = (types: WeaponNodeType[]) => {
+  const weaponBuild = buildGraphWeapon(types);
+
+  return {
+    machineStats: buildPresetMachineStats(weaponBuild),
+    weaponBuild,
+  };
+};
+
+export const weaponPlaygroundPresets: WeaponPlaygroundPreset[] = [
+  {
+    description: "Starter rivet shot with the normal machine loadout.",
+    id: "default",
+    label: "Default Rivet",
+    machineStats: playgroundMachineStats,
+    weaponBuild: playgroundWeaponBuild,
+  },
+  {
+    description: "Wide three-lane burst from the Arc Splitter module.",
+    id: "split",
+    label: "Split Arc",
+    ...buildMachinePreset("arc-splitter-coil"),
+  },
+  {
+    description: "Curving projectile built from the common ripple modifier.",
+    id: "wave",
+    label: "Wave",
+    ...buildGraphPreset(["ripple-common"]),
+  },
+  {
+    description: "Arcing lob shot for checking gravity and range feel.",
+    id: "lob",
+    label: "Lob",
+    ...buildGraphPreset(["lob-common"]),
+  },
+  {
+    description: "Charged beam from the Pressure Lance module.",
+    id: "laser",
+    label: "Laser",
+    ...buildMachinePreset("pressure-lance-nozzle"),
+  },
+  {
+    description: "Straight shot with periodic homing rocket support.",
+    id: "rocket",
+    label: "Rocket Support",
+    ...buildGraphPreset(["rocket-common"]),
+  },
+];
 
 export const noop = () => {
   // Intentional no-op handler used by playground stories.
