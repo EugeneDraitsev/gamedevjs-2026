@@ -1,6 +1,10 @@
 <script lang="ts">
   import "@xyflow/svelte/dist/style.css";
   import {
+    createAudioDuckReason,
+    setGameAudioDucked,
+  } from "$lib/audio/ducking";
+  import {
     buildPipeline,
     entryPosition,
     exitPosition,
@@ -43,6 +47,7 @@
     onReturnModule,
     preview,
   }: WeaponLabModalProps = $props();
+  const audioDuckReason = createAudioDuckReason("weapon-lab");
   let knownModifierTypes = new Map<string, WeaponNodeType>();
 
   const syncPipeline = (sourceNodes = nodes) => {
@@ -126,6 +131,14 @@
     }
 
     knownModifierTypes = nextModifierTypes;
+  });
+
+  $effect(() => {
+    setGameAudioDucked(audioDuckReason, open);
+
+    return () => {
+      setGameAudioDucked(audioDuckReason, false);
+    };
   });
 </script>
 

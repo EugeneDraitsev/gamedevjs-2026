@@ -15,6 +15,7 @@ const defaultSfxMix: SfxMixSettings = {
 };
 
 const sfxOutputBoost = 3;
+const modalSfxDuckFactor = 0.18;
 const silentLevel = 0.0001;
 const sharedNoiseBufferSeconds = 1.25;
 const stopTailSeconds = 0.02;
@@ -324,6 +325,7 @@ const enemyHitSlapVariants = [
 ] as const;
 
 class GameSfxManager {
+  #ducked = false;
   readonly #lastFiredAt = new Map<string, number>();
   #laserWarmupKey = "";
   #mix: SfxMixSettings = defaultSfxMix;
@@ -368,6 +370,15 @@ class GameSfxManager {
     }
 
     Howler.volume(this.#mix.masterSoundEnabled ? this.#mix.masterVolume : 0);
+    this.#applyOutputVolume();
+  }
+
+  setDucked(ducked: boolean) {
+    if (this.#ducked === ducked) {
+      return;
+    }
+
+    this.#ducked = ducked;
     this.#applyOutputVolume();
   }
 
@@ -1394,7 +1405,11 @@ class GameSfxManager {
   }
 
   #targetOutputVolume() {
-    return this.#mix.sfxSoundEnabled ? this.#mix.sfxVolume * sfxOutputBoost : 0;
+    return this.#mix.sfxSoundEnabled
+      ? this.#mix.sfxVolume *
+          sfxOutputBoost *
+          (this.#ducked ? modalSfxDuckFactor : 1)
+      : 0;
   }
 
   #playBrightCrack(context: AudioContext, root: GainNode, start: number) {

@@ -6,6 +6,10 @@
   import magazineStatIconUrl from "$lib/assets/machine-stats/stat-magazine.svg";
   import reloadStatIconUrl from "$lib/assets/machine-stats/stat-reload.svg";
   import {
+    createAudioDuckReason,
+    setGameAudioDucked,
+  } from "$lib/audio/ducking";
+  import {
     computeMachineStats,
     getMachineModule,
     getMachineModuleKindAccent,
@@ -90,6 +94,7 @@
     open = false,
   }: MachineBayModalProps = $props();
 
+  const audioDuckReason = createAudioDuckReason("machine-bay");
   let selectedSlotId = $state<MachineSlotId | null>(null);
   let viewingModuleId = $state<MachineModuleId | null>(null);
 
@@ -320,6 +325,14 @@
     }
 
     viewingModuleId = selectedOptions[0]?.moduleId ?? null;
+  });
+
+  $effect(() => {
+    setGameAudioDucked(audioDuckReason, open);
+
+    return () => {
+      setGameAudioDucked(audioDuckReason, false);
+    };
   });
 </script>
 

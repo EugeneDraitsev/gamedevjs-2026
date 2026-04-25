@@ -1,4 +1,8 @@
 <script lang="ts">
+  import {
+    createAudioDuckReason,
+    setGameAudioDucked,
+  } from "$lib/audio/ducking";
   import type { SceneSettings } from "$lib/config/scene-settings";
 
   interface SettingsPanelProps {
@@ -19,6 +23,7 @@
     settings = $bindable(),
   }: SettingsPanelProps = $props();
 
+  const audioDuckReason = createAudioDuckReason("settings-panel");
   let confirmAction = $state<"main-menu" | "reset" | null>(null);
 
   const handleDangerAction = (
@@ -37,6 +42,14 @@
 
     confirmAction = action;
   };
+
+  $effect(() => {
+    setGameAudioDucked(audioDuckReason, true);
+
+    return () => {
+      setGameAudioDucked(audioDuckReason, false);
+    };
+  });
 </script>
 
 <section class="panel">

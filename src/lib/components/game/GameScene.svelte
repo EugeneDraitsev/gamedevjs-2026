@@ -702,7 +702,6 @@
         combat.projectiles = [];
         combat.projectilePositions.clear();
         gameSfx.playPlayerDamage();
-        onMusicCue?.("silence", { fadeOutMs: 600 });
         onPlayerDeath?.();
       }
       player.health = 0;
@@ -753,7 +752,7 @@
 </script>
 
 <div class="scene">
-  <Canvas shadows={PCFSoftShadowMap} dpr={2}>
+  <Canvas shadows={PCFSoftShadowMap} dpr={1}>
     <SceneRendererConfig
       backgroundColor={outside ? "#c7d0c0" : "#050403"}
       compileBeforeReady={!outside}

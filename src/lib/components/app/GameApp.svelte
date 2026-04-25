@@ -476,6 +476,9 @@
     clearRunSave(seed);
     applyRunState(createDefaultRunState());
     resetScene();
+    handleMusicCue(floorIndex >= outsideFloor ? "outside" : "level", {
+      restart: true,
+    });
   };
 
   const continueAfterDeath = () => {

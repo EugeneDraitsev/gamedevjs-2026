@@ -1,10 +1,24 @@
 <script lang="ts">
+  import {
+    createAudioDuckReason,
+    setGameAudioDucked,
+  } from "$lib/audio/ducking";
+
   interface Props {
     onContinue?: () => void;
     onRestart?: () => void;
   }
 
   let { onContinue, onRestart }: Props = $props();
+  const audioDuckReason = createAudioDuckReason("death-modal");
+
+  $effect(() => {
+    setGameAudioDucked(audioDuckReason, true);
+
+    return () => {
+      setGameAudioDucked(audioDuckReason, false);
+    };
+  });
 </script>
 
 <dialog class="death-dialog" open>

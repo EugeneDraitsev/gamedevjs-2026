@@ -62,12 +62,15 @@ const defaultAudioMix: AudioMixSettings = {
   musicSoundEnabled: true,
   musicVolume: 0.7,
 };
+const modalMusicDuckFactor = 0.22;
+const modalDuckFadeMs = 220;
 
 const clamp01 = (value: number) =>
   Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 
 class GameMusicManager {
   #active: ActiveMusic | null = null;
+  #ducked = false;
   readonly #howls = new Map<MusicTrackId, Howl>();
   #mix: AudioMixSettings = defaultAudioMix;
   #pendingTrackId: MusicTrackId | null = null;
@@ -87,6 +90,20 @@ class GameMusicManager {
 
     Howler.volume(this.#mix.masterSoundEnabled ? this.#mix.masterVolume : 0);
     this.#applyActiveVolume();
+  }
+
+  setDucked(ducked: boolean) {
+    if (this.#ducked === ducked) {
+      return;
+    }
+
+    this.#ducked = ducked;
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    this.#applyActiveVolume(modalDuckFadeMs);
   }
 
   preload() {
@@ -174,13 +191,24 @@ class GameMusicManager {
     this.#fadeOut(active, fadeOutMs, token);
   }
 
-  #applyActiveVolume() {
+  #applyActiveVolume(fadeMs = 0) {
     if (!this.#active) {
       return;
     }
 
-    this.#active.howl.volume(
-      this.#targetVolume(this.#active.trackId),
+    const targetVolume = this.#targetVolume(this.#active.trackId);
+
+    if (fadeMs <= 0) {
+      this.#active.howl.volume(targetVolume, this.#active.id);
+      return;
+    }
+
+    const currentVolume = this.#active.howl.volume(this.#active.id);
+
+    this.#active.howl.fade(
+      typeof currentVolume === "number" ? currentVolume : targetVolume,
+      targetVolume,
+      fadeMs,
       this.#active.id
     );
   }
@@ -284,7 +312,11 @@ class GameMusicManager {
       return 0;
     }
 
-    return clamp01(this.#mix.musicVolume) * musicTracks[trackId].baseVolume;
+    return (
+      clamp01(this.#mix.musicVolume) *
+      musicTracks[trackId].baseVolume *
+      (this.#ducked ? modalMusicDuckFactor : 1)
+    );
   }
 }
 

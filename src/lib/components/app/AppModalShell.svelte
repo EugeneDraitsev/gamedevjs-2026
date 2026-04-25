@@ -1,5 +1,9 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import {
+    createAudioDuckReason,
+    setGameAudioDucked,
+  } from "$lib/audio/ducking";
 
   interface AppModalShellProps {
     children?: Snippet;
@@ -16,6 +20,15 @@
     onClose,
     open = true,
   }: AppModalShellProps = $props();
+  const audioDuckReason = createAudioDuckReason("app-modal");
+
+  $effect(() => {
+    setGameAudioDucked(audioDuckReason, open);
+
+    return () => {
+      setGameAudioDucked(audioDuckReason, false);
+    };
+  });
 </script>
 
 {#if open}

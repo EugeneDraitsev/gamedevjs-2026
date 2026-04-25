@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { gameMusic } from "$lib/audio/music";
+  import { gameSfx } from "$lib/audio/sfx";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import {
     createSceneSettings,
@@ -46,6 +47,7 @@
   $effect(() => {
     saveSceneSettings(settings);
     gameMusic.syncMix(settings);
+    gameSfx.syncMix(settings);
   });
 
   onMount(() => {
