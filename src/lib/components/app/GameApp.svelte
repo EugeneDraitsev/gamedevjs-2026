@@ -177,6 +177,23 @@
     floorAdvancePhase = "idle";
   };
 
+  const getImmediateModuleInventory = (
+    loadout: MachineLoadout,
+    inventory: MachineModuleId[]
+  ) => {
+    const ownedModuleIds = new Set<MachineModuleId>([
+      ...Object.values(loadout).filter(
+        (moduleId): moduleId is MachineModuleId => Boolean(moduleId)
+      ),
+      ...inventory,
+    ]);
+
+    return [
+      ...inventory,
+      ...machineModuleIds.filter((moduleId) => !ownedModuleIds.has(moduleId)),
+    ];
+  };
+
   const applyRunState = (state: SavedRunState) => {
     collectedArtifactRooms = [...state.collectedArtifactRooms];
     demoCompleteOpen = false;
@@ -184,7 +201,10 @@
     floorAdvanceTarget = getNextRunFloor(state.floorIndex);
     gearCount = state.gearCount ?? 0;
     machineLoadout = { ...state.machineLoadout };
-    moduleInventory = [...state.moduleInventory];
+    moduleInventory = getImmediateModuleInventory(
+      state.machineLoadout,
+      state.moduleInventory
+    );
     purchasedShopOfferIds = [...(state.purchasedShopOfferIds ?? [])];
     playerDeathPending = false;
     deathModalOpen = false;
@@ -386,7 +406,11 @@
 
     purchasedShopOfferIds = [...purchasedShopOfferIds, offer.id];
 
-    if (offer.kind === "module" && offer.moduleId) {
+    if (
+      offer.kind === "module" &&
+      offer.moduleId &&
+      !hasMachineModule(machineLoadout, moduleInventory, offer.moduleId)
+    ) {
       moduleInventory = [...moduleInventory, offer.moduleId];
     }
   };

@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import {
+  computeMachineStats,
+  createDefaultMachineLoadout,
+} from "$lib/config/machine-modules";
 import { roomTemplateById } from "$lib/config/room-templates";
 import { createRoomEnemies } from "$lib/game/scene-layout";
 import type { CombatStore } from "$lib/stores/combat.svelte";
@@ -166,5 +170,120 @@ describe("stepEnemies outside gate clear", () => {
     );
     expect(combat.gateLasers).toHaveLength(1);
     expect(combat.gateLasers[0]?.damage).toBe(0);
+  });
+
+  it("applies one-hit kill to projectile hits on Gate Keeper", () => {
+    const template = roomTemplateById["boss-gate-keeper"];
+    const currentRoomId = "boss-room";
+    const room = createRoomStub();
+    const [gateKeeper] = createRoomEnemies(
+      {
+        exits: {},
+        grid: [0, 0],
+        id: currentRoomId,
+        kind: "boss",
+        label: "Gate Keeper",
+        templateId: "boss-gate-keeper",
+      },
+      template,
+      "south",
+      new Set(),
+      1000
+    );
+    const weaponBuild = computeMachineStats(
+      createDefaultMachineLoadout()
+    ).weaponBuild;
+    const projectile: ActiveProjectile = {
+      build: { ...weaponBuild, damage: 1, radius: 10 },
+      id: "kill-shot",
+      position: [0, 0.62, -5.6],
+      velocity: [0, 0, 1],
+    };
+    const combat = {
+      beams: [],
+      bombs: [],
+      damagePopups: [],
+      deflectBursts: [],
+      enemies: [{ ...gateKeeper }],
+      enemyShots: [
+        {
+          color: "#ffd6a0",
+          damage: 1,
+          id: "gate-shot",
+          position: [0, 0.62, -3],
+          radius: 0.18,
+          ttlMs: 1000,
+          velocity: [0, 0, 1],
+        },
+      ],
+      gateLasers: [
+        {
+          arcSpan: Math.PI,
+          center: [0, 0.62, -5.6],
+          color: "#ffb24d",
+          core: "#fff8d7",
+          createdAt: performance.now(),
+          damage: 1,
+          fadeMs: 420,
+          id: "gate-laser",
+          originId: gateKeeper?.id ?? "",
+          radius: 8,
+          startAngle: 0,
+          sweepMs: 1100,
+          telegraphMs: 850,
+          width: 0.35,
+        },
+      ],
+      healBursts: [],
+      projectilePositions: new Map([["kill-shot", [0, 0.62, -5.6] as Vec3]]),
+      projectiles: [projectile],
+      popDamage: vi.fn(),
+      removeProjectiles: vi.fn(),
+    } as unknown as CombatStore;
+    const player = {
+      health: 6,
+      lastHitAt: 0,
+      lastPosition: [0, 1, 0] as Vec3,
+      lastTouchHitAt: 0,
+      pushImpact: vi.fn(),
+      triggerRecover: vi.fn(),
+    } as unknown as PlayerStore;
+    const pickups = {
+      dropRoom: vi.fn(() => 0),
+    } as unknown as PickupStore;
+    const timing = {
+      enemyWakeUntil: 0,
+      lastHazardAt: 0,
+    } as unknown as TimingStore;
+
+    const result = stepEnemies({
+      combat,
+      currentRoomId,
+      currentRoomTemplate: template,
+      delta: 0.016,
+      doorOpenDelayMs: 120,
+      doorOpenDurationMs: 520,
+      isCurrentRoomCombat: true,
+      oneHitKill: true,
+      pickups,
+      player,
+      room,
+      roomHazards: [],
+      roomPlatforms: [],
+      timing,
+    });
+
+    expect(result.roomCleared).toBe(true);
+    expect(combat.enemies).toHaveLength(0);
+    expect(combat.popDamage).toHaveBeenCalledWith(
+      gateKeeper?.hp,
+      expect.any(Array),
+      "enemy"
+    );
+    expect(combat.enemyShots[0]?.damage).toBe(0);
+    expect(combat.enemyShots[0]?.velocity).toEqual([0, 0, 0]);
+    expect(combat.gateLasers).toHaveLength(1);
+    expect(combat.gateLasers[0]?.damage).toBe(0);
+    expect(combat.gateLasers[0]?.fadeMs).toBeLessThanOrEqual(260);
   });
 });

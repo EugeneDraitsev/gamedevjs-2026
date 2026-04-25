@@ -37,6 +37,7 @@ interface StepContext {
   enemyAiPaused?: boolean;
   isCurrentRoomCombat: boolean;
   obstacles: SolidObstacle[];
+  oneHitKill?: boolean;
   pickups: PickupStore;
   player: PlayerStore;
   room: RoomStore;
@@ -175,7 +176,8 @@ const applyProjectileHits = (
   knockbackVelocity: Vec3,
   hp: number,
   now: number,
-  spentProjectiles: Set<string>
+  spentProjectiles: Set<string>,
+  oneHitKill = false
 ) => {
   let nextHp = hp;
   let nextLastHitAt = enemy.lastHitAt;
@@ -186,16 +188,18 @@ const applyProjectileHits = (
       continue;
     }
 
-    const damage = getProjectileHitDamage(
+    const hitDamage = getProjectileHitDamage(
       projectile,
       combat.projectilePositions.get(projectile.id),
       position,
       enemy.radius
     );
 
-    if (!damage) {
+    if (!hitDamage) {
       continue;
     }
+
+    const damage = oneHitKill ? nextHp : hitDamage;
 
     nextHp -= damage;
     nextLastHitAt = now;
@@ -235,6 +239,10 @@ const applyProjectileHits = (
       ),
     ];
     spentProjectiles.add(projectile.id);
+
+    if (oneHitKill) {
+      break;
+    }
   }
 
   return {
@@ -580,7 +588,8 @@ const stepEnemy = (
     knockbackVelocity,
     hp,
     now,
-    spentProjectiles
+    spentProjectiles,
+    ctx.oneHitKill
   ));
 
   const knockbackDamping = Math.max(0, 1 - delta * 5.8);
@@ -728,7 +737,8 @@ const stepPausedEnemy = (
     [0, 0, 0],
     hp,
     now,
-    spentProjectiles
+    spentProjectiles,
+    ctx.oneHitKill
   ));
 
   if (hp <= 0) {
@@ -866,7 +876,8 @@ const applyProjectileHitsToBomb = (
   bomb: ActiveBomb,
   position: Vec3,
   now: number,
-  spentProjectiles: Set<string>
+  spentProjectiles: Set<string>,
+  oneHitKill = false
 ) => {
   let hp = bomb.hp;
   let lastHitAt = bomb.lastHitAt;
@@ -892,10 +903,12 @@ const applyProjectileHitsToBomb = (
       continue;
     }
 
-    hp -= 1;
+    const damage = oneHitKill ? hp : 1;
+
+    hp -= damage;
     lastHitAt = now;
     combat.popDamage(
-      1,
+      damage,
       [position[0], position[1] + bomb.radius + 0.28, position[2]],
       "enemy"
     );
@@ -974,7 +987,8 @@ const stepBombs = (
       bomb,
       position,
       now,
-      spentProjectiles
+      spentProjectiles,
+      ctx.oneHitKill
     );
 
     if (hp <= 0) {
@@ -1134,6 +1148,7 @@ const stepActiveEnemies = (
   const spawnedEnemyShots: ActiveEnemyShot[] = [];
   const spawnedBombs: ActiveBomb[] = [];
   const spawnedGateLasers: ActiveGateLaser[] = [];
+  const defeatedGateKeeperIds: string[] = [];
   let gateKeeperDefeated = false;
   let playerDamage = 0;
 
@@ -1176,7 +1191,15 @@ const stepActiveEnemies = (
       spawnedGateLasers.push(...result.gateLasers);
     }
 
-    gateKeeperDefeated = gateKeeperDefeated || result.gateKeeperDefeated;
+    const enemyWasGateKeeperDefeated =
+      result.gateKeeperDefeated ||
+      (result.enemy === null && enemy.templateId === "gate-keeper");
+
+    if (enemyWasGateKeeperDefeated) {
+      defeatedGateKeeperIds.push(enemy.id);
+    }
+
+    gateKeeperDefeated = gateKeeperDefeated || enemyWasGateKeeperDefeated;
 
     if (result.enemy) {
       nextEnemies.push(result.enemy);
@@ -1185,6 +1208,7 @@ const stepActiveEnemies = (
 
   return {
     gateKeeperDefeated,
+    defeatedGateKeeperIds,
     nextEnemies,
     playerDamage,
     spawnedBombs,
@@ -1196,15 +1220,21 @@ const stepActiveEnemies = (
 const keepOriginBoundActorsAlive = (
   combat: CombatStore,
   nextEnemies: ActiveEnemy[],
-  options: { keepGateKeeperActors?: boolean } = {}
+  options: {
+    keepGateKeeperActors?: boolean;
+    keptOriginIds?: Set<string>;
+  } = {}
 ) => {
   const livingIds = new Set(nextEnemies.map((entry) => entry.id));
-  const isKeptFinaleActor = (originId: string) =>
-    Boolean(options.keepGateKeeperActors && originId.endsWith("-gate-keeper"));
+  const isKeptOriginActor = (originId: string) =>
+    Boolean(
+      options.keptOriginIds?.has(originId) ||
+        (options.keepGateKeeperActors && originId.endsWith("-gate-keeper"))
+    );
 
   if (combat.bombs.length > 0) {
     const survivingBombs = combat.bombs.filter(
-      (bomb) => livingIds.has(bomb.originId) || isKeptFinaleActor(bomb.originId)
+      (bomb) => livingIds.has(bomb.originId) || isKeptOriginActor(bomb.originId)
     );
 
     if (survivingBombs.length !== combat.bombs.length) {
@@ -1215,13 +1245,48 @@ const keepOriginBoundActorsAlive = (
   if (combat.gateLasers.length > 0) {
     const survivingGateLasers = combat.gateLasers.filter(
       (laser) =>
-        livingIds.has(laser.originId) || isKeptFinaleActor(laser.originId)
+        livingIds.has(laser.originId) || isKeptOriginActor(laser.originId)
     );
 
     if (survivingGateLasers.length !== combat.gateLasers.length) {
       combat.gateLasers = survivingGateLasers;
     }
   }
+};
+
+const silenceGateKeeperHazards = (
+  combat: CombatStore,
+  now: number,
+  isGateKeeperOrigin: (originId: string) => boolean
+) => {
+  combat.bombs = combat.bombs.map((bomb) =>
+    isGateKeeperOrigin(bomb.originId)
+      ? {
+          ...bomb,
+          armAt: Number.POSITIVE_INFINITY,
+          damage: 0,
+          velocity: [0, 0, 0],
+        }
+      : bomb
+  );
+  combat.enemyShots = combat.enemyShots.map((shot) => ({
+    ...shot,
+    damage: 0,
+    velocity: [0, 0, 0],
+  }));
+  combat.gateLasers = combat.gateLasers.map((laser) =>
+    isGateKeeperOrigin(laser.originId)
+      ? {
+          ...laser,
+          createdAt: Math.min(
+            laser.createdAt,
+            now - laser.telegraphMs - laser.sweepMs
+          ),
+          damage: 0,
+          fadeMs: Math.min(laser.fadeMs, 260),
+        }
+      : laser
+  );
 };
 
 export interface StepEnemiesResult {
@@ -1299,10 +1364,12 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
     !steppedEnemies.nextEnemies.some(
       (enemy) => enemy.templateId === "gate-keeper"
     );
+  const defeatedGateKeeperIdSet = new Set(steppedEnemies.defeatedGateKeeperIds);
 
   combat.enemies = steppedEnemies.nextEnemies;
   keepOriginBoundActorsAlive(combat, steppedEnemies.nextEnemies, {
     keepGateKeeperActors: outsideGateKeeperCleared,
+    keptOriginIds: defeatedGateKeeperIdSet,
   });
 
   if (steppedEnemies.spawnedEnemyShots.length > 0) {
@@ -1319,24 +1386,13 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
 
   combat.removeProjectiles(spentProjectiles);
 
-  if (outsideGateKeeperCleared) {
-    combat.bombs = combat.bombs.map((bomb) =>
-      bomb.originId.endsWith("-gate-keeper")
-        ? {
-            ...bomb,
-            armAt: Number.POSITIVE_INFINITY,
-            damage: 0,
-            velocity: [0, 0, 0],
-          }
-        : bomb
-    );
-    combat.enemyShots = combat.enemyShots.map((shot) => ({
-      ...shot,
-      damage: 0,
-      velocity: [0, 0, 0],
-    }));
-    combat.gateLasers = combat.gateLasers.map((laser) =>
-      laser.originId.endsWith("-gate-keeper") ? { ...laser, damage: 0 } : laser
+  if (outsideGateKeeperCleared || defeatedGateKeeperIdSet.size > 0) {
+    silenceGateKeeperHazards(
+      combat,
+      now,
+      (originId) =>
+        defeatedGateKeeperIdSet.has(originId) ||
+        (outsideGateKeeperCleared && originId.endsWith("-gate-keeper"))
     );
   }
 

@@ -547,6 +547,7 @@
       doorOpenDurationMs,
       enemyAiPaused,
       isCurrentRoomCombat: scene.isCurrentRoomCombat,
+      oneHitKill: cheats.oneHitKill,
       pickups,
       player,
       room,

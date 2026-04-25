@@ -16,6 +16,7 @@ const defaultSfxMix: SfxMixSettings = {
 
 const sfxOutputBoost = 3;
 const silentLevel = 0.0001;
+const sharedNoiseBufferSeconds = 1.25;
 const stopTailSeconds = 0.02;
 
 const compressorSettings = {
@@ -180,17 +181,28 @@ const connectOutput = (
   panner.connect(root);
 };
 
-const createNoiseBuffer = (context: AudioContext, durationSeconds: number) => {
-  const length = Math.max(1, Math.floor(context.sampleRate * durationSeconds));
+let sharedNoiseBuffer: AudioBuffer | null = null;
+let sharedNoiseBufferSampleRate = 0;
+
+const getSharedNoiseBuffer = (context: AudioContext) => {
+  if (sharedNoiseBuffer && sharedNoiseBufferSampleRate === context.sampleRate) {
+    return sharedNoiseBuffer;
+  }
+
+  const length = Math.max(
+    1,
+    Math.floor(context.sampleRate * sharedNoiseBufferSeconds)
+  );
   const buffer = context.createBuffer(1, length, context.sampleRate);
   const data = buffer.getChannelData(0);
 
   for (let index = 0; index < length; index += 1) {
-    const fade = 1 - index / length;
-    data[index] = (Math.random() * 2 - 1) * (0.35 + fade * fade * 0.65);
+    data[index] = Math.random() * 2 - 1;
   }
 
-  return buffer;
+  sharedNoiseBuffer = buffer;
+  sharedNoiseBufferSampleRate = context.sampleRate;
+  return sharedNoiseBuffer;
 };
 
 const playTone = (context: AudioContext, root: AudioNode, voice: ToneVoice) => {
@@ -225,7 +237,8 @@ const playNoise = (
   const gain = context.createGain();
   const bufferLength = voice.bufferDuration ?? voice.duration;
 
-  source.buffer = createNoiseBuffer(context, bufferLength);
+  source.buffer = getSharedNoiseBuffer(context);
+  source.loop = true;
 
   if (voice.playbackRate !== undefined) {
     source.playbackRate.setValueAtTime(voice.playbackRate, voice.start);
@@ -244,8 +257,10 @@ const playNoise = (
   filtered.connect(gain);
   connectOutput(context, gain, root, voice.pan, voice.start, voice.duration);
 
-  source.start(voice.start);
-  source.stop(voice.start + bufferLength + stopTailSeconds);
+  source.start(voice.start, randomBetween(0, sharedNoiseBufferSeconds * 0.86));
+  source.stop(
+    voice.start + Math.max(bufferLength, voice.duration) + stopTailSeconds
+  );
 };
 
 const defaultPerSoundLevels: Record<string, number> = {
@@ -1409,7 +1424,8 @@ class GameSfxManager {
     const attack = 0.18;
     const release = 0.18;
 
-    source.buffer = createNoiseBuffer(context, bufferDur);
+    source.buffer = getSharedNoiseBuffer(context);
+    source.loop = true;
     source.playbackRate.setValueAtTime(0.55, start);
 
     lowpass.type = "lowpass";
@@ -1436,7 +1452,7 @@ class GameSfxManager {
     lowpass.connect(bandpass);
     bandpass.connect(gain);
     gain.connect(root);
-    source.start(start);
+    source.start(start, randomBetween(0, sharedNoiseBufferSeconds * 0.86));
     source.stop(start + bufferDur + stopTailSeconds);
   }
 
