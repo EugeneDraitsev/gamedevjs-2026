@@ -112,7 +112,7 @@
   });
 </script>
 
-<T.Mesh {geometry} {material} receiveShadow />
+<T.Mesh {geometry} {material} />
 
 <RigidBody type="fixed">
   <AutoColliders shape="trimesh">

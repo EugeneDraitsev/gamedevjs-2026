@@ -46,11 +46,7 @@
 </script>
 
 <T.Group {position} rotation={[0, rotation, 0]}>
-  <T.Mesh
-    geometry={getGeometry(args)}
-    receiveShadow
-    scale={[args[0], 1, args[2]]}
-  >
+  <T.Mesh geometry={getGeometry(args)} scale={[args[0], 1, args[2]]}>
     <T.MeshStandardMaterial
       {color}
       map={texture}

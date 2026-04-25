@@ -181,5 +181,5 @@
 </script>
 
 {#each geometries as road (road.id)}
-  <T.Mesh geometry={road.geometry} {material} receiveShadow renderOrder={1} />
+  <T.Mesh geometry={road.geometry} {material} renderOrder={1} />
 {/each}

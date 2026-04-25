@@ -34,6 +34,7 @@
   import { handlePlayerPositionChange } from "$lib/game/room-transitions";
   import {
     beamDurationMs,
+    corePrisonSealCenterZ,
     createOutsidePickups,
     createRoomEnemies,
     damagePopupDurationMs,
@@ -42,6 +43,7 @@
     floorExitTriggerHalfWidth,
     floorExitTriggerZ,
     getRoomBounds,
+    getStartRoomSpawnTarget,
     outsideGateTriggerHalfWidth,
     outsideGateTriggerZ,
   } from "$lib/game/scene-layout";
@@ -91,7 +93,7 @@
 
   const scene = new GameSceneStore();
   let sceneReady = $state(false);
-  let outsideDetailLevel = $state(0);
+  let outsideDetailLevel = $state(3);
   let outsideDetailFrame = 0;
   const syncSceneInputs = () =>
     scene.syncInputs({
@@ -131,9 +133,17 @@
     scene.currentRoomTemplate.environment === "core-prison" &&
       corePrisonSealHits < corePrisonSealHitsRequired
   );
+  const outsidePreloadTextures = $derived.by(() => [
+    textures.outsideEarth,
+    textures.outsideEarthDecals,
+    textures.outsideRockDecals,
+    textures.outsideRocks,
+    textures.outsideWater,
+    textures.outsideWaterDecals,
+  ]);
   const warmupPreloadTextures = $derived.by(() => {
     if (outside) {
-      return [textures.outsideEarth];
+      return outsidePreloadTextures;
     }
 
     return [
@@ -159,7 +169,7 @@
   });
   const blockingPreloadTextures = $derived.by(() => {
     if (outside) {
-      return [textures.outsideEarth];
+      return outsidePreloadTextures;
     }
 
     if (
@@ -212,26 +222,7 @@
   };
   const revealOutsideDetails = () => {
     clearOutsideDetailFrame();
-
-    if (!outside) {
-      outsideDetailLevel = 3;
-      return;
-    }
-
-    const step = () => {
-      outsideDetailFrame = 0;
-      outsideDetailLevel = Math.min(3, outsideDetailLevel + 1);
-
-      if (outsideDetailLevel < 3) {
-        outsideDetailFrame = window.requestAnimationFrame(() => {
-          outsideDetailFrame = window.requestAnimationFrame(step);
-        });
-      }
-    };
-
-    outsideDetailFrame = window.requestAnimationFrame(() => {
-      outsideDetailFrame = window.requestAnimationFrame(step);
-    });
+    outsideDetailLevel = 3;
   };
 
   setGameSceneContext(scene);
@@ -244,7 +235,7 @@
   $effect(() => {
     dungeon.seed;
     scene.currentRoom.id;
-    outsideDetailLevel = outside ? 0 : 3;
+    outsideDetailLevel = 3;
 
     return () => {
       clearOutsideDetailFrame();
@@ -304,10 +295,9 @@
       }
       pickups.enterRoom(startRoomId);
       player.resetForFloor();
-
-      if (startRoom.templateId === "outside-start") {
-        room.teleportTo([0, 1.1, startBounds.teleportZ * 0.92]);
-      }
+      room.teleportTo(
+        getStartRoomSpawnTarget(startRoom.templateId, startBounds)
+      );
     });
   });
 
@@ -390,6 +380,15 @@
       return;
     }
 
+    if (outside) {
+      light.castShadow = false;
+      light.shadow.map?.dispose();
+      light.shadow.map = null;
+      light.shadow.needsUpdate = false;
+      return;
+    }
+
+    light.castShadow = true;
     light.shadow.bias = settings.shadowBias;
     light.shadow.camera.far = settings.shadowFar;
     light.shadow.mapSize.set(settings.shadowMapSize, settings.shadowMapSize);
@@ -557,7 +556,8 @@
       !(corePrisonSealLocked && frame.active) ||
       frame.ended ||
       frame.swingId === corePrisonLastSealSwingId ||
-      Math.hypot(frame.center[0], frame.center[2]) > 2.35
+      Math.hypot(frame.center[0], frame.center[2] - corePrisonSealCenterZ) >
+        2.35
     ) {
       return;
     }
@@ -574,7 +574,7 @@
       color: nextHits >= corePrisonSealHitsRequired ? "#ffd166" : "#8ff7ff",
       createdAt: now,
       id: crypto.randomUUID(),
-      position: [0, 1, 1.66],
+      position: [0, 1, corePrisonSealCenterZ + 1.18],
       radius: nextHits >= corePrisonSealHitsRequired ? 2.2 : 1,
     });
 
@@ -718,10 +718,10 @@
       textures.loadOutsideCritical();
     } else {
       textures.loadGameplayCritical();
+      textures
+        .loadDeferred({ signal: textureLoadAbort.signal })
+        .catch(() => undefined);
     }
-    textures
-      .loadDeferred({ signal: textureLoadAbort.signal })
-      .catch(() => undefined);
 
     let frameId = 0;
     let previousTime = performance.now();
@@ -752,15 +752,16 @@
 </script>
 
 <div class="scene">
-  <Canvas shadows={PCFSoftShadowMap} dpr={1}>
+  <Canvas shadows={outside ? false : PCFSoftShadowMap} dpr={1}>
     <SceneRendererConfig
       backgroundColor={outside ? "#c7d0c0" : "#050403"}
-      compileBeforeReady={!outside}
+      compileBeforeReady
       environmentMap={textures.environmentMap}
       exposure={outside ? 0.82 : scene.settings.toneMappingExposure}
       onProgress={onLoadProgress}
       onReady={markSceneReady}
       preloadTextures={blockingPreloadTextures}
+      shadowsEnabled={!outside}
       warmupTextures={warmupPreloadTextures}
       showEnvironmentMap={!outside && scene.settings.showEnvironmentMap}
     />
@@ -813,7 +814,7 @@
     />
     <T.DirectionalLight
       bind:ref={sunLight}
-      castShadow
+      castShadow={!outside}
       color={outside ? '#ffd18a' : '#ffbd76'}
       intensity={outside ? 3.25 : scene.settings.sunIntensity}
       position={[

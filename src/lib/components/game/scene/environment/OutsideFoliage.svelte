@@ -2,10 +2,12 @@
   import {
     BufferAttribute,
     type BufferGeometry,
+    CircleGeometry,
     Color,
     ConeGeometry,
     CylinderGeometry,
     IcosahedronGeometry,
+    MeshBasicMaterial,
     MeshStandardMaterial,
   } from "three";
   import type { VegetationKindId } from "$lib/game/outside-chunk/types";
@@ -122,6 +124,36 @@
     flatShading: true,
     vertexColors: true,
   });
+  const fakeShadowGeometry = new CircleGeometry(1, 24);
+  fakeShadowGeometry.rotateX(-Math.PI / 2);
+  const fakeShadowMaterial = new MeshBasicMaterial({
+    color: "#17200f",
+    depthWrite: false,
+    opacity: 0.18,
+    polygonOffset: true,
+    polygonOffsetFactor: -8,
+    polygonOffsetUnits: -8,
+    transparent: true,
+  });
+  const fakeShadowStyleByKind: Partial<
+    Record<VegetationKindId, { length: number; width: number }>
+  > = {
+    conifer: { width: 0.78, length: 2.8 },
+    broadleaf: { width: 1.1, length: 2.7 },
+    deadwood: { width: 0.48, length: 2.0 },
+    "bush-small": { width: 0.38, length: 0.86 },
+    "bush-large": { width: 0.68, length: 1.25 },
+    "rock-med": { width: 0.5, length: 0.78 },
+    "rock-lg": { width: 0.86, length: 1.2 },
+  };
+  const fakeShadowDirection = {
+    x: 0.72,
+    z: 0.58,
+  };
+  const fakeShadowYaw = Math.atan2(
+    fakeShadowDirection.x,
+    fakeShadowDirection.z
+  );
 
   // --- Kind geometries (cached) ---
   const coniferTrunk = new CylinderGeometry(0.18, 0.28, 1.8, 7);
@@ -378,6 +410,7 @@
     if (!instances.length) {
       return [] as InstancedMesh[];
     }
+
     return renderer.parts.map((part) => {
       const mesh = new InstancedMesh(
         part.geometry,
@@ -385,8 +418,8 @@
         instances.length
       );
       mesh.count = instances.length;
-      mesh.castShadow = part.castShadow;
-      mesh.receiveShadow = part.receiveShadow;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
       const dummy = new Object3D();
       instances.forEach((inst, i) => {
         const sXZ = inst.scale * part.localScaleXZ;
@@ -407,6 +440,46 @@
     });
   };
 
+  const buildFakeShadowMesh = () => {
+    const instances = plan.vegetation.instances.filter(
+      (instance) => fakeShadowStyleByKind[instance.kind]
+    );
+    const mesh = new InstancedMesh(
+      fakeShadowGeometry,
+      fakeShadowMaterial,
+      instances.length
+    );
+    const dummy = new Object3D();
+
+    mesh.count = instances.length;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.renderOrder = 1;
+
+    instances.forEach((inst, i) => {
+      const style = fakeShadowStyleByKind[inst.kind];
+
+      if (!style) {
+        return;
+      }
+
+      const length = style.length * inst.scale;
+
+      dummy.position.set(
+        inst.x + fakeShadowDirection.x * length * 0.34,
+        inst.y + 0.055,
+        inst.z + fakeShadowDirection.z * length * 0.34
+      );
+      dummy.rotation.set(0, fakeShadowYaw, 0);
+      dummy.scale.set(style.width * inst.scale, 1, length);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    return mesh;
+  };
+
   const kindOrder: VegetationKindId[] = [
     "conifer",
     "broadleaf",
@@ -419,7 +492,10 @@
     "rock-lg",
   ];
   const allMeshes = kindOrder.flatMap(buildKindMeshes);
+  const fakeShadowMesh = buildFakeShadowMesh();
 </script>
+
+<T is={fakeShadowMesh} />
 
 {#each allMeshes as mesh (mesh.uuid)}
   <T is={mesh} />

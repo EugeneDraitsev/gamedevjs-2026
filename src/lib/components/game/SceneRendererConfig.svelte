@@ -16,6 +16,7 @@
     onProgress,
     onReady,
     preloadTextures = [],
+    shadowsEnabled = true,
     showEnvironmentMap = false,
     warmupTextures = [],
   }: {
@@ -30,6 +31,7 @@
     }) => void;
     onReady?: () => void;
     preloadTextures?: Array<Texture | null>;
+    shadowsEnabled?: boolean;
     showEnvironmentMap?: boolean;
     warmupTextures?: Array<Texture | null>;
   } = $props();
@@ -92,6 +94,9 @@
     renderer.autoClear = true;
     renderer.autoClearColor = true;
     renderer.outputColorSpace = SRGBColorSpace;
+    renderer.shadowMap.enabled = shadowsEnabled;
+    renderer.shadowMap.autoUpdate = shadowsEnabled;
+    renderer.shadowMap.needsUpdate = shadowsEnabled;
     renderer.setClearColor(background, 1);
     renderer.toneMapping = ACESFilmicToneMapping;
     renderer.toneMappingExposure = exposure;
@@ -125,6 +130,20 @@
         emitProgress("Ready", 1, "Ready");
         onReady?.();
         frame = requestAnimationFrame(warmup);
+      }
+    };
+
+    const warmupRender = () => {
+      if (!camera.current) {
+        return;
+      }
+
+      try {
+        renderer.shadowMap.needsUpdate = renderer.shadowMap.enabled;
+        renderer.render(scene, camera.current);
+      } catch {
+        // If the browser drops this one-off warmup render, the normal
+        // Threlte frame loop will still render the scene.
       }
     };
 
@@ -166,7 +185,10 @@
             .compileAsync(scene, camera.current)
             .catch(() => undefined)
             .finally(() =>
-              requestAnimationFrame(() => requestAnimationFrame(ready))
+              requestAnimationFrame(() => {
+                warmupRender();
+                requestAnimationFrame(ready);
+              })
             );
         }
 

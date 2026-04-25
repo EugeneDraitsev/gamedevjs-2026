@@ -76,7 +76,6 @@
   const createGrassMesh = () => {
     const mesh = new InstancedMesh(bladeGeo, grassMat, grassCount);
     mesh.count = 0;
-    mesh.receiveShadow = true;
     return mesh;
   };
 

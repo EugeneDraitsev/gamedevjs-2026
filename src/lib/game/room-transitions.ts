@@ -9,6 +9,7 @@ import {
   getEntryDirectionFromTarget,
   getRoomBounds,
   getRoomEntryTarget,
+  getStartRoomSpawnTarget,
   getTransition,
   roomTeleportZ,
 } from "$lib/game/scene-layout";
@@ -154,9 +155,5 @@ export const resetPlayerAfterDeath = ({
     roomTemplateById[startRoom.templateId].layout
   );
 
-  room.teleportTo([
-    0,
-    1.1,
-    startRoom.templateId === "outside-start" ? startBounds.teleportZ * 0.92 : 0,
-  ]);
+  room.teleportTo(getStartRoomSpawnTarget(startRoom.templateId, startBounds));
 };

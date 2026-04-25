@@ -22,7 +22,7 @@
 
 {#if texture}
   <T.Group {position} rotation={[0, rotation, 0]}>
-    <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+    <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
       <T.PlaneGeometry args={[args[0] * 2, args[2] * 2]} />
       <T.MeshBasicMaterial
         alphaTest={0.04}

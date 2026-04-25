@@ -567,7 +567,7 @@ const getSplitDamageFactor = (
   }
 
   if (count === 3) {
-    return 0.31 + rareRelief - commonPenalty;
+    return (0.31 + rareRelief - commonPenalty) * 1.8;
   }
 
   if (count === 4) {
@@ -659,11 +659,11 @@ const modifierAppliers: Record<
   },
   "laser-common": (draft) => {
     draft.attackMode = "beam";
-    draft.damageFactor *= 0.56;
+    draft.damageFactor *= 0.76;
     draft.massFactor *= 0.78;
     draft.speedFactor *= 1.08;
     draft.spread *= 0.8;
-    draft.ttlMs *= 0.72;
+    draft.ttlMs *= 1.8;
   },
   "maelstrom-rare": (draft, value) => {
     draft.curve += 6.8 + value * 8.2;

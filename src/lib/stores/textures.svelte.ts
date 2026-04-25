@@ -192,6 +192,7 @@ const textureAssignments: TextureAssignment[] = [
     },
   },
   {
+    outsideCritical: true,
     load: (store) => {
       if (!store.outsideEarthDecals) {
         store.outsideEarthDecals = makeTexture(outsideEarthDecalTextureUrl);
@@ -199,6 +200,7 @@ const textureAssignments: TextureAssignment[] = [
     },
   },
   {
+    outsideCritical: true,
     load: (store) => {
       if (!store.outsideRockDecals) {
         store.outsideRockDecals = makeTexture(outsideRockDecalTextureUrl);
@@ -206,6 +208,7 @@ const textureAssignments: TextureAssignment[] = [
     },
   },
   {
+    outsideCritical: true,
     load: (store) => {
       if (!store.outsideRocks) {
         store.outsideRocks = makeTexture(outsideRocksTextureUrl);
@@ -213,6 +216,7 @@ const textureAssignments: TextureAssignment[] = [
     },
   },
   {
+    outsideCritical: true,
     load: (store) => {
       if (!store.outsideWater) {
         store.outsideWater = makeTexture(outsideWaterTextureUrl);
@@ -220,6 +224,7 @@ const textureAssignments: TextureAssignment[] = [
     },
   },
   {
+    outsideCritical: true,
     load: (store) => {
       if (!store.outsideWaterDecals) {
         store.outsideWaterDecals = makeTexture(outsideWaterDecalTextureUrl);

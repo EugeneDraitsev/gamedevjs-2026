@@ -65,6 +65,7 @@ export const floorExitTriggerZ = -5.9;
 export const hazardTickMs = 420;
 export const playerMaxHealth = 6;
 export const playerRadius = 0.55;
+export const corePrisonSealCenterZ = -5.25;
 export const roomTransitionDurationMs = 190;
 
 export interface RoomBounds {
@@ -105,6 +106,21 @@ export const outsideGateTriggerZ = -outsideRoomBounds.transitionInsetZ;
 
 export const getRoomBounds = (layout: RoomTemplate["layout"]): RoomBounds =>
   layout === "outside-yard" ? outsideRoomBounds : defaultRoomBounds;
+
+export const getStartRoomSpawnTarget = (
+  templateId: string,
+  bounds: RoomBounds
+): Vec3 => {
+  if (templateId === "outside-start") {
+    return [0, 1.1, bounds.teleportZ * 0.92];
+  }
+
+  if (templateId === "core-prison") {
+    return [0, 1.1, corePrisonSealCenterZ];
+  }
+
+  return [0, 1.1, 0];
+};
 
 export const getRoomEntryTarget = (
   entryDirection: DungeonRoomDirection,

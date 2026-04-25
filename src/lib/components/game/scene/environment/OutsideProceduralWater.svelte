@@ -114,7 +114,6 @@
   <T.Mesh
     geometry={riverbed.geometry}
     material={riverbedMaterial}
-    receiveShadow
     renderOrder={1}
   />
 {/each}
@@ -124,6 +123,5 @@
   {material}
   rotation={[-Math.PI / 2, 0, 0]}
   position={[0, 0, 0]}
-  receiveShadow
   renderOrder={2}
 />

@@ -24,6 +24,7 @@
   } from "three";
   import crackHeavyUrl from "$lib/assets/generated/core-prison-dome-crack-heavy.png?url";
   import crackLightUrl from "$lib/assets/generated/core-prison-dome-crack-light.png?url";
+  import { corePrisonSealCenterZ } from "$lib/game/scene-layout";
   import type { Vec3 } from "$lib/types/game";
 
   interface Props {
@@ -194,6 +195,9 @@
   ];
   const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
   const breakFadeSeconds = 1.35;
+  const instructionPlaneWidth = 13.12;
+  const instructionPlaneHeight = 4.7;
+  const instructionPlaneZ = -1.35;
   const glow = $derived(
     0.22 + Math.max(0, 1 - clamp01((animationAge - 0.1) / 1.45)) * 0.78
   );
@@ -262,16 +266,20 @@
       return;
     }
 
-    canvas.width = 3072;
-    canvas.height = 1108;
-    context.clearRect(0, 0, canvas.width, canvas.height);
+    const textureScale = 1.5;
+    const textureWidth = 3072;
+    const textureHeight = 1108;
 
-    const ink = "#211817";
-    const dimInk = "rgba(33, 24, 23, 0.68)";
-    const panel = "rgba(126, 74, 52, 0.5)";
-    const keyFill = "rgba(115, 69, 52, 0.46)";
-    const fontFamily =
-      '"Comic Sans MS", "Segoe UI Black", "Arial Black", sans-serif';
+    canvas.width = textureWidth * textureScale;
+    canvas.height = textureHeight * textureScale;
+    context.setTransform(textureScale, 0, 0, textureScale, 0, 0);
+    context.clearRect(0, 0, textureWidth, textureHeight);
+
+    const ink = "#140d0b";
+    const dimInk = "rgba(20, 13, 11, 0.84)";
+    const panel = "rgba(232, 143, 88, 0.78)";
+    const keyFill = "rgba(255, 216, 170, 0.82)";
+    const fontFamily = '"Arial Black", Impact, "Segoe UI Black", sans-serif';
     const drawText = (
       text: string,
       x: number,
@@ -282,9 +290,11 @@
       context.font = `900 ${size}px ${fontFamily}`;
       context.textAlign = align;
       context.lineJoin = "round";
-      context.lineWidth = Math.max(4, size * 0.08);
-      context.strokeStyle = "rgba(7, 5, 5, 0.12)";
-      context.strokeText(text, x + 4, y + 4);
+      context.lineWidth = Math.max(5, size * 0.09);
+      context.strokeStyle = "rgba(255, 235, 198, 0.34)";
+      context.strokeText(text, x, y);
+      context.strokeStyle = "rgba(7, 5, 5, 0.22)";
+      context.strokeText(text, x + 3, y + 3);
       context.fillStyle = ink;
       context.fillText(text, x, y);
     };
@@ -417,11 +427,6 @@
         ],
         12
       );
-      context.beginPath();
-      context.arc(x, y, 118, -0.84, 0.64);
-      context.lineWidth = 12;
-      context.strokeStyle = dimInk;
-      context.stroke();
     };
     const drawGearPack = (x: number, y: number) => {
       sketchBox(x - 72, y - 78, 144, 136);
@@ -457,11 +462,11 @@
       );
     };
     context.fillStyle = panel;
-    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillRect(0, 0, textureWidth, textureHeight);
 
     for (let index = 0; index < 56; index += 1) {
-      const x = 90 + ((index * 157) % (canvas.width - 180));
-      const y = 90 + ((index * 91) % (canvas.height - 180));
+      const x = 90 + ((index * 157) % (textureWidth - 180));
+      const y = 90 + ((index * 91) % (textureHeight - 180));
 
       context.beginPath();
       context.arc(x, y, 7 + (index % 5) * 3, 0, Math.PI * 2);
@@ -471,25 +476,25 @@
 
     context.strokeStyle = "rgba(35, 25, 23, 0.42)";
     context.lineWidth = 22;
-    context.strokeRect(42, 42, canvas.width - 84, canvas.height - 84);
-    context.strokeStyle = "rgba(231, 142, 89, 0.22)";
+    context.strokeRect(42, 42, textureWidth - 84, textureHeight - 84);
+    context.strokeStyle = "rgba(255, 233, 184, 0.38)";
     context.lineWidth = 8;
-    context.strokeRect(82, 82, canvas.width - 164, canvas.height - 164);
+    context.strokeRect(82, 82, textureWidth - 164, textureHeight - 164);
 
     const columns = [390, 960, 1536, 2112, 2682];
 
-    drawText("MOVE", columns[0], 210, 92);
+    drawText("MOVE", columns[0], 205, 116);
     drawOrbFigure(columns[0], 405);
     drawArrow([columns[0], 290], [columns[0], 250]);
     drawArrow([columns[0], 525], [columns[0], 580]);
     drawArrow([columns[0] - 88, 405], [columns[0] - 164, 405]);
     drawArrow([columns[0] + 88, 405], [columns[0] + 164, 405]);
-    drawKey("W", columns[0], 720);
-    drawKey("A", columns[0] - 152, 855);
-    drawKey("S", columns[0], 855);
-    drawKey("D", columns[0] + 152, 855);
+    drawKey("W", columns[0], 720, 156, 62);
+    drawKey("A", columns[0] - 162, 855, 156, 62);
+    drawKey("S", columns[0], 855, 156, 62);
+    drawKey("D", columns[0] + 162, 855, 156, 62);
 
-    drawText("SHOOT", columns[1], 210, 88);
+    drawText("SHOOT", columns[1], 205, 108);
     drawMouse(columns[1], 395, "left");
     sketchLine(
       [
@@ -504,25 +509,23 @@
     context.lineWidth = 9;
     context.strokeStyle = ink;
     context.stroke();
-    drawKey("LMB", columns[1], 815, 184, 44);
+    drawKey("LMB", columns[1], 815, 220, 58);
 
-    drawText("SWORD", columns[2], 210, 86);
-    drawSword(columns[2], 405);
-    drawKey("F / RMB", columns[2], 815, 258, 42);
-    drawText("HIT x3", columns[2], 940, 42);
+    drawText("SWORD", columns[2], 205, 104);
+    drawSword(columns[2] - 92, 405);
+    drawText("F", columns[2] - 42, 542, 78);
+    drawMouse(columns[2] + 156, 405, "right");
+    drawText("OR", columns[2] + 34, 432, 44);
+    drawKey("F", columns[2] - 104, 815, 156, 62);
+    drawKey("RMB", columns[2] + 116, 815, 220, 58);
+    drawText("HIT SEAL x3", columns[2], 940, 50);
 
-    drawText("JUMP", columns[3], 210, 90);
+    drawText("JUMP", columns[3], 205, 112);
     drawOrbFigure(columns[3], 430);
-    context.beginPath();
-    context.arc(columns[3], 560, 132, Math.PI * 1.08, Math.PI * 1.92);
-    context.lineWidth = 12;
-    context.strokeStyle = dimInk;
-    context.stroke();
-    drawArrow([columns[3] - 120, 505], [columns[3] - 76, 430]);
-    drawArrow([columns[3] + 76, 430], [columns[3] + 120, 505]);
-    drawKey("SPACE", columns[3], 815, 232, 42);
+    drawArrow([columns[3], 350], [columns[3], 265]);
+    drawKey("SPACE", columns[3], 815, 292, 54);
 
-    drawText("GEAR", columns[4], 210, 92);
+    drawText("GEAR", columns[4], 205, 116);
     drawGearPack(columns[4], 405);
     drawOrbFigure(columns[4] + 155, 455);
     sketchLine(
@@ -539,8 +542,8 @@
       ],
       7
     );
-    drawKey("E", columns[4], 815, 132, 48);
-    drawText("LOADOUT", columns[4], 940, 42);
+    drawKey("E", columns[4], 815, 156, 62);
+    drawText("LOADOUT", columns[4], 940, 54);
 
     const texture = new CanvasTexture(canvas);
 
@@ -567,19 +570,22 @@
 </script>
 
 {#if instructionTexture}
-  <T.Mesh position={[0, 0.082, -3.45]} rotation={[-Math.PI / 2, 0, 0]}>
-    <T.PlaneGeometry args={[10.4, 3.68]} />
+  <T.Mesh
+    position={[0, 0.082, instructionPlaneZ]}
+    rotation={[-Math.PI / 2, 0, 0]}
+  >
+    <T.PlaneGeometry args={[instructionPlaneWidth, instructionPlaneHeight]} />
     <T.MeshBasicMaterial
       map={instructionTexture}
       depthWrite={false}
-      opacity={0.9 * activeOpacity}
+      opacity={activeOpacity}
       transparent
       toneMapped={false}
     />
   </T.Mesh>
 {/if}
 
-<T.Group position={[0, 0, 0.48]}>
+<T.Group position={[0, 0, corePrisonSealCenterZ]}>
   {#each domeColliderSegments as segment}
     <T.Group position={segment.position} rotation={[0, segment.rotationY, 0]}>
       <RigidBody type="fixed">
