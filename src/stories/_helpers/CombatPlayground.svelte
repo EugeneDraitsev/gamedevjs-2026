@@ -216,6 +216,10 @@
       collectedArtifactRoomIds={[]}
       controlsLocked={settingsOpen || machineBayOpen}
       {dungeon}
+      enemySpawnOverride={{
+        enemyCount: currentPreset.enemyCount,
+        enemyTemplateId: currentPreset.enemyTemplateId,
+      }}
       inventoryModuleIds={moduleInventory}
       {machineLoadout}
       {meleeParams}

@@ -44,4 +44,19 @@
 
 <Story args={{ initialPresetId: "mine-herald" }} name="Boss — Mine Herald" />
 
+<Story
+  args={{ initialPresetId: "wheel-slinger" }}
+  name="Wheel Slinger - Ricochet"
+/>
+
+<Story
+  args={{ initialPresetId: "veil-stalker" }}
+  name="Veil Stalker - Stealth"
+/>
+
+<Story
+  args={{ initialPresetId: "blast-runner" }}
+  name="Blast Runner - Bomber"
+/>
+
 <Story args={{ initialPresetId: "gate-keeper" }} name="Boss - Gate Keeper" />

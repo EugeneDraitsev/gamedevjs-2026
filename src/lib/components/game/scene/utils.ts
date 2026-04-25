@@ -194,6 +194,7 @@ export const createEnemyShots = (
   const shotColor = enemy.shotColor;
   const shotDamage = enemy.shotDamage;
   const shotSpeed = enemy.shotSpeed;
+  const shotKind = enemy.shotKind ?? "energy";
 
   if (
     typeof shotColor !== "string" ||
@@ -205,20 +206,23 @@ export const createEnemyShots = (
   }
 
   const baseYaw = Math.atan2(dx, dz);
-  const muzzleDistance = enemy.radius + enemyShotRadius + 0.12;
+  const radius = shotKind === "wheel" ? 0.34 : enemyShotRadius;
+  const muzzleDistance = enemy.radius + radius + 0.12;
   const spreads = enemy.radius > 1 ? [-0.24, 0, 0.24] : [0];
 
   return spreads.map((spread) => ({
     color: shotColor,
     damage: shotDamage,
     id: crypto.randomUUID(),
+    kind: shotKind,
+    originId: enemy.id,
     position: [
       position[0] + Math.sin(baseYaw + spread) * muzzleDistance,
-      position[1] + enemy.radius * 0.24,
+      shotKind === "wheel" ? 0.42 : position[1] + enemy.radius * 0.24,
       position[2] + Math.cos(baseYaw + spread) * muzzleDistance,
     ],
-    radius: enemyShotRadius,
-    ttlMs: enemyShotTtlMs,
+    radius,
+    ttlMs: shotKind === "wheel" ? 60_000 : enemyShotTtlMs,
     velocity: [
       Math.sin(baseYaw + spread) * shotSpeed,
       0,
@@ -232,13 +236,16 @@ export const createBombs = (
   position: Vec3,
   dx: number,
   dz: number,
-  now: number
+  now: number,
+  playerVelocity: Vec3 = [0, 0, 0],
+  avoidDropPositions: Vec3[] = []
 ): ActiveBomb[] => {
   const {
     bombArmMs,
     bombColor,
     bombCount,
     bombDamage,
+    bombDelivery,
     bombExplosionRadius,
     bombHp,
     bombRadius,
@@ -260,9 +267,17 @@ export const createBombs = (
     return [];
   }
 
-  const baseYaw = Math.atan2(dx, dz);
   const muzzleDistance = enemy.radius + bombRadius + 0.18;
-  const spreads = Array.from({ length: bombCount }, (_, index) => {
+  const baseYaw = Math.atan2(dx, dz);
+  const leadSeconds = Math.min(1.35, Math.max(0.4, bombArmMs / 1000));
+  const droppedTargets = [
+    [dx, dz],
+    [
+      dx + playerVelocity[0] * leadSeconds,
+      dz + playerVelocity[2] * leadSeconds,
+    ],
+  ];
+  const thrownSpreads = Array.from({ length: bombCount }, (_, index) => {
     if (bombCount === 1) {
       return 0;
     }
@@ -271,14 +286,77 @@ export const createBombs = (
 
     return -span / 2 + (span * index) / (bombCount - 1);
   });
+  const reservedDropPositions = [...avoidDropPositions];
+  const resolveDropPosition = (targetDx: number, targetDz: number) => {
+    const basePosition: Vec3 = [
+      position[0] + targetDx,
+      position[1],
+      position[2] + targetDz,
+    ];
+    const minSpacing = bombExplosionRadius * 1.55;
+    const candidates: Vec3[] = [basePosition];
 
-  return spreads.map((spread) => {
-    const yaw = baseYaw + spread;
+    for (let ring = 1; ring <= 3; ring += 1) {
+      const radius = bombExplosionRadius * (0.82 + ring * 0.52);
+      const count = 8 + ring * 4;
+
+      for (let index = 0; index < count; index += 1) {
+        const angle = (index / count) * Math.PI * 2 + ring * 0.37;
+
+        candidates.push([
+          basePosition[0] + Math.sin(angle) * radius,
+          basePosition[1],
+          basePosition[2] + Math.cos(angle) * radius,
+        ]);
+      }
+    }
+
+    let bestPosition = candidates[0];
+    let bestScore = -Number.POSITIVE_INFINITY;
+
+    for (const candidate of candidates) {
+      const nearestDistance =
+        reservedDropPositions.length === 0
+          ? minSpacing
+          : Math.min(
+              ...reservedDropPositions.map((reserved) =>
+                Math.hypot(
+                  candidate[0] - reserved[0],
+                  candidate[2] - reserved[2]
+                )
+              )
+            );
+      const driftPenalty =
+        Math.hypot(
+          candidate[0] - basePosition[0],
+          candidate[2] - basePosition[2]
+        ) * 0.32;
+      const score = Math.min(nearestDistance, minSpacing) - driftPenalty;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestPosition = candidate;
+      }
+    }
+
+    reservedDropPositions.push(bestPosition);
+
+    return bestPosition;
+  };
+
+  return Array.from({ length: bombCount }, (_, index) => {
+    const dropped = bombDelivery === "drop";
+    const [targetDx, targetDz] =
+      droppedTargets[Math.min(index, droppedTargets.length - 1)];
+    const yaw = dropped
+      ? Math.atan2(targetDx, targetDz)
+      : baseYaw + thrownSpreads[index];
 
     return {
       armAt: now + bombArmMs,
       color: bombColor,
       damage: bombDamage,
+      delivery: dropped ? "drop" : "throw",
       explosionRadius: bombExplosionRadius,
       expiresAt: now + bombTtlMs,
       hp: bombHp,
@@ -286,14 +364,18 @@ export const createBombs = (
       lastHitAt: 0,
       maxHp: bombHp,
       originId: enemy.id,
-      position: [
-        position[0] + Math.sin(yaw) * muzzleDistance,
-        position[1],
-        position[2] + Math.cos(yaw) * muzzleDistance,
-      ],
+      position: dropped
+        ? resolveDropPosition(targetDx, targetDz)
+        : [
+            position[0] + Math.sin(yaw) * muzzleDistance,
+            position[1],
+            position[2] + Math.cos(yaw) * muzzleDistance,
+          ],
       radius: bombRadius,
       spawnedAt: now,
-      velocity: [Math.sin(yaw) * bombSpeed, 0, Math.cos(yaw) * bombSpeed],
+      velocity: dropped
+        ? [0, 0, 0]
+        : [Math.sin(yaw) * bombSpeed, 0, Math.cos(yaw) * bombSpeed],
     };
   });
 };

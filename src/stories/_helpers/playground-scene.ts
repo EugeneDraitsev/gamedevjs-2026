@@ -299,6 +299,33 @@ export const combatPresets: CombatPreset[] = [
     templateId: "normal-relay",
   },
   {
+    description:
+      "Five small wheel slingers fill the room with ricocheting wheels until you take them out.",
+    enemyCount: 5,
+    enemyTemplateId: "wheel-slinger",
+    id: "wheel-slinger",
+    label: "Wheel Slinger - Ricochet",
+    templateId: "normal-crossfire",
+  },
+  {
+    description:
+      "Stealth shooters briefly reveal themselves for rare, heavy shots before fading back into a shimmer.",
+    enemyCount: 2,
+    enemyTemplateId: "veil-stalker",
+    id: "veil-stalker",
+    label: "Veil Stalker - Stealth",
+    templateId: "normal-relay",
+  },
+  {
+    description:
+      "Bombers kite around the room and launch one bomb at you, one at your projected path.",
+    enemyCount: 3,
+    enemyTemplateId: "blast-runner",
+    id: "blast-runner",
+    label: "Blast Runner - Bomber",
+    templateId: "normal-arc",
+  },
+  {
     description: "Boss fight: Iron Warden.",
     enemyCount: 1,
     enemyTemplateId: "iron-warden",

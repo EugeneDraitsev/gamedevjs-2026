@@ -86,3 +86,8 @@
   args={{ height: "420px", template: byId("rail-hunter") }}
   name="Rail Hunter"
 />
+
+<Story
+  args={{ height: "420px", template: byId("veil-stalker") }}
+  name="Veil Stalker"
+/>

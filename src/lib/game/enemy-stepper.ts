@@ -25,6 +25,7 @@ import type {
   ActiveEnemy,
   ActiveEnemyShot,
   ActiveGateLaser,
+  ActiveStealthBeam,
   RoomHazard,
   RoomPlatform,
   Vec3,
@@ -34,6 +35,7 @@ const projectileImpactColor = "#3aa7ff";
 const projectileImpactCore = "#9be6ff";
 
 interface StepContext {
+  bombDropReservations: Vec3[];
   combat: CombatStore;
   currentRoomId: string;
   currentRoomTemplate: RoomTemplate;
@@ -269,6 +271,56 @@ const getEnemyConveyorVelocity = (ctx: StepContext, enemy: ActiveEnemy): Vec3 =>
     enemy.radius * 0.2
   ) ?? [0, 0, 0];
 
+const getProjectileAvoidance = (ctx: StepContext, enemy: ActiveEnemy): Vec3 => {
+  if (enemy.behavior !== "bomber" || ctx.combat.projectiles.length === 0) {
+    return [0, 0, 0];
+  }
+
+  let avoidX = 0;
+  let avoidZ = 0;
+
+  for (const projectile of ctx.combat.projectiles) {
+    const projectilePosition =
+      ctx.combat.projectilePositions.get(projectile.id) ?? projectile.position;
+    const toEnemyX = enemy.position[0] - projectilePosition[0];
+    const toEnemyZ = enemy.position[2] - projectilePosition[2];
+    const distance = Math.hypot(toEnemyX, toEnemyZ);
+
+    if (distance > 5.6 || distance <= 0.001) {
+      continue;
+    }
+
+    const speed = Math.hypot(projectile.velocity[0], projectile.velocity[2]);
+
+    if (speed <= 0.001) {
+      continue;
+    }
+
+    const headingX = projectile.velocity[0] / speed;
+    const headingZ = projectile.velocity[2] / speed;
+    const approach =
+      (toEnemyX / distance) * headingX + (toEnemyZ / distance) * headingZ;
+
+    if (approach < 0.42) {
+      continue;
+    }
+
+    const side = Math.sign(toEnemyX * headingZ - toEnemyZ * headingX) || 1;
+    const strength = ((5.6 - distance) / 5.6) * approach;
+
+    avoidX += -headingZ * side * strength;
+    avoidZ += headingX * side * strength;
+  }
+
+  const length = Math.hypot(avoidX, avoidZ);
+
+  if (length <= 0.001) {
+    return [0, 0, 0];
+  }
+
+  return [avoidX / length, 0, avoidZ / length];
+};
+
 const countActiveBombs = (combat: CombatStore, originId: string) => {
   let count = 0;
 
@@ -373,6 +425,75 @@ const createGateKeeperLaser = (
   };
 };
 
+const stealthBeamWidth = 0.26;
+const stealthBeamLength = 32;
+const stealthBeamFireMs = 120;
+const stealthBeamFadeMs = 180;
+
+const createStealthBeam = (
+  enemy: ActiveEnemy,
+  position: Vec3,
+  yaw: number,
+  now: number
+): ActiveStealthBeam => ({
+  color: "#8beeff",
+  core: "#f5feff",
+  createdAt: now,
+  fadeMs: stealthBeamFadeMs,
+  fireMs: stealthBeamFireMs,
+  id: crypto.randomUUID(),
+  length: stealthBeamLength,
+  originId: enemy.id,
+  position: [position[0], position[1] + enemy.radius * 0.34, position[2]],
+  rotationY: yaw,
+  telegraphMs: enemy.stealthWindupMs ?? 900,
+  width: stealthBeamWidth,
+});
+
+const stealthBeamHitsPlayer = (beam: ActiveStealthBeam, playerPos: Vec3) => {
+  const endX = beam.position[0] + Math.sin(beam.rotationY) * beam.length;
+  const endZ = beam.position[2] + Math.cos(beam.rotationY) * beam.length;
+  const hit = getDistanceToSegment2D(
+    playerPos[0],
+    playerPos[2],
+    beam.position[0],
+    beam.position[2],
+    endX,
+    endZ
+  );
+
+  return hit.t >= 0 && hit.t <= 1 && hit.distance <= beam.width + playerRadius;
+};
+
+const getStealthRelocationTarget = (
+  ctx: StepContext,
+  enemy: ActiveEnemy,
+  now: number
+): Vec3 => {
+  const bounds = getRoomBounds(ctx.currentRoomTemplate.layout);
+  const playerPos = ctx.player.lastPosition;
+  const seed = Math.sin(
+    now * 0.0019 + enemy.position[0] * 1.7 + enemy.position[2]
+  );
+  const angle =
+    Math.atan2(
+      enemy.position[0] - playerPos[0],
+      enemy.position[2] - playerPos[2]
+    ) +
+    seed * 1.9;
+  const distance = 5.4 + Math.abs(seed) * 3.2;
+
+  return clampToRoom(
+    [
+      playerPos[0] + Math.sin(angle) * distance,
+      enemy.position[1],
+      playerPos[2] + Math.cos(angle) * distance,
+    ],
+    enemy.radius,
+    bounds
+  );
+};
+
 const createEnemyRangedAttacks = (
   ctx: StepContext,
   enemy: ActiveEnemy,
@@ -389,6 +510,16 @@ const createEnemyRangedAttacks = (
   let shots: ActiveEnemyShot[] = [];
   let bombs: ActiveBomb[] = [];
   let gateLasers: ActiveGateLaser[] = [];
+
+  if (enemy.stealthRevealMs) {
+    return {
+      bombs,
+      gateLasers,
+      lastBombAt: nextLastBombAt,
+      lastShotAt: nextLastShotAt,
+      shots,
+    };
+  }
 
   if (
     isGateKeeper &&
@@ -434,10 +565,22 @@ const createEnemyRangedAttacks = (
       position,
       playerPos[0] - position[0],
       playerPos[2] - position[2],
-      now
+      now,
+      ctx.player.velocity,
+      [
+        ...ctx.bombDropReservations,
+        ...ctx.combat.bombs
+          .filter((bomb) => bomb.velocity[0] === 0 && bomb.velocity[2] === 0)
+          .map((bomb) => bomb.position),
+      ]
     );
 
     if (bombs.length > 0) {
+      ctx.bombDropReservations.push(
+        ...bombs
+          .filter((bomb) => bomb.velocity[0] === 0 && bomb.velocity[2] === 0)
+          .map((bomb) => bomb.position)
+      );
       nextLastBombAt = now;
     }
   }
@@ -543,6 +686,213 @@ const getEnemyBlockingPlatforms = (
     ? platforms.filter((platform) => !platform.id.includes("dais"))
     : platforms;
 
+interface StealthEnemyState {
+  actionAt: number;
+  aimYaw?: number;
+  lastShotAt: number;
+  mode: NonNullable<ActiveEnemy["stealthMode"]>;
+  position: Vec3;
+  targetPosition?: Vec3;
+}
+
+const stepStealthRelocation = (
+  enemy: ActiveEnemy,
+  state: StealthEnemyState,
+  delta: number,
+  now: number
+): StealthEnemyState => {
+  if (state.mode !== "relocating" || !state.targetPosition) {
+    return state;
+  }
+
+  const dx = state.targetPosition[0] - state.position[0];
+  const dz = state.targetPosition[2] - state.position[2];
+  const distance = Math.hypot(dx, dz);
+  const step = Math.min(
+    distance,
+    (enemy.stealthMoveSpeed ?? enemy.moveSpeed) * delta
+  );
+  const position: Vec3 =
+    distance <= 0.08
+      ? state.targetPosition
+      : [
+          state.position[0] + (dx / (distance || 1)) * step,
+          state.position[1],
+          state.position[2] + (dz / (distance || 1)) * step,
+        ];
+
+  return {
+    ...state,
+    lastShotAt:
+      distance <= 0.12 && enemy.shotIntervalMs
+        ? now - enemy.shotIntervalMs
+        : state.lastShotAt,
+    mode: distance <= 0.12 ? ("hidden" as const) : state.mode,
+    position,
+    targetPosition: distance <= 0.12 ? undefined : state.targetPosition,
+  };
+};
+
+const beginStealthAim = (
+  enemy: ActiveEnemy,
+  state: StealthEnemyState,
+  playerPos: Vec3,
+  now: number
+) => {
+  if (
+    state.mode !== "hidden" ||
+    !enemy.shotIntervalMs ||
+    now - state.lastShotAt < enemy.shotIntervalMs
+  ) {
+    return { beam: null, state };
+  }
+
+  const aimYaw = Math.atan2(
+    playerPos[0] - state.position[0],
+    playerPos[2] - state.position[2]
+  );
+
+  return {
+    beam: createStealthBeam(enemy, state.position, aimYaw, now),
+    state: {
+      ...state,
+      actionAt: now,
+      aimYaw,
+      mode: "aiming" as const,
+    },
+  };
+};
+
+const resolveStealthShot = (
+  ctx: StepContext,
+  enemy: ActiveEnemy,
+  state: StealthEnemyState,
+  now: number
+) => {
+  if (state.mode !== "aiming" || typeof state.aimYaw !== "number") {
+    return { playerDamage: 0, state };
+  }
+
+  const windupMs = enemy.stealthWindupMs ?? 900;
+
+  if (now - state.actionAt < windupMs) {
+    return { playerDamage: 0, state };
+  }
+
+  const { combat, player } = ctx;
+  const playerPos = player.lastPosition;
+  const beam = createStealthBeam(
+    enemy,
+    state.position,
+    state.aimYaw,
+    state.actionAt
+  );
+  let playerDamage = 0;
+
+  if (stealthBeamHitsPlayer(beam, playerPos)) {
+    player.lastHitAt = now;
+    player.triggerRecover(420);
+    playerDamage = enemy.shotDamage ?? player.health;
+    combat.popDamage(
+      playerDamage,
+      [playerPos[0], playerPos[1] + 1.05, playerPos[2]],
+      "player"
+    );
+    player.pushImpact(
+      [Math.sin(state.aimYaw), 0, Math.cos(state.aimYaw)],
+      1.4,
+      0.28
+    );
+  }
+
+  return {
+    playerDamage,
+    state: {
+      ...state,
+      aimYaw: undefined,
+      lastShotAt: now,
+      mode: "relocating" as const,
+      targetPosition: getStealthRelocationTarget(ctx, enemy, now),
+    },
+  };
+};
+
+const stepStealthEnemy = (
+  ctx: StepContext,
+  enemy: ActiveEnemy,
+  delta: number,
+  now: number,
+  spentProjectiles: Set<string>
+): StepActiveEnemyResult => {
+  const { combat, player } = ctx;
+  const playerPos = player.lastPosition;
+  let hp = enemy.hp;
+  let lastHitAt = enemy.lastHitAt;
+  let state: StealthEnemyState = {
+    actionAt: enemy.lastBombAt ?? 0,
+    aimYaw: enemy.stealthAimYaw,
+    lastShotAt: enemy.lastShotAt,
+    mode: enemy.stealthMode ?? "hidden",
+    position: enemy.position,
+    targetPosition: enemy.stealthTargetPosition,
+  };
+  const stealthBeams: ActiveStealthBeam[] = [];
+
+  ({ hp, lastHitAt } = applyProjectileHits(
+    combat,
+    enemy,
+    state.position,
+    [0, 0, 0],
+    hp,
+    now,
+    spentProjectiles
+  ));
+
+  if (hp <= 0) {
+    pushEnemyDeathBurst(combat, enemy, state.position, now);
+    return {
+      enemy: null,
+      gateKeeperDefeated: false,
+      playerDamage: 0,
+      shots: [],
+      bombs: [],
+      gateLasers: [],
+      stealthBeams,
+    };
+  }
+
+  state = stepStealthRelocation(enemy, state, delta, now);
+  const aim = beginStealthAim(enemy, state, playerPos, now);
+  state = aim.state;
+
+  if (aim.beam) {
+    stealthBeams.push(aim.beam);
+  }
+
+  const shot = resolveStealthShot(ctx, enemy, state, now);
+  state = shot.state;
+
+  return {
+    enemy: Object.assign(enemy, {
+      hp,
+      knockbackVelocity: [0, 0, 0] as Vec3,
+      lastBombAt: state.actionAt,
+      lastHitAt,
+      lastShotAt: state.lastShotAt,
+      position: state.position,
+      stealthAimYaw: state.aimYaw,
+      stealthMode: state.mode,
+      stealthTargetPosition: state.targetPosition,
+    }),
+    gateKeeperDefeated: false,
+    playerDamage: shot.playerDamage,
+    shots: [],
+    bombs: [],
+    gateLasers: [],
+    stealthBeams,
+  };
+};
+
 const stepEnemy = (
   ctx: StepContext,
   enemy: ActiveEnemy,
@@ -550,6 +900,10 @@ const stepEnemy = (
   now: number,
   spentProjectiles: Set<string>
 ) => {
+  if (enemy.stealthRevealMs) {
+    return stepStealthEnemy(ctx, enemy, delta, now, spentProjectiles);
+  }
+
   const { combat, player } = ctx;
   const { distance, dx, dz, moveIntent, playerDistance, playerPos } =
     getEnemyTarget(ctx, enemy, now);
@@ -570,16 +924,19 @@ const stepEnemy = (
         waterSpeedFactor
       : 0;
   const conveyor = getEnemyConveyorVelocity(ctx, enemy);
+  const projectileAvoidance = getProjectileAvoidance(ctx, enemy);
   let knockbackVelocity = enemy.knockbackVelocity;
   let position: Vec3 = [
     enemy.position[0] +
       (dx / distance) * step +
       (-dz / distance) * strafeStep +
+      projectileAvoidance[0] * enemy.moveSpeed * delta * 1.35 +
       (knockbackVelocity[0] + conveyor[0]) * delta,
     enemy.position[1],
     enemy.position[2] +
       (dz / distance) * step +
       (dx / distance) * strafeStep +
+      projectileAvoidance[2] * enemy.moveSpeed * delta * 1.35 +
       (knockbackVelocity[2] + conveyor[2]) * delta,
   ];
   let hp = enemy.hp;
@@ -619,6 +976,7 @@ const stepEnemy = (
       shots,
       bombs,
       gateLasers,
+      stealthBeams: [],
     };
   }
 
@@ -669,6 +1027,7 @@ const stepEnemy = (
       shots,
       bombs,
       gateLasers,
+      stealthBeams: [],
     };
   }
 
@@ -726,6 +1085,7 @@ const stepEnemy = (
     shots,
     bombs,
     gateLasers,
+    stealthBeams: [],
   };
 };
 
@@ -1042,61 +1402,178 @@ const stepBombs = (
   return playerDamage;
 };
 
-const stepEnemyShots = (ctx: StepContext, delta: number, now: number) => {
-  const { combat, player } = ctx;
+const getMovedEnemyShot = (shot: ActiveEnemyShot, delta: number): Vec3 => [
+  shot.position[0] + shot.velocity[0] * delta,
+  shot.position[1] + shot.velocity[1] * delta,
+  shot.position[2] + shot.velocity[2] * delta,
+];
+
+const resolveWheelShotMovement = (
+  shot: ActiveEnemyShot,
+  position: Vec3,
+  bounds: ReturnType<typeof getRoomBounds>,
+  obstacles: SolidObstacle[]
+) => {
+  const minX = -bounds.floorHalfWidth + shot.radius;
+  const maxX = bounds.floorHalfWidth - shot.radius;
+  const minZ = -bounds.floorHalfDepth + shot.radius;
+  const maxZ = bounds.floorHalfDepth - shot.radius;
+  let nextX = position[0];
+  let nextZ = position[2];
+  let nextVelocityX = shot.velocity[0];
+  let nextVelocityZ = shot.velocity[2];
+
+  if (nextX < minX || nextX > maxX) {
+    nextX = clamp(nextX, minX, maxX);
+    nextVelocityX *= -1;
+  }
+
+  if (nextZ < minZ || nextZ > maxZ) {
+    nextZ = clamp(nextZ, minZ, maxZ);
+    nextVelocityZ *= -1;
+  }
+
+  const obstacleImpact = resolveObstacleImpact(
+    [nextX, position[1], nextZ],
+    shot.radius,
+    obstacles
+  );
+
+  if (obstacleImpact.hit) {
+    const normalX = obstacleImpact.position[0] - nextX;
+    const normalZ = obstacleImpact.position[2] - nextZ;
+    const normalLength = Math.hypot(normalX, normalZ) || 1;
+    const nx = normalX / normalLength;
+    const nz = normalZ / normalLength;
+    const dot = nextVelocityX * nx + nextVelocityZ * nz;
+    nextVelocityX -= 2 * dot * nx;
+    nextVelocityZ -= 2 * dot * nz;
+    nextX = obstacleImpact.position[0];
+    nextZ = obstacleImpact.position[2];
+  }
+
+  return {
+    position: [nextX, position[1], nextZ] as Vec3,
+    velocity: [nextVelocityX, 0, nextVelocityZ] as Vec3,
+  };
+};
+
+const enemyShotHitsPlayer = (
+  shot: ActiveEnemyShot,
+  position: Vec3,
+  playerPos: Vec3
+) =>
+  Math.hypot(
+    playerPos[0] - position[0],
+    playerPos[1] - position[1],
+    playerPos[2] - position[2]
+  ) <=
+  shot.radius + playerRadius;
+
+const applyEnemyShotPlayerHit = (
+  combat: CombatStore,
+  player: PlayerStore,
+  shot: ActiveEnemyShot,
+  velocity: Vec3,
+  now: number,
+  recoverMs: number
+) => {
   const playerPos = player.lastPosition;
-  const bounds = getRoomBounds(ctx.currentRoomTemplate.layout);
+
+  player.lastHitAt = now;
+  player.triggerRecover(recoverMs);
+  combat.popDamage(
+    shot.damage,
+    [playerPos[0], playerPos[1] + 1.05, playerPos[2]],
+    "player"
+  );
+  player.pushImpact(
+    velocity,
+    0.54 + Math.hypot(velocity[0], velocity[2]) * 0.06,
+    0.2
+  );
+};
+
+const enemyShotIsOutOfBounds = (
+  shot: ActiveEnemyShot,
+  position: Vec3,
+  bounds: ReturnType<typeof getRoomBounds>,
+  obstacles: SolidObstacle[]
+) =>
+  Math.abs(position[0]) > bounds.floorHalfWidth + 1 ||
+  Math.abs(position[2]) > bounds.floorHalfDepth + 1 ||
+  shotHitsObstacle(shot.position, position, shot.radius, obstacles);
+
+const stepEnemyShot = (
+  ctx: StepContext,
+  shot: ActiveEnemyShot,
+  delta: number,
+  now: number,
+  bounds: ReturnType<typeof getRoomBounds>
+) => {
+  const wheel = shot.kind === "wheel";
+  const ttlMs = shot.ttlMs - delta * 1000;
+  let position = getMovedEnemyShot(shot, delta);
+  let velocity = shot.velocity;
   let playerDamage = 0;
 
-  combat.enemyShots = combat.enemyShots.filter((shot) => {
-    const ttlMs = shot.ttlMs - delta * 1000;
-    const position: Vec3 = [
-      shot.position[0] + shot.velocity[0] * delta,
-      shot.position[1] + shot.velocity[1] * delta,
-      shot.position[2] + shot.velocity[2] * delta,
-    ];
+  if (ttlMs <= 0 && !wheel) {
+    return { playerDamage, shot: null };
+  }
 
-    if (
-      ttlMs <= 0 ||
-      Math.abs(position[0]) > bounds.floorHalfWidth + 1 ||
-      Math.abs(position[2]) > bounds.floorHalfDepth + 1
-    ) {
-      return false;
-    }
+  if (wheel) {
+    ({ position, velocity } = resolveWheelShotMovement(
+      shot,
+      position,
+      bounds,
+      ctx.obstacles
+    ));
+  } else if (enemyShotIsOutOfBounds(shot, position, bounds, ctx.obstacles)) {
+    return { playerDamage, shot: null };
+  }
 
-    if (shotHitsObstacle(shot.position, position, shot.radius, ctx.obstacles)) {
-      return false;
-    }
-
-    if (
-      Math.hypot(
-        playerPos[0] - position[0],
-        playerPos[1] - position[1],
-        playerPos[2] - position[2]
-      ) <=
-      shot.radius + playerRadius
-    ) {
-      player.lastHitAt = now;
-      player.triggerRecover(260);
-      playerDamage += shot.damage;
-      combat.popDamage(
-        shot.damage,
-        [playerPos[0], playerPos[1] + 1.05, playerPos[2]],
-        "player"
+  if (enemyShotHitsPlayer(shot, position, ctx.player.lastPosition)) {
+    if (!wheel || now - (shot.lastHitAt ?? 0) >= 360) {
+      playerDamage = shot.damage;
+      applyEnemyShotPlayerHit(
+        ctx.combat,
+        ctx.player,
+        shot,
+        velocity,
+        now,
+        wheel ? 360 : 260
       );
-      player.pushImpact(
-        shot.velocity,
-        0.54 + Math.hypot(shot.velocity[0], shot.velocity[2]) * 0.06,
-        0.2
-      );
-      return false;
+      shot.lastHitAt = now;
     }
 
-    shot.position = position;
-    shot.ttlMs = ttlMs;
+    if (!wheel) {
+      return { playerDamage, shot: null };
+    }
+  }
 
-    return true;
-  });
+  shot.position = position;
+  shot.velocity = velocity;
+  shot.ttlMs = wheel ? shot.ttlMs : ttlMs;
+
+  return { playerDamage, shot };
+};
+
+const stepEnemyShots = (ctx: StepContext, delta: number, now: number) => {
+  const { combat } = ctx;
+  const bounds = getRoomBounds(ctx.currentRoomTemplate.layout);
+  const nextShots: ActiveEnemyShot[] = [];
+  let playerDamage = 0;
+
+  for (const shot of combat.enemyShots) {
+    const result = stepEnemyShot(ctx, shot, delta, now, bounds);
+    playerDamage += result.playerDamage;
+
+    if (result.shot) {
+      nextShots.push(result.shot);
+    }
+  }
+
+  combat.enemyShots = nextShots;
 
   return playerDamage;
 };
@@ -1139,7 +1616,8 @@ const syncRoomDoorState = (
   room.doorOpenAmount = 0;
 };
 
-interface StepEnemiesArgs extends Omit<StepContext, "obstacles"> {
+interface StepEnemiesArgs
+  extends Omit<StepContext, "bombDropReservations" | "obstacles"> {
   delta: number;
   doorOpenDelayMs: number;
   doorOpenDurationMs: number;
@@ -1152,6 +1630,7 @@ interface StepActiveEnemyResult {
   gateLasers: ActiveGateLaser[];
   playerDamage: number;
   shots: ActiveEnemyShot[];
+  stealthBeams: ActiveStealthBeam[];
 }
 
 const stepActiveEnemies = (
@@ -1165,6 +1644,7 @@ const stepActiveEnemies = (
   const spawnedEnemyShots: ActiveEnemyShot[] = [];
   const spawnedBombs: ActiveBomb[] = [];
   const spawnedGateLasers: ActiveGateLaser[] = [];
+  const spawnedStealthBeams: ActiveStealthBeam[] = [];
   const defeatedGateKeeperIds: string[] = [];
   let gateKeeperDefeated = false;
   let playerDamage = 0;
@@ -1180,6 +1660,7 @@ const stepActiveEnemies = (
         shots: [],
         bombs: [],
         gateLasers: [],
+        stealthBeams: [],
       };
     } else if (enemiesSleeping) {
       result = {
@@ -1189,6 +1670,7 @@ const stepActiveEnemies = (
         shots: [],
         bombs: [],
         gateLasers: [],
+        stealthBeams: [],
       };
     } else {
       result = stepEnemy(ctx, enemy, delta, now, spentProjectiles);
@@ -1206,6 +1688,10 @@ const stepActiveEnemies = (
 
     if (result.gateLasers.length > 0) {
       spawnedGateLasers.push(...result.gateLasers);
+    }
+
+    if (result.stealthBeams.length > 0) {
+      spawnedStealthBeams.push(...result.stealthBeams);
     }
 
     const enemyWasGateKeeperDefeated =
@@ -1231,6 +1717,7 @@ const stepActiveEnemies = (
     spawnedBombs,
     spawnedEnemyShots,
     spawnedGateLasers,
+    spawnedStealthBeams,
   };
 };
 
@@ -1267,6 +1754,28 @@ const keepOriginBoundActorsAlive = (
 
     if (survivingGateLasers.length !== combat.gateLasers.length) {
       combat.gateLasers = survivingGateLasers;
+    }
+  }
+
+  const stealthBeams = combat.stealthBeams ?? [];
+
+  if (stealthBeams.length > 0) {
+    const survivingStealthBeams = stealthBeams.filter((beam) =>
+      livingIds.has(beam.originId)
+    );
+
+    if (survivingStealthBeams.length !== stealthBeams.length) {
+      combat.stealthBeams = survivingStealthBeams;
+    }
+  }
+
+  if (combat.enemyShots.length > 0) {
+    const survivingEnemyShots = combat.enemyShots.filter(
+      (shot) => shot.kind !== "wheel" || livingIds.has(shot.originId ?? "")
+    );
+
+    if (survivingEnemyShots.length !== combat.enemyShots.length) {
+      combat.enemyShots = survivingEnemyShots;
     }
   }
 };
@@ -1332,6 +1841,7 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
   let nextHealth = player.health;
   const ctx: StepContext = {
     ...args,
+    bombDropReservations: [],
     obstacles: getSolidObstacles(currentRoomTemplate.layout),
   };
   const doorWasLocked =
@@ -1399,6 +1909,11 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
 
   if (steppedEnemies.spawnedGateLasers.length > 0) {
     combat.gateLasers.push(...steppedEnemies.spawnedGateLasers);
+  }
+
+  if (steppedEnemies.spawnedStealthBeams.length > 0) {
+    combat.stealthBeams ??= [];
+    combat.stealthBeams.push(...steppedEnemies.spawnedStealthBeams);
   }
 
   combat.removeProjectiles(spentProjectiles);
