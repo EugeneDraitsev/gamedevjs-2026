@@ -179,24 +179,6 @@
     );
   }
 
-  .crosshair-reload::after {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    inline-size: 0.5rem;
-    block-size: 0.5rem;
-    pointer-events: none;
-    content: "";
-    background: #fffbe5;
-    border-radius: 999px;
-    box-shadow:
-      0 0 0.5rem #ffe6a8,
-      0 0 1rem rgba(255, 184, 107, 0.95),
-      0 0 1.6rem rgba(255, 130, 60, 0.55);
-    transform: translate(-50%, -50%) rotate(calc(var(--reload) * 1turn))
-      translateY(-1.4rem);
-  }
-
   @keyframes crosshair-reload-pulse {
     0%,
     100% {

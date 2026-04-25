@@ -45,9 +45,9 @@ const musicTracks: Record<MusicTrackId, MusicTrackConfig> = {
 
 const defaultAudioMix: AudioMixSettings = {
   masterSoundEnabled: true,
-  masterVolume: 0.86,
+  masterVolume: 1,
   musicSoundEnabled: true,
-  musicVolume: 0.72,
+  musicVolume: 0.7,
 };
 
 const clamp01 = (value: number) =>

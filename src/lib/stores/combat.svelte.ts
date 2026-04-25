@@ -1,3 +1,4 @@
+import { gameSfx } from "$lib/audio/sfx";
 import type {
   ActiveBeam,
   ActiveBomb,
@@ -35,6 +36,10 @@ export class CombatStore {
       position,
       variant,
     });
+
+    if (variant === "enemy") {
+      gameSfx.playEnemyHit();
+    }
   }
 
   popHeal(amount: number, position: Vec3) {

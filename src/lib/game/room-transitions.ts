@@ -1,3 +1,4 @@
+import { gameSfx } from "$lib/audio/sfx";
 import type { DungeonLayout, DungeonRoom } from "$lib/config/dungeon-layout";
 import type { MachineModuleId } from "$lib/config/machine-modules";
 import {
@@ -57,6 +58,7 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
   ) {
     if (currentArtifactType && Math.hypot(position[0], position[2]) < 1.5) {
       timing.pickArtifact(currentArtifactType, now);
+      gameSfx.playArtifactPickup();
       onCollectArtifact?.(currentRoom.id, currentArtifactType);
     }
 

@@ -1,3 +1,4 @@
+import { gameSfx } from "$lib/audio/sfx";
 import {
   createBombs,
   createEnemyShots,
@@ -475,6 +476,7 @@ const pushEnemyDeathBurst = (
     position: [position[0], position[1] + enemy.radius * 0.28, position[2]],
     radius: enemy.radius > 1 ? enemy.radius * 2.2 : enemy.radius * 1.4,
   });
+  gameSfx.playEnemyDeath(enemy.radius - 0.4);
 };
 
 const pushEnemyFromPlatforms = (

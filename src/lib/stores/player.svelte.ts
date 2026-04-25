@@ -1,3 +1,4 @@
+import { gameSfx } from "$lib/audio/sfx";
 import { playerMaxHealth } from "$lib/game/scene-layout";
 import type { Vec3 } from "$lib/types/game";
 
@@ -83,6 +84,7 @@ export class PlayerStore {
     this.reloadDuration = duration;
     this.reloadStartedAt = now;
     this.reloadUntil = now + duration;
+    gameSfx.playReload();
     return true;
   }
 

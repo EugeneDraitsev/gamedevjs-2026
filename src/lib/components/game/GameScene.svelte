@@ -285,12 +285,18 @@
     position: Vec3;
     velocity: Vec3;
   }) => {
+    const build = scene.weaponBuild;
+    const intensity =
+      build.attackMode === "beam" ? build.damage / 22 : build.damage / 36;
+
+    gameSfx.playLaserShot(Math.min(1, Math.max(0, intensity)));
+
     spawnPlayerProjectile({
       combat,
       player,
       position,
       velocity,
-      weaponBuild: scene.weaponBuild,
+      weaponBuild: build,
     });
   };
 
