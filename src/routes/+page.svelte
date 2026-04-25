@@ -10,20 +10,46 @@
 
   const defaultSeed = "polygon-001";
   const customSeedStorageKey = "warden-menu-custom-seed";
+  const lastRunSeedStorageKey = "warden-menu-last-run-seed";
   const useCustomSeedStorageKey = "warden-menu-use-custom-seed";
   let canResume = $state(false);
   let customSeed = $state(defaultSeed);
   let floorIndex = $state(initialDungeonFloor);
+  let lastRunSeed = $state(defaultSeed);
   let storageReady = $state(false);
   let useCustomSeed = $state(false);
 
-  const normalizeMenuSeed = (value: string) => value.trim() || defaultSeed;
+  const normalizeMenuSeed = (value: string) => value.trim();
   const seed = $derived(
-    useCustomSeed ? normalizeMenuSeed(customSeed) : defaultSeed
+    useCustomSeed ? normalizeMenuSeed(customSeed) : lastRunSeed
   );
 
+  const setLastRunSeed = (nextSeed: string) => {
+    lastRunSeed = nextSeed;
+
+    if (storageReady) {
+      localStorage.setItem(lastRunSeedStorageKey, nextSeed);
+    }
+  };
+
+  const createRandomSeed = () => {
+    if (!globalThis.crypto?.getRandomValues) {
+      return `run-${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 10)}`;
+    }
+
+    const randomValues = new Uint32Array(2);
+
+    globalThis.crypto.getRandomValues(randomValues);
+
+    return `run-${Date.now().toString(36)}-${Array.from(randomValues)
+      .map((value) => value.toString(36).padStart(7, "0"))
+      .join("")}`;
+  };
+
   const syncResumeState = () => {
-    const savedRun = loadRunSave(seed);
+    const savedRun = seed ? loadRunSave(seed) : null;
 
     canResume = Boolean(savedRun);
     floorIndex = savedRun?.floorIndex ?? initialDungeonFloor;
@@ -39,9 +65,14 @@
   onMount(() => {
     const settings = loadSceneSettings();
     const savedCustomSeed = localStorage.getItem(customSeedStorageKey);
+    const savedLastRunSeed = localStorage.getItem(lastRunSeedStorageKey);
 
     if (savedCustomSeed !== null) {
       customSeed = savedCustomSeed;
+    }
+
+    if (savedLastRunSeed) {
+      setLastRunSeed(savedLastRunSeed);
     }
 
     useCustomSeed = localStorage.getItem(useCustomSeedStorageKey) === "true";
@@ -58,6 +89,7 @@
     }
 
     localStorage.setItem(customSeedStorageKey, customSeed);
+    localStorage.setItem(lastRunSeedStorageKey, lastRunSeed);
     localStorage.setItem(useCustomSeedStorageKey, String(useCustomSeed));
     syncResumeState();
   });
@@ -85,6 +117,33 @@
     await goto(path);
   };
 
+  const startNewGame = async () => {
+    const nextSeed =
+      useCustomSeed && normalizeMenuSeed(customSeed)
+        ? normalizeMenuSeed(customSeed)
+        : createRandomSeed();
+
+    setLastRunSeed(nextSeed);
+
+    await openGameRoute(
+      withDebugParam(gameRouteForSeed(nextSeed)),
+      initialDungeonFloor
+    );
+  };
+
+  const continueRun = async () => {
+    if (!seed) {
+      return;
+    }
+
+    setLastRunSeed(seed);
+
+    await openGameRoute(
+      withDebugParam(gameRouteForSeed(seed, true)),
+      floorIndex
+    );
+  };
+
   const openRoute = async (path: URL | string) => {
     await gameMusic.unlock();
     await goto(path);
@@ -97,12 +156,10 @@
   {canResume}
   {customSeed}
   {floorIndex}
-  onContinue={() =>
-    openGameRoute(withDebugParam(gameRouteForSeed(seed, true)), floorIndex)}
+  onContinue={continueRun}
   onCustomSeedChange={(value) => (customSeed = value)}
   onOpenSettings={() => openRoute(withDebugParam("/settings"))}
-  onPlay={() =>
-    openGameRoute(withDebugParam(gameRouteForSeed(seed)), initialDungeonFloor)}
+  onPlay={startNewGame}
   onUseCustomSeedChange={(value) => (useCustomSeed = value)}
   {seed}
   {useCustomSeed}
