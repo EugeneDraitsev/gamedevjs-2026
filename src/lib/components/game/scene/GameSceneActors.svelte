@@ -131,7 +131,6 @@
     (_unused, index) => index
   );
   const beamParticleIndexes = [0, 1, 2];
-  const beamLightIndexes = [0, 1];
   const enemyWarmups: ActiveEnemy[] = [
     "scrap-runner",
     "coil-sentry",
@@ -248,12 +247,6 @@
       value: 1,
     },
   ];
-  const projectileLightIndexes = Array.from({ length: 6 }, (_, index) => index);
-  const projectileImpactLightIndexes = Array.from(
-    { length: 8 },
-    (_, index) => index
-  );
-  const lightParkingPosition: Vec3 = [0, -100, 0];
   const beamLaserPositionOffsetY = 0.03;
 
   const getBeamFade = (beam: ActiveBeam) => {
@@ -335,22 +328,14 @@
     }
     return outsidePlan().shopkeeper;
   });
-  const projectileLightSlots = $derived.by(() => {
+  const projectileLights = $derived.by(() => {
     timing.now;
-    const activeProjectiles = combat.projectiles.slice(-6);
 
-    return projectileLightIndexes.map((index) => {
-      const projectile = activeProjectiles[index];
-      const position = projectile
-        ? (combat.projectilePositions.get(projectile.id) ?? projectile.position)
-        : lightParkingPosition;
-
-      return {
-        id: index,
-        intensity: projectile ? 0.72 : 0,
-        position,
-      };
-    });
+    return combat.projectiles.slice(-2).map((projectile) => ({
+      id: projectile.id,
+      position:
+        combat.projectilePositions.get(projectile.id) ?? projectile.position,
+    }));
   });
   $effect(() => {
     const beam = combat.beams.at(-1);
@@ -363,61 +348,49 @@
     beamLaserHeadMaterial.opacity = softFade * 0.98;
     beamLaserParticleMaterial.opacity = softFade * 0.5;
   });
-  const beamLightSlots = $derived.by(() => {
+  const beamLight = $derived.by(() => {
     const beam = combat.beams.at(-1);
 
-    return beamLightIndexes.map((index) => {
-      if (!beam) {
-        return {
-          id: index,
-          intensity: 0,
-          position: lightParkingPosition,
-        };
-      }
+    if (!beam) {
+      return null;
+    }
 
-      const slot = index % 2;
-      const age = Math.min(1, (timing.now - beam.createdAt) / beamDurationMs);
-      const fade = Math.max(0, 1 - age);
-      const distanceAlong = slot === 0 ? 0.6 : beam.length * 0.58;
+    const fade = getBeamFade(beam);
 
-      return {
-        id: index,
-        intensity: fade * fade * (slot === 0 ? 6.4 : 3.8),
-        position: [
-          beam.position[0] + Math.sin(beam.rotationY) * distanceAlong,
-          beam.position[1] + 0.48,
-          beam.position[2] + Math.cos(beam.rotationY) * distanceAlong,
-        ] as Vec3,
-      };
-    });
+    if (fade <= 0) {
+      return null;
+    }
+
+    return {
+      id: beam.id,
+      intensity: fade * fade * 6.4,
+      position: [
+        beam.position[0] + Math.sin(beam.rotationY) * 0.6,
+        beam.position[1] + 0.48,
+        beam.position[2] + Math.cos(beam.rotationY) * 0.6,
+      ] as Vec3,
+    };
   });
-  const projectileImpactLightSlots = $derived.by(() => {
-    const activeImpacts = combat.projectileImpactBursts.slice(-8);
+  const projectileImpactLights = $derived.by(() => {
+    const now = timing.now;
 
-    return projectileImpactLightIndexes.map((index) => {
-      const burst = activeImpacts[index];
+    return combat.projectileImpactBursts
+      .slice(-2)
+      .map((burst) => {
+        const age = Math.min(1, (now - burst.createdAt) / 320);
+        const fade = 1 - age;
 
-      if (!burst) {
         return {
-          id: index,
-          intensity: 0,
-          position: lightParkingPosition,
+          id: burst.id,
+          intensity: fade * 1.1,
+          position: [
+            burst.position[0],
+            burst.position[1] + burst.radius * 0.18,
+            burst.position[2],
+          ] as Vec3,
         };
-      }
-
-      const age = Math.min(1, (timing.now - burst.createdAt) / 320);
-      const fade = 1 - age;
-
-      return {
-        id: index,
-        intensity: fade * 1.1,
-        position: [
-          burst.position[0],
-          burst.position[1] + burst.radius * 0.18,
-          burst.position[2],
-        ] as Vec3,
-      };
-    });
+      })
+      .filter((light) => light.intensity > 0.001);
   });
 </script>
 
@@ -508,26 +481,26 @@
   </T.Group>
 {/if}
 
-{#each projectileLightSlots as light (light.id)}
+{#each projectileLights as light (light.id)}
   <T.PointLight
     color="#3aa7ff"
     distance={2.8}
-    intensity={light.intensity}
+    intensity={0.72}
     position={light.position}
   />
 {/each}
 
-{#each beamLightSlots as light (light.id)}
+{#if beamLight}
   <T.PointLight
     color="#ff2d55"
     decay={1.4}
     distance={8.8}
-    intensity={light.intensity}
-    position={light.position}
+    intensity={beamLight.intensity}
+    position={beamLight.position}
   />
-{/each}
+{/if}
 
-{#each projectileImpactLightSlots as light (light.id)}
+{#each projectileImpactLights as light (light.id)}
   <T.PointLight
     color="#9be6ff"
     distance={2.8}

@@ -35,8 +35,7 @@
   );
   const bossDecoratedWallFacings: WallFacing[] = ["east", "south", "west"];
   const bossGearlessWallFacings: WallFacing[] = ["south"];
-  const lampLightSlots = [0, 1, 2, 3, 4, 5, 6, 7];
-  const hiddenLampLightPosition: Vec3 = [0, -100, 0];
+  const maxLampLights = 8;
   const decoratedWallFacings = $derived(
     scene.currentRoom.kind === "boss" ? bossDecoratedWallFacings : null
   );
@@ -51,7 +50,7 @@
           wall.style === "mechanic" &&
           (!wall.opacity || wall.opacity >= 1)
       )
-      .slice(0, lampLightSlots.length)
+      .slice(0, maxLampLights)
       .map((wall) => {
         const horizontal = wall.args[0] > wall.args[2];
         const span = (horizontal ? wall.args[0] : wall.args[2]) * 2;
@@ -100,13 +99,13 @@
   showWallKit={!outside}
 />
 
-{#each lampLightSlots as slot}
+{#each lampLightPositions as position, slot (slot)}
   <T.PointLight
     color="#ff9d43"
     decay={1.6}
-    distance={lampLightPositions[slot] ? 5.4 : 0.1}
-    intensity={lampLightPositions[slot] ? 0.7 : 0}
-    position={lampLightPositions[slot] ?? hiddenLampLightPosition}
+    distance={5.4}
+    intensity={0.7}
+    {position}
   />
 {/each}
 
