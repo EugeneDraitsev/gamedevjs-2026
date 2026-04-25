@@ -1,29 +1,19 @@
 <script lang="ts">
   import { Canvas, T } from "@threlte/core";
   import { OrbitControls } from "@threlte/extras";
-  import { AdditiveBlending, GreaterDepth, PCFSoftShadowMap } from "three";
+  import {
+    AdditiveBlending,
+    GreaterDepth,
+    NormalBlending,
+    PCFSoftShadowMap,
+  } from "three";
   import type { MachineSlotId } from "$lib/config/machine-modules";
 
   type Vec3 = [number, number, number];
 
   interface MachineBayOrbPreviewProps {
     highlightedSlotId?: MachineSlotId | null;
-    onHoverSlot?: (slotId: MachineSlotId | null) => void;
   }
-
-  const partHitZones = [
-    { maxX: 50, maxY: 54, minX: 34, minY: 36, slotId: "attack" },
-    { maxX: 40, maxY: 76, minX: 19, minY: 50, slotId: "utility-a" },
-    { maxX: 57, maxY: 46, minX: 39, minY: 23, slotId: "utility-b" },
-    { maxX: 82, maxY: 82, minX: 56, minY: 18, slotId: "utility-c" },
-    { maxX: 55, maxY: 74, minX: 20, minY: 19, slotId: "body" },
-  ] satisfies {
-    maxX: number;
-    maxY: number;
-    minX: number;
-    minY: number;
-    slotId: MachineSlotId;
-  }[];
 
   const rivets: Vec3[] = [
     [-0.64, 0.34, 0.75],
@@ -65,122 +55,47 @@
     { position: Vec3; rotation: Vec3 }
   >;
 
-  let { highlightedSlotId = null, onHoverSlot }: MachineBayOrbPreviewProps =
-    $props();
-
-  let localHoveredSlotId = $state<MachineSlotId | null>(null);
-
-  const inspectionActive = $derived(highlightedSlotId !== null);
+  let { highlightedSlotId = null }: MachineBayOrbPreviewProps = $props();
 
   const isActive = (slotId: MachineSlotId) => highlightedSlotId === slotId;
 
-  const isMuted = (slotId: MachineSlotId) =>
-    inspectionActive && highlightedSlotId !== slotId;
+  const inspectionActive = $derived(highlightedSlotId !== null);
 
-  const mutedOpacityFor = (slotId: MachineSlotId) =>
-    slotId === "utility-c" ? 0.05 : 0.08;
+  const eyeShellColor = $derived(isActive("attack") ? "#20363a" : "#15120f");
 
-  const opacityFor = (slotId: MachineSlotId) =>
-    isMuted(slotId) ? mutedOpacityFor(slotId) : 1;
+  const eyeGlassColor = $derived(isActive("attack") ? "#eaffff" : "#8ff7ff");
 
-  const wireframeFor = (slotId: MachineSlotId) =>
-    slotId === "utility-c" ? false : isMuted(slotId);
+  const bodyShellColor = $derived(isActive("body") ? "#bb7721" : "#8f6424");
 
-  const eyeHiddenForBody = $derived(highlightedSlotId === "body");
+  const bodyShellEmissive = $derived(isActive("body") ? "#3a1f08" : "#120900");
 
-  const getBodyGhostOpacity = () => {
-    if (isActive("body")) {
-      return 0.12;
-    }
+  const bodyShellEmissiveIntensity = $derived(isActive("body") ? 0.48 : 0.25);
 
-    if (isMuted("body")) {
-      return 0.04;
-    }
+  const bodyGlowOpacity = $derived(isActive("body") ? 0.16 : 0);
 
-    return 0.12;
-  };
+  const swordGlowOpacity = $derived(isActive("utility-c") ? 0.22 : 0);
 
-  const bodyGhostOpacity = $derived(getBodyGhostOpacity());
-
-  const getSwordGlowOpacity = () => {
-    if (isActive("utility-c")) {
-      return 0.22;
-    }
-
-    if (isMuted("utility-c")) {
-      return 0;
-    }
-
-    return 0;
-  };
-
-  const swordGlowOpacity = $derived(getSwordGlowOpacity());
-
-  const getSwordLightIntensity = () => {
-    if (isActive("utility-c")) {
-      return 1.35;
-    }
-
-    if (isMuted("utility-c")) {
-      return 0;
-    }
-
-    return 0;
-  };
-
-  const swordLightIntensity = $derived(getSwordLightIntensity());
+  const swordLightIntensity = $derived(isActive("utility-c") ? 1.35 : 0);
 
   const utilityFillOpacityFor = (slotId: MachineSlotId) => {
-    if (isMuted(slotId)) {
-      return opacityFor(slotId);
-    }
-
-    if (isActive(slotId)) {
-      return 1;
-    }
-
-    return 0.72;
-  };
-
-  const setHoveredSlot = (slotId: MachineSlotId | null) => {
-    if (localHoveredSlotId === slotId) {
-      return;
-    }
-
-    localHoveredSlotId = slotId;
-    onHoverSlot?.(slotId);
-  };
-
-  const handlePreviewPointerMove = (event: PointerEvent) => {
-    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = ((event.clientX - bounds.left) / bounds.width) * 100;
-    const y = ((event.clientY - bounds.top) / bounds.height) * 100;
-    const hitZone = partHitZones.find(
-      (zone) =>
-        x >= zone.minX && x <= zone.maxX && y >= zone.minY && y <= zone.maxY
-    );
-
-    setHoveredSlot(hitZone?.slotId ?? null);
+    return isActive(slotId) ? 1 : 0.72;
   };
 </script>
 
-<div
-  class="orb-preview"
-  role="img"
-  aria-label="Machine chassis part preview"
-  onpointerleave={() => setHoveredSlot(null)}
-  onpointermove={handlePreviewPointerMove}
->
+<div class="orb-preview" role="img" aria-label="Machine chassis part preview">
   <Canvas dpr={2} shadows={PCFSoftShadowMap}>
     <T.PerspectiveCamera fov={35} makeDefault position={[0, 0.5, 5.35]}>
       <OrbitControls
         enableDamping
         enablePan={false}
-        enableZoom={false}
+        enableZoom
+        maxDistance={6.15}
+        minDistance={3.45}
         maxPolarAngle={Math.PI * 0.68}
         minPolarAngle={Math.PI * 0.26}
         rotateSpeed={0.65}
         target={[0.05, 0, 0]}
+        zoomSpeed={0.72}
       />
     </T.PerspectiveCamera>
 
@@ -195,7 +110,7 @@
     <T.PointLight
       color="#78f7ff"
       distance={4.8}
-      intensity={inspectionActive ? 1.2 : 1.65}
+      intensity={inspectionActive ? 1.35 : 1.65}
       position={[0, -0.14, 1.6]}
     />
 
@@ -208,26 +123,22 @@
         <T.Mesh renderOrder={30} scale={[1.08, 1.08, 1.08]}>
           <T.SphereGeometry args={[1, 32, 16]} />
           <T.MeshBasicMaterial
-            color="#f4fbff"
+            color="#ffc267"
             depthFunc={GreaterDepth}
-            opacity={bodyGhostOpacity}
+            opacity={bodyGlowOpacity}
             transparent
             depthWrite={false}
-            wireframe={wireframeFor("body")}
           />
         </T.Mesh>
 
         <T.Mesh castShadow receiveShadow>
           <T.SphereGeometry args={[1, 72, 36]} />
           <T.MeshStandardMaterial
-            color="#8f6424"
-            emissive="#120900"
-            emissiveIntensity={0.25}
+            color={bodyShellColor}
+            emissive={bodyShellEmissive}
+            emissiveIntensity={bodyShellEmissiveIntensity}
             metalness={0.95}
-            opacity={opacityFor("body")}
-            roughness={0.42}
-            transparent={isMuted("body")}
-            wireframe={wireframeFor("body")}
+            roughness={isActive("body") ? 0.32 : 0.42}
           />
         </T.Mesh>
 
@@ -238,10 +149,7 @@
             emissive="#000000"
             emissiveIntensity={0}
             metalness={1}
-            opacity={opacityFor("body")}
             roughness={0.35}
-            transparent={isMuted("body")}
-            wireframe={wireframeFor("body")}
           />
         </T.Mesh>
 
@@ -250,10 +158,7 @@
           <T.MeshStandardMaterial
             color="#3a2412"
             metalness={0.8}
-            opacity={opacityFor("body")}
             roughness={0.55}
-            transparent={isMuted("body")}
-            wireframe={wireframeFor("body")}
           />
         </T.Mesh>
 
@@ -262,63 +167,31 @@
           <T.MeshStandardMaterial
             color="#3a2412"
             metalness={0.8}
-            opacity={opacityFor("body")}
             roughness={0.55}
-            transparent={isMuted("body")}
-            wireframe={wireframeFor("body")}
           />
         </T.Mesh>
 
-        <T.Mesh
-          position={[0, 0.22, 0.965]}
-          rotation={[Math.PI / 2, 0, 0]}
-          visible={!eyeHiddenForBody}
-        >
+        <T.Mesh position={[0, 0.22, 0.965]} rotation={[Math.PI / 2, 0, 0]}>
           <T.CylinderGeometry args={[0.31, 0.31, 0.055, 40]} />
           <T.MeshStandardMaterial
-            color={isActive("attack") ? "#20363a" : "#15120f"}
+            color={eyeShellColor}
             emissive={isActive("attack") ? "#35e9ff" : "#000000"}
             emissiveIntensity={isActive("attack") ? 0.42 : 0}
             metalness={0.7}
-            opacity={opacityFor("attack")}
             roughness={0.35}
-            transparent={isMuted("attack")}
-            wireframe={wireframeFor("attack")}
           />
         </T.Mesh>
 
-        <T.Mesh
-          position={[0, 0.22, 1.003]}
-          rotation={[Math.PI / 2, 0, 0]}
-          visible={!eyeHiddenForBody}
-        >
+        <T.Mesh position={[0, 0.22, 1.003]} rotation={[Math.PI / 2, 0, 0]}>
           <T.CylinderGeometry args={[0.19, 0.19, 0.035, 40]} />
           <T.MeshBasicMaterial
-            blending={isActive("attack") ? AdditiveBlending : undefined}
-            color={isActive("attack") ? "#eaffff" : "#8ff7ff"}
-            opacity={opacityFor("attack")}
+            blending={isActive("attack") ? AdditiveBlending : NormalBlending}
+            color={eyeGlassColor}
+            opacity={isActive("attack") ? 1 : 0.82}
             toneMapped={false}
-            transparent={isMuted("attack")}
-            wireframe={wireframeFor("attack")}
+            transparent
           />
         </T.Mesh>
-
-        {#if eyeHiddenForBody}
-          <T.Mesh position={[0, 0.22, 1.014]} rotation={[Math.PI / 2, 0, 0]}>
-            <T.CylinderGeometry args={[0.34, 0.34, 0.026, 48]} />
-            <T.MeshBasicMaterial color="#030606" opacity={0.92} transparent />
-          </T.Mesh>
-          <T.Mesh position={[0, 0.22, 1.022]} rotation={[Math.PI / 2, 0, 0]}>
-            <T.TorusGeometry args={[0.34, 0.022, 12, 48]} />
-            <T.MeshStandardMaterial
-              color="#4b2a12"
-              emissive="#140905"
-              emissiveIntensity={0.2}
-              metalness={0.85}
-              roughness={0.48}
-            />
-          </T.Mesh>
-        {/if}
 
         {#if isActive("attack")}
           <T.PointLight
@@ -329,6 +202,15 @@
           />
         {/if}
 
+        {#if isActive("body")}
+          <T.PointLight
+            color="#ffb84f"
+            intensity={1.35}
+            distance={3.3}
+            position={[-0.2, 0.18, 1.2]}
+          />
+        {/if}
+
         {#each scratches as scratch}
           <T.Mesh
             position={scratch.position}
@@ -336,13 +218,7 @@
             scale={scratch.scale}
           >
             <T.BoxGeometry args={[1, 1, 1]} />
-            <T.MeshStandardMaterial
-              color="#16100b"
-              opacity={opacityFor("body")}
-              roughness={0.8}
-              transparent={isMuted("body")}
-              wireframe={wireframeFor("body")}
-            />
+            <T.MeshStandardMaterial color="#16100b" roughness={0.8} />
           </T.Mesh>
         {/each}
 
@@ -354,10 +230,7 @@
               emissive="#000000"
               emissiveIntensity={0}
               metalness={1}
-              opacity={opacityFor("body")}
               roughness={0.32}
-              transparent={isMuted("body")}
-              wireframe={wireframeFor("body")}
             />
           </T.Mesh>
         {/each}
@@ -373,10 +246,7 @@
                   : "#000000"}
                 emissiveIntensity={isActive(slotId as MachineSlotId) ? 0.9 : 0}
                 metalness={0.65}
-                opacity={opacityFor(slotId as MachineSlotId)}
                 roughness={0.28}
-                transparent={isMuted(slotId as MachineSlotId)}
-                wireframe={wireframeFor(slotId as MachineSlotId)}
               />
             </T.Mesh>
             <T.Mesh position={[0, 0, 0.02]}>
@@ -384,12 +254,11 @@
               <T.MeshBasicMaterial
                 blending={isActive(slotId as MachineSlotId)
                   ? AdditiveBlending
-                  : undefined}
+                  : NormalBlending}
                 color={isActive(slotId as MachineSlotId) ? "#ffffff" : "#27313a"}
                 opacity={utilityFillOpacityFor(slotId as MachineSlotId)}
                 toneMapped={false}
                 transparent
-                wireframe={wireframeFor(slotId as MachineSlotId)}
               />
             </T.Mesh>
           </T.Group>
@@ -406,10 +275,7 @@
           <T.MeshStandardMaterial
             color={isActive("utility-c") ? "#272018" : "#17110c"}
             metalness={0.8}
-            opacity={opacityFor("utility-c")}
             roughness={0.45}
-            transparent={isMuted("utility-c")}
-            wireframe={wireframeFor("utility-c")}
           />
         </T.Mesh>
 
@@ -420,10 +286,7 @@
             emissive={isActive("utility-c") ? "#f59e0b" : "#000000"}
             emissiveIntensity={isActive("utility-c") ? 0.32 : 0}
             metalness={1}
-            opacity={opacityFor("utility-c")}
             roughness={0.3}
-            transparent={isMuted("utility-c")}
-            wireframe={wireframeFor("utility-c")}
           />
         </T.Mesh>
 
@@ -432,10 +295,7 @@
           <T.MeshStandardMaterial
             color={isActive("utility-c") ? "#f5c869" : "#d19a38"}
             metalness={1}
-            opacity={opacityFor("utility-c")}
             roughness={0.28}
-            transparent={isMuted("utility-c")}
-            wireframe={wireframeFor("utility-c")}
           />
         </T.Mesh>
 
@@ -446,10 +306,7 @@
             emissive="#0f3a44"
             emissiveIntensity={isActive("utility-c") ? 0.14 : 0.03}
             metalness={0.28}
-            opacity={opacityFor("utility-c")}
             roughness={0.22}
-            transparent={isMuted("utility-c")}
-            wireframe={wireframeFor("utility-c")}
           />
         </T.Mesh>
 
@@ -462,7 +319,6 @@
             opacity={swordGlowOpacity}
             toneMapped={false}
             transparent
-            wireframe={wireframeFor("utility-c")}
           />
         </T.Mesh>
 
@@ -473,10 +329,7 @@
             emissive="#0b2b34"
             emissiveIntensity={isActive("utility-c") ? 0.12 : 0.02}
             metalness={0.22}
-            opacity={opacityFor("utility-c")}
             roughness={0.24}
-            transparent={isMuted("utility-c")}
-            wireframe={wireframeFor("utility-c")}
           />
         </T.Mesh>
 

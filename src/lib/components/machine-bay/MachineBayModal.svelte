@@ -36,26 +36,26 @@
 
   const slotPresentation = {
     attack: {
+      code: "EYE",
       label: "Eye Module",
-      path: "M18 17 L46 42",
     },
     body: {
+      code: "BODY",
       label: "Body Module",
-      path: "M82 17 L62 33",
     },
     "utility-a": {
+      code: "Utility 1",
       label: "Utility Module",
-      path: "M18 74 L37 58",
     },
     "utility-b": {
+      code: "Utility 2",
       label: "Utility Module",
-      path: "M82 50 L67 38",
     },
     "utility-c": {
+      code: "SWORD",
       label: "Sword Module",
-      path: "M50 86 L66 61",
     },
-  } satisfies Record<MachineSlotId, { label: string; path: string }>;
+  } satisfies Record<MachineSlotId, { code: string; label: string }>;
 
   let {
     gearCount,
@@ -76,33 +76,50 @@
     hoveredSlotId = null;
   };
 
+  const handleStagePointerMove = (event: PointerEvent) => {
+    const target = event.target;
+    const isInsideSlot =
+      target instanceof Element && target.closest(".loadout-slot");
+
+    if (!isInsideSlot) {
+      hoveredSlotId = null;
+    }
+  };
+
+  const machineStatAccent = "#fbbf24";
+
   const statReadouts = $derived([
     {
-      accent: "#f87171",
+      accent: machineStatAccent,
+      description: "Damage dealt by each shot.",
       iconUrl: damageStatIconUrl,
       label: "Damage",
       value: `${machineStats.damage}`,
     },
     {
-      accent: "#facc15",
+      accent: machineStatAccent,
+      description: "Shots fired per second.",
       iconUrl: fireRateStatIconUrl,
       label: "Fire Rate",
       value: `${machineStats.fireRate.toFixed(2)}/s`,
     },
     {
-      accent: "#4ade80",
+      accent: machineStatAccent,
+      description: "Maximum machine health.",
       iconUrl: healthStatIconUrl,
       label: "Max HP",
       value: `${machineStats.maxHealth}`,
     },
     {
-      accent: "#60a5fa",
+      accent: machineStatAccent,
+      description: "Shots available before reloading.",
       iconUrl: magazineStatIconUrl,
       label: "Magazine",
       value: `${machineStats.magazineSize}`,
     },
     {
-      accent: "#fbbf24",
+      accent: machineStatAccent,
+      description: "Time needed to reload.",
       iconUrl: reloadStatIconUrl,
       label: "Reload",
       value: `${(machineStats.reloadDurationMs / 1000).toFixed(2)}s`,
@@ -180,21 +197,25 @@
           {#each statReadouts as stat}
             <div
               class="stat-chip"
-              aria-label={`${stat.label} ${stat.value}`}
+              aria-label={`${stat.label}: ${stat.value}. ${stat.description}`}
+              data-tooltip={`${stat.label}: ${stat.description}`}
               style:--stat={stat.accent}
             >
-              <img
-                class="stat-icon"
-                src={stat.iconUrl}
-                alt=""
-                aria-hidden="true"
-              >
+              <span class="stat-icon-frame" aria-hidden="true">
+                <img class="stat-icon" src={stat.iconUrl} alt="">
+              </span>
               <strong>{stat.value}</strong>
             </div>
           {/each}
 
-          <div class="stat-chip gear-chip" aria-label={`Gears ${gearCount}`}>
-            <img src={gearCurrencyUrl} alt="" aria-hidden="true">
+          <div
+            class="stat-chip gear-chip"
+            aria-label={`Gears: ${gearCount}. Currency used for machine modules.`}
+            data-tooltip="Gears: Currency used for machine modules."
+          >
+            <span class="stat-icon-frame" aria-hidden="true">
+              <img class="stat-icon" src={gearCurrencyUrl} alt="">
+            </span>
             <strong>{gearCount}</strong>
           </div>
         </div>
@@ -221,28 +242,15 @@
             >
           </div>
 
-          <div class="chassis-stage">
-            <svg
-              class="callout-lines"
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              {#each socketViews as socket (socket.slot.id)}
-                <path
-                  class="callout-line"
-                  class:active={hoveredSlotId === socket.slot.id}
-                  d={socket.presentation.path}
-                  style:--accent={socket.accent}
-                />
-              {/each}
-            </svg>
-
+          <div
+            class="chassis-stage"
+            onpointercancel={clearHoveredSlot}
+            onpointerleave={clearHoveredSlot}
+            onpointermove={handleStagePointerMove}
+            role="presentation"
+          >
             <div class="model-port">
-              <MachineBayOrbPreview
-                highlightedSlotId={hoveredSlotId}
-                onHoverSlot={(slotId) => (hoveredSlotId = slotId)}
-              />
+              <MachineBayOrbPreview highlightedSlotId={hoveredSlotId} />
             </div>
 
             <div class="loadout-slots">
@@ -258,6 +266,11 @@
                   style:--accent={socket.accent}
                   style:--rarity={socket.rarityAccent}
                 >
+                  <div class="slot-kicker">
+                    <span>{socket.presentation.code}</span>
+                    <small>{socket.presentation.label}</small>
+                  </div>
+
                   {#if socket.template}
                     <div class="module-head">
                       <div class="module-glyph" aria-hidden="true">
@@ -294,9 +307,6 @@
                       </button>
                     </div>
                   {:else}
-                    <div class="socket-label">
-                      <span>{socket.presentation.label}</span>
-                    </div>
                     <div class="empty-copy">
                       <strong>Empty socket</strong>
                       <span>
@@ -452,6 +462,7 @@
   .module-head,
   .inventory-actions,
   .panel-title,
+  .slot-kicker,
   .socket-label,
   .slot-footer,
   .tag-row,
@@ -477,6 +488,7 @@
   }
 
   .panel-title span,
+  .slot-kicker small,
   .socket-label small,
   .module-head small,
   p,
@@ -507,6 +519,7 @@
   }
 
   .stat-chip {
+    position: relative;
     display: inline-flex;
     gap: 0.42rem;
     align-items: center;
@@ -528,10 +541,55 @@
       0 0 0.9rem color-mix(in srgb, var(--stat, #fbbf24) 8%, transparent);
   }
 
-  .stat-icon,
-  .gear-chip img {
-    inline-size: 1.46rem;
-    block-size: 1.46rem;
+  .stat-chip::after {
+    position: absolute;
+    inset-block-start: calc(100% + 0.42rem);
+    inset-inline-start: 50%;
+    z-index: 8;
+    visibility: hidden;
+    inline-size: max-content;
+    max-inline-size: 13rem;
+    padding: 0.42rem 0.5rem;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.18;
+    color: #fff7d7;
+    text-align: center;
+    white-space: normal;
+    pointer-events: none;
+    content: attr(data-tooltip);
+    background: rgba(8, 11, 10, 0.96);
+    border: 1px solid color-mix(in srgb, var(--stat, #fbbf24) 42%, #2a2110);
+    border-radius: 5px;
+    box-shadow:
+      0 0.55rem 1.3rem rgba(0, 0, 0, 0.42),
+      0 0 0.8rem color-mix(in srgb, var(--stat, #fbbf24) 13%, transparent);
+    opacity: 0;
+    transform: translate(-50%, -0.15rem);
+    transition:
+      opacity 120ms ease,
+      visibility 120ms ease,
+      transform 120ms ease;
+  }
+
+  .stat-chip:hover::after {
+    visibility: visible;
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  .stat-icon-frame {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    inline-size: 1.9rem;
+    block-size: 1.9rem;
+    overflow: hidden;
+  }
+
+  .stat-icon {
+    inline-size: 1.75rem;
+    block-size: 1.75rem;
     object-fit: contain;
     filter: drop-shadow(0 0.1rem 0.12rem rgba(0, 0, 0, 0.44))
       drop-shadow(
@@ -554,12 +612,12 @@
   }
 
   .bay-button {
-    gap: 0.42rem;
+    gap: 0.32rem;
     justify-content: center;
     min-inline-size: 0;
-    min-block-size: 2.15rem;
-    padding: 0.5rem 0.68rem;
-    font-size: 0.74rem;
+    min-block-size: 1.72rem;
+    padding: 0.34rem 0.5rem;
+    font-size: 0.66rem;
     font-weight: 900;
     line-height: 1;
     color: #061015;
@@ -571,8 +629,8 @@
 
   .bay-button svg {
     flex: 0 0 auto;
-    inline-size: 0.92rem;
-    block-size: 0.92rem;
+    inline-size: 0.78rem;
+    block-size: 0.78rem;
     fill: none;
     stroke: currentColor;
     stroke-width: 2.25;
@@ -645,7 +703,7 @@
 
   .bay-layout {
     display: grid;
-    grid-template-columns: minmax(46rem, 1fr) minmax(18rem, 0.58fr);
+    grid-template-columns: minmax(0, 1.72fr) minmax(16.75rem, 0.78fr);
     min-block-size: 0;
   }
 
@@ -653,8 +711,9 @@
   .inventory-panel {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
+    min-inline-size: 0;
     min-block-size: 0;
-    padding: 1rem;
+    padding: 0.72rem;
   }
 
   .socket-panel {
@@ -664,8 +723,8 @@
   .panel-title {
     gap: 1rem;
     justify-content: space-between;
-    min-block-size: 2.3rem;
-    margin-bottom: 0.85rem;
+    min-block-size: 1.9rem;
+    margin-bottom: 0.48rem;
   }
 
   .panel-title > div {
@@ -686,23 +745,25 @@
   }
 
   .chassis-stage {
+    --module-card-height: 8.05rem;
+    --module-side-fr: 0.56fr;
+
     position: relative;
     display: grid;
     grid-template-areas:
       "attack model body"
       "utility-a model utility-b"
+      ". model ."
       ". utility-c .";
-    grid-template-rows: minmax(10rem, auto) minmax(10rem, auto) minmax(
-        8.5rem,
-        auto
-      );
-    grid-template-columns: minmax(11.8rem, 1fr) minmax(12.5rem, 0.86fr) minmax(
-        11.8rem,
-        1fr
-      );
-    gap: 0.78rem;
+    grid-template-rows:
+      var(--module-card-height) minmax(var(--module-card-height), 1fr)
+      minmax(1.1rem, 0.34fr) var(--module-card-height);
+    grid-template-columns:
+      minmax(9.4rem, var(--module-side-fr)) minmax(0, 1fr)
+      minmax(9.4rem, var(--module-side-fr));
+    gap: 0.58rem;
     min-block-size: 0;
-    padding: 0.9rem;
+    padding: 0.58rem;
     overflow: hidden;
     background:
       radial-gradient(
@@ -727,37 +788,9 @@
     grid-area: model;
     align-self: center;
     justify-self: center;
-    inline-size: min(29.7rem, 100%);
+    inline-size: min(100%, clamp(19rem, 38vw, 30rem));
     aspect-ratio: 1;
     border-radius: 50%;
-  }
-
-  .callout-lines {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-  }
-
-  .callout-line {
-    fill: none;
-    opacity: 0.36;
-    stroke: color-mix(in srgb, var(--accent, #38bdf8) 52%, transparent);
-    stroke-width: 0.28;
-    stroke-linecap: round;
-    transition:
-      opacity 160ms ease,
-      stroke-width 160ms ease,
-      filter 160ms ease;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .callout-line.active {
-    opacity: 0.92;
-    filter: drop-shadow(
-      0 0 0.42rem color-mix(in srgb, var(--accent, #38bdf8) 68%, transparent)
-    );
-    stroke-width: 0.54;
   }
 
   .loadout-slots {
@@ -766,8 +799,9 @@
 
   .loadout-slot,
   .inventory-item {
+    box-sizing: border-box;
     display: grid;
-    gap: 0.62rem;
+    gap: 0.34rem;
     align-content: start;
     min-inline-size: 0;
     overflow: hidden;
@@ -790,9 +824,11 @@
   .loadout-slot {
     position: relative;
     z-index: 3;
-    inline-size: 100%;
-    min-block-size: 9.8rem;
-    padding: 0.76rem;
+    align-self: start;
+    inline-size: min(100%, 11.8rem);
+    block-size: var(--module-card-height);
+    min-block-size: 0;
+    padding: 0.46rem;
     transition:
       border-color 160ms ease,
       box-shadow 160ms ease,
@@ -802,22 +838,33 @@
 
   .slot-attack {
     grid-area: attack;
+    align-self: start;
+    justify-self: start;
   }
 
   .slot-body {
     grid-area: body;
+    align-self: start;
+    justify-self: end;
   }
 
   .slot-utility-a {
     grid-area: utility-a;
+    align-self: center;
+    justify-self: start;
   }
 
   .slot-utility-b {
     grid-area: utility-b;
+    align-self: center;
+    justify-self: end;
   }
 
   .slot-utility-c {
     grid-area: utility-c;
+    align-self: end;
+    justify-self: center;
+    inline-size: min(100%, 11.8rem);
   }
 
   .loadout-slot.empty {
@@ -844,11 +891,40 @@
     transform: translateY(-2px);
   }
 
-  .socket-label {
-    gap: 0.6rem;
+  .slot-kicker {
+    gap: 0.28rem;
     justify-content: space-between;
-    min-block-size: 1.2rem;
-    font-size: 0.68rem;
+    min-inline-size: 0;
+    min-block-size: 0.9rem;
+    font-size: 0.54rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  .slot-kicker span {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: color-mix(in srgb, var(--accent, #f59e0b) 72%, white);
+    white-space: nowrap;
+  }
+
+  .slot-kicker small {
+    flex: 0 1 45%;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: end;
+    white-space: nowrap;
+  }
+
+  .socket-label {
+    gap: 0.38rem;
+    justify-content: space-between;
+    min-block-size: 0.95rem;
+    font-size: 0.58rem;
     font-weight: 900;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -868,20 +944,20 @@
   }
 
   .module-head {
-    gap: 0.62rem;
+    gap: 0.42rem;
     min-inline-size: 0;
   }
 
   .module-head > div:last-child {
     display: grid;
-    gap: 0.18rem;
+    gap: 0.08rem;
     min-inline-size: 0;
   }
 
   .module-head strong {
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 0.86rem;
+    font-size: 0.74rem;
     line-height: 1.1;
     white-space: nowrap;
   }
@@ -889,8 +965,8 @@
   .module-head small {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.32rem;
-    font-size: 0.62rem;
+    gap: 0.22rem;
+    font-size: 0.54rem;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -905,8 +981,8 @@
     display: grid;
     flex: 0 0 auto;
     place-items: center;
-    inline-size: 2.45rem;
-    block-size: 2.45rem;
+    inline-size: 1.78rem;
+    block-size: 1.78rem;
     background: radial-gradient(
       circle,
       color-mix(in srgb, var(--accent) 26%, transparent),
@@ -920,21 +996,26 @@
   }
 
   .module-glyph img {
-    inline-size: 2.8rem;
-    block-size: 2.8rem;
+    inline-size: 2.05rem;
+    block-size: 2.05rem;
     object-fit: contain;
     filter: drop-shadow(0 0.28rem 0.32rem rgba(0, 0, 0, 0.38));
   }
 
   p {
-    min-block-size: 2.35em;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    min-block-size: 0;
     margin: 0;
-    font-size: 0.73rem;
-    line-height: 1.28;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    font-size: 0.64rem;
+    line-height: 1.16;
   }
 
   .slot-footer {
-    gap: 0.55rem;
+    gap: 0.34rem;
     justify-content: space-between;
     margin-top: auto;
   }
@@ -942,12 +1023,12 @@
   .tag-row {
     flex: 1 1 auto;
     flex-wrap: wrap;
-    gap: 0.32rem;
+    gap: 0.22rem;
   }
 
   .tag-row span {
-    padding: 0.2rem 0.4rem;
-    font-size: 0.64rem;
+    padding: 0.13rem 0.3rem;
+    font-size: 0.56rem;
     font-weight: 900;
     color: color-mix(in srgb, var(--accent) 76%, white);
     background: color-mix(in srgb, var(--accent) 13%, transparent);
@@ -958,15 +1039,15 @@
   .empty-copy,
   .inventory-empty {
     display: grid;
-    gap: 0.3rem;
+    gap: 0.18rem;
     place-content: center;
-    min-block-size: 7.2rem;
+    min-block-size: 4.25rem;
     text-align: center;
   }
 
   .empty-copy strong,
   .inventory-empty strong {
-    font-size: 0.92rem;
+    font-size: 0.78rem;
   }
 
   .inventory-panel {
@@ -1045,11 +1126,16 @@
   @media (max-width: 760px) {
     .backdrop {
       align-items: stretch;
+      justify-items: stretch;
+      inline-size: 100dvw;
+      block-size: 100dvh;
       padding: 0;
     }
 
     .bay {
-      block-size: 100vh;
+      inline-size: 100dvw;
+      max-inline-size: none;
+      block-size: 100dvh;
       border-width: 0;
       border-radius: 0;
     }
@@ -1057,9 +1143,18 @@
     .bay-header {
       display: grid;
       grid-template-columns: 1fr auto;
+      gap: 0.58rem;
       align-items: start;
       min-block-size: auto;
-      padding: 0.72rem;
+      padding: 0.58rem 0.62rem;
+    }
+
+    .bay-heading {
+      min-inline-size: 0;
+    }
+
+    .bay-heading strong {
+      font-size: 0.98rem;
     }
 
     .close-button {
@@ -1074,6 +1169,7 @@
       grid-column: 1 / -1;
       padding-block-end: 0.12rem;
       overflow-x: auto;
+      overscroll-behavior-inline: contain;
       scrollbar-width: none;
     }
 
@@ -1088,10 +1184,14 @@
       padding: 0.25rem 0.42rem;
     }
 
-    .stat-icon,
-    .gear-chip img {
-      inline-size: 1.2rem;
-      block-size: 1.2rem;
+    .stat-icon-frame {
+      inline-size: 1.62rem;
+      block-size: 1.62rem;
+    }
+
+    .stat-icon {
+      inline-size: 1.48rem;
+      block-size: 1.48rem;
     }
 
     .stat-chip strong {
@@ -1101,7 +1201,7 @@
 
     .socket-panel,
     .inventory-panel {
-      padding: 0.72rem;
+      padding: 0.55rem;
     }
 
     .socket-panel {
@@ -1109,15 +1209,19 @@
     }
 
     .chassis-stage {
+      --module-card-height: 7.65rem;
+
       display: grid;
       grid-template-areas:
-        "model"
-        "slots";
-      grid-template-rows: auto auto;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0.75rem;
-      padding: 0.75rem;
-      overflow: visible;
+        "model model"
+        "attack body"
+        "utility-a utility-b"
+        "utility-c utility-c";
+      grid-template-rows: auto repeat(3, var(--module-card-height));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+      padding: 0.55rem;
+      overflow: hidden;
     }
 
     .model-port {
@@ -1125,45 +1229,88 @@
       inset: auto;
       grid-area: model;
       justify-self: center;
-      inline-size: min(19.8rem, 92%);
+      inline-size: min(12.8rem, 56vw);
       transform: none;
     }
 
-    .callout-lines {
-      display: none;
-    }
-
     .loadout-slots {
-      display: grid;
-      grid-area: slots;
-      grid-template-columns: 1fr;
-      gap: 0.62rem;
+      display: contents;
     }
 
     .loadout-slot {
       position: relative;
       inset: auto;
       inline-size: 100%;
+      block-size: var(--module-card-height);
       min-block-size: 0;
+      padding: 0.42rem;
       transform: none;
     }
 
-    .slot-attack,
-    .slot-body,
-    .slot-utility-a,
-    .slot-utility-b,
+    .slot-attack {
+      grid-area: attack;
+    }
+
+    .slot-body {
+      grid-area: body;
+    }
+
+    .slot-utility-a {
+      grid-area: utility-a;
+    }
+
+    .slot-utility-b {
+      grid-area: utility-b;
+    }
+
     .slot-utility-c {
-      grid-area: auto;
+      grid-area: utility-c;
+      grid-column: 1 / -1;
+      justify-self: center;
+      inline-size: min(50%, 11.8rem);
+    }
+
+    .module-head {
+      gap: 0.34rem;
+    }
+
+    .module-head strong {
+      font-size: 0.68rem;
+    }
+
+    .module-glyph {
+      inline-size: 1.48rem;
+      block-size: 1.48rem;
+    }
+
+    .module-glyph img {
+      inline-size: 1.72rem;
+      block-size: 1.72rem;
+    }
+
+    .empty-copy {
+      min-block-size: 0;
+    }
+
+    p {
+      -webkit-line-clamp: 1;
+      line-clamp: 1;
+      font-size: 0.58rem;
+    }
+
+    .tag-row span {
+      font-size: 0.5rem;
+    }
+
+    .bay-button {
+      min-block-size: 1.55rem;
+      font-size: 0.62rem;
     }
 
     .slot-footer,
     .inventory-actions {
       flex-direction: column;
       align-items: stretch;
-    }
-
-    .bay-button {
-      inline-size: 100%;
     }
   }
 
@@ -1174,6 +1321,11 @@
       align-items: start;
     }
 
+    .slot-utility-c {
+      inline-size: min(64%, 11.8rem);
+    }
+
+    .slot-kicker,
     .socket-label {
       flex-direction: column;
       gap: 0.15rem;
@@ -1182,6 +1334,27 @@
 
     .socket-label small {
       text-align: start;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .chassis-stage {
+      --module-card-height: 6.55rem;
+
+      grid-template-areas:
+        "model"
+        "attack"
+        "body"
+        "utility-a"
+        "utility-b"
+        "utility-c";
+      grid-template-rows: auto repeat(5, var(--module-card-height));
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .slot-utility-c {
+      grid-column: auto;
+      inline-size: 100%;
     }
   }
 </style>
