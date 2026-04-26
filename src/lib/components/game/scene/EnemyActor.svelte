@@ -514,49 +514,52 @@
       {/each}
     </T.Group>
   {:else}
-    {#if stealthDistortionVisible}
-      <T.Mesh
-        geometry={enemyRingGeometry}
-        position={[0, -enemy.radius + 0.08, 0]}
-        renderOrder={13}
-        rotation={[-Math.PI / 2, 0, animationNow * 0.0031]}
-        scale={[
-          enemy.radius * (0.42 + stealthReveal * 0.34),
-          enemy.radius * (0.42 + stealthReveal * 0.34),
-          1,
-        ]}
-      >
-        <T.MeshBasicMaterial
-          color={enemy.color}
-          depthWrite={false}
-          opacity={stealthShimmerOpacity}
-          transparent
-        />
-      </T.Mesh>
+    {#if isStealther}
+      <T.Group visible={stealthDistortionVisible}>
+        <T.Mesh
+          geometry={enemyRingGeometry}
+          position={[0, -enemy.radius + 0.08, 0]}
+          renderOrder={13}
+          rotation={[-Math.PI / 2, 0, animationNow * 0.0031]}
+          scale={[
+            enemy.radius * (0.42 + stealthReveal * 0.34),
+            enemy.radius * (0.42 + stealthReveal * 0.34),
+            1,
+          ]}
+        >
+          <T.MeshBasicMaterial
+            color={enemy.color}
+            depthWrite={false}
+            opacity={stealthShimmerOpacity}
+            transparent
+          />
+        </T.Mesh>
 
-      <T.Mesh
-        geometry={stealthWingGeometry}
-        renderOrder={14}
-        scale={[
-          enemy.radius * (0.58 + Math.sin(animationNow * 0.009) * 0.012),
-          enemy.radius * (0.04 + Math.sin(animationNow * 0.007) * 0.006),
-          enemy.radius * (0.72 + Math.cos(animationNow * 0.009) * 0.012),
-        ]}
-      >
-        <T.MeshBasicMaterial
-          color="#dffbff"
-          depthWrite={false}
-          opacity={0.003 + (stealthMoving ? 0.01 : 0) + stealthRevealCurve * 0.06}
-          transparent
-          wireframe
-        />
-      </T.Mesh>
+        <T.Mesh
+          geometry={stealthWingGeometry}
+          renderOrder={14}
+          scale={[
+            enemy.radius * (0.58 + Math.sin(animationNow * 0.009) * 0.012),
+            enemy.radius * (0.04 + Math.sin(animationNow * 0.007) * 0.006),
+            enemy.radius * (0.72 + Math.cos(animationNow * 0.009) * 0.012),
+          ]}
+        >
+          <T.MeshBasicMaterial
+            color="#dffbff"
+            depthWrite={false}
+            opacity={0.003 + (stealthMoving ? 0.01 : 0) + stealthRevealCurve * 0.06}
+            transparent
+            wireframe
+          />
+        </T.Mesh>
+      </T.Group>
     {/if}
 
-    {#if stealthShowBody && isStealther}
+    {#if isStealther}
       <T.Group
         rotation={[0, stealthDroneYaw, 0]}
         scale={[1, 0.92 + stealthReveal * 0.08, 1]}
+        visible={stealthShowBody}
       >
         <T.Mesh
           geometry={stealthWingGeometry}

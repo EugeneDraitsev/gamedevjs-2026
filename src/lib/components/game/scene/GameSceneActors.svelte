@@ -99,6 +99,7 @@
   import {
     getMachineModule,
     getMachineModuleKindAccent,
+    machineModuleIds,
   } from "$lib/config/machine-modules";
   import { enemyTemplateById } from "$lib/config/room-templates";
   import type { ShopOffer } from "$lib/config/shop-offers";
@@ -157,6 +158,9 @@
     "iron-warden",
     "mine-herald",
     "gate-keeper",
+    "veil-stalker",
+    "blast-runner",
+    "wheel-slinger",
   ].map((templateId, index) => {
     const template = enemyTemplateById[templateId];
 
@@ -231,6 +235,16 @@
       ttlMs: 1000,
       velocity: [0, 0, 1],
     },
+    {
+      color: "#ffb648",
+      damage: 1,
+      id: "enemy-shot-warmup-wheel",
+      kind: "wheel",
+      position: [1.6, 0.62, 0],
+      radius: 0.46,
+      ttlMs: 1000,
+      velocity: [0, 0, 1],
+    },
   ];
   const gateLaserWarmups: ActiveGateLaser[] = [
     {
@@ -293,33 +307,27 @@
     },
   ];
   const shopOfferWarmups: ShopOffer[] = [
-    {
-      id: "shop-warmup-module-a",
-      kind: "module",
-      moduleId: "arc-splitter-coil",
-      position: [-5.4, 0.6, -2.4],
-      price: 5,
-      value: 0,
-    },
-    {
-      id: "shop-warmup-module-b",
-      kind: "module",
-      moduleId: "rivet-press-core",
-      position: [-1.8, 0.6, -2.4],
-      price: 5,
-      value: 0,
-    },
+    ...machineModuleIds.map(
+      (moduleId, index): ShopOffer => ({
+        id: `shop-warmup-module-${moduleId}`,
+        kind: "module",
+        moduleId,
+        position: [(index - machineModuleIds.length / 2) * 1.4, 0.6, -2.4],
+        price: 5,
+        value: 0,
+      })
+    ),
     {
       id: "shop-warmup-heal-small",
       kind: "heal-small",
-      position: [1.8, 0.6, -2.4],
+      position: [-1, 0.6, -1],
       price: 3,
       value: 1,
     },
     {
       id: "shop-warmup-heal-big",
       kind: "heal-big",
-      position: [5.4, 0.6, -2.4],
+      position: [1, 0.6, -1],
       price: 7,
       value: 3,
     },
@@ -570,27 +578,61 @@
 
       {#each enemyShotWarmups as shot (shot.id)}
         <T.Group position={shot.position}>
-          <T.Mesh renderOrder={28} scale={[1.35, 1.35, 1.35]}>
-            <T.SphereGeometry args={[shot.radius, 16, 16]} />
-            <T.MeshBasicMaterial
-              color="#ff8068"
-              depthFunc={GreaterDepth}
-              depthWrite={false}
-              opacity={0.36}
-              transparent
-            />
-          </T.Mesh>
+          {#if shot.kind === "wheel"}
+            <T.Mesh castShadow>
+              <T.TorusGeometry
+                args={[shot.radius * 0.72, shot.radius * 0.2, 10, 24]}
+              />
+              <T.MeshStandardMaterial
+                color="#20242a"
+                emissive={shot.color}
+                emissiveIntensity={0.26}
+                metalness={0.78}
+                roughness={0.28}
+              />
+            </T.Mesh>
 
-          <T.Mesh castShadow>
-            <T.SphereGeometry args={[shot.radius, 16, 16]} />
-            <T.MeshStandardMaterial
-              color={shot.color}
-              emissive={shot.color}
-              emissiveIntensity={0.7}
-              metalness={0.08}
-              roughness={0.16}
-            />
-          </T.Mesh>
+            <T.Mesh>
+              <T.TorusGeometry
+                args={[shot.radius * 0.38, shot.radius * 0.055, 8, 18]}
+              />
+              <T.MeshBasicMaterial color={shot.color} />
+            </T.Mesh>
+
+            <T.Mesh renderOrder={28} rotation={[-Math.PI / 2, 0, 0]}>
+              <T.RingGeometry
+                args={[shot.radius * 1.1, shot.radius * 1.42, 32]}
+              />
+              <T.MeshBasicMaterial
+                color={shot.color}
+                depthWrite={false}
+                opacity={0.34}
+                transparent
+              />
+            </T.Mesh>
+          {:else}
+            <T.Mesh renderOrder={28} scale={[1.35, 1.35, 1.35]}>
+              <T.SphereGeometry args={[shot.radius, 16, 16]} />
+              <T.MeshBasicMaterial
+                color="#ff8068"
+                depthFunc={GreaterDepth}
+                depthWrite={false}
+                opacity={0.36}
+                transparent
+              />
+            </T.Mesh>
+
+            <T.Mesh castShadow>
+              <T.SphereGeometry args={[shot.radius, 16, 16]} />
+              <T.MeshStandardMaterial
+                color={shot.color}
+                emissive={shot.color}
+                emissiveIntensity={0.7}
+                metalness={0.08}
+                roughness={0.16}
+              />
+            </T.Mesh>
+          {/if}
         </T.Group>
       {/each}
 
