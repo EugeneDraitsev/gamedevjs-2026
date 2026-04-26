@@ -165,6 +165,7 @@ export interface ActivePickup {
   createdAt: number;
   id: string;
   kind: PickupKind;
+  magnetizedAt?: number;
   position: Vec3;
   radius: number;
   value: number;

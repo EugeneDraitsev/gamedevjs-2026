@@ -126,6 +126,26 @@ describe("collectPickups", () => {
     expect(result.pickups[0].collectedAt).toBe(100);
   });
 
+  it("pulls gears toward the player when pickup bonus is active", () => {
+    const distantGear: ActivePickup = {
+      ...pickup("gear"),
+      position: [2.2, 0.54, 0],
+      radius: 0.38,
+    };
+    const withoutMagnet = collectPickups([distantGear], [0, 1, 0], 4, 6, 116);
+    const withMagnet = collectPickups([distantGear], [0, 1, 0], 4, 6, 116, {
+      pickupRadiusBonus: 0.38,
+    });
+
+    expect(withoutMagnet.gearDelta).toBe(0);
+    expect(withoutMagnet.pickups[0].position).toEqual(distantGear.position);
+    expect(withMagnet.gearDelta).toBe(0);
+    expect(withMagnet.pickups[0].position[0]).toBeLessThan(
+      distantGear.position[0]
+    );
+    expect(withMagnet.pickups[0].magnetizedAt).toBe(116);
+  });
+
   it("collects gate keys without changing gear or health", () => {
     const result = collectPickups([pickup("key")], [0, 1, 0], 4, 6, 100);
 

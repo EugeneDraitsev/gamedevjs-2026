@@ -39,6 +39,11 @@ export const pickupConfigs = {
 } satisfies Record<PickupKind, PickupConfig>;
 
 export const pickupCollectDurationMs = 360;
+const gearMagnetPullRadiusMultiplier = 4.5;
+const gearMagnetMinElapsedMs = 16;
+const gearMagnetMaxElapsedMs = 50;
+const gearMagnetBaseSpeed = 2.4;
+const gearMagnetBonusSpeedScale = 4.2;
 
 const roomDrops: PickupDrop[] = [
   { kind: "gear", value: 1, weight: 1 },
@@ -79,6 +84,56 @@ const pushPickupAway = (
   return overlapsObstacle(nextPosition, pickup.radius, obstacles)
     ? pickup.position
     : nextPosition;
+};
+
+const getPickupDistance = (pickup: ActivePickup, playerPosition: Vec3) =>
+  Math.hypot(
+    pickup.position[0] - playerPosition[0],
+    pickup.position[2] - playerPosition[2]
+  );
+
+const pullGearTowardPlayer = (
+  pickup: ActivePickup,
+  playerPosition: Vec3,
+  distance: number,
+  now: number,
+  pickupRadiusBonus: number,
+  obstacles?: RoomPlatform[]
+): ActivePickup => {
+  if (distance <= 0) {
+    return { ...pickup, magnetizedAt: now };
+  }
+
+  const elapsedMs = Math.min(
+    gearMagnetMaxElapsedMs,
+    Math.max(
+      gearMagnetMinElapsedMs,
+      now - (pickup.magnetizedAt ?? now - gearMagnetMinElapsedMs)
+    )
+  );
+  const pullStep = Math.min(
+    distance,
+    (gearMagnetBaseSpeed + pickupRadiusBonus * gearMagnetBonusSpeedScale) *
+      (elapsedMs / 1000)
+  );
+  const pullX = (playerPosition[0] - pickup.position[0]) / distance;
+  const pullZ = (playerPosition[2] - pickup.position[2]) / distance;
+  const nextPosition = clampToRoom(
+    [
+      pickup.position[0] + pullX * pullStep,
+      pickup.position[1],
+      pickup.position[2] + pullZ * pullStep,
+    ],
+    pickup.radius
+  );
+
+  return {
+    ...pickup,
+    magnetizedAt: now,
+    position: overlapsObstacle(nextPosition, pickup.radius, obstacles)
+      ? pickup.position
+      : nextPosition,
+  };
 };
 
 export const seededUnit = (seed: string) => {
@@ -180,6 +235,7 @@ export const collectPickups = (
   let gearDelta = 0;
   let keyDelta = 0;
   let nextHealth = health;
+  const pickupRadiusBonus = Math.max(0, context.pickupRadiusBonus ?? 0);
 
   for (const pickup of pickups) {
     if (pickup.collectedAt !== undefined) {
@@ -190,15 +246,37 @@ export const collectPickups = (
       continue;
     }
 
-    const distance = Math.hypot(
-      pickup.position[0] - playerPosition[0],
-      pickup.position[2] - playerPosition[2]
-    );
+    let activePickup = pickup;
+    let distance = getPickupDistance(activePickup, playerPosition);
+    const collectRadius =
+      playerRadius + activePickup.radius + pickupRadiusBonus;
+    const magnetPullRadius =
+      playerRadius +
+      activePickup.radius +
+      pickupRadiusBonus * gearMagnetPullRadiusMultiplier;
+
+    if (
+      activePickup.kind === "gear" &&
+      pickupRadiusBonus > 0 &&
+      distance > collectRadius &&
+      distance <= magnetPullRadius
+    ) {
+      activePickup = pullGearTowardPlayer(
+        activePickup,
+        playerPosition,
+        distance,
+        now,
+        pickupRadiusBonus,
+        context.obstacles
+      );
+      distance = getPickupDistance(activePickup, playerPosition);
+    }
+
     const slashed =
       context.meleeFrame?.active === true &&
       context.meleeParams !== undefined &&
       isPointInSwing(
-        pickup.position,
+        activePickup.position,
         context.meleeFrame.t,
         context.meleeFrame.center,
         context.meleeFrame.facingYaw,
@@ -206,49 +284,45 @@ export const collectPickups = (
           ...context.meleeParams,
           innerRadius: Math.max(
             0,
-            context.meleeParams.innerRadius - pickup.radius
+            context.meleeParams.innerRadius - activePickup.radius
           ),
-          reach: context.meleeParams.reach + pickup.radius,
+          reach: context.meleeParams.reach + activePickup.radius,
           thickness: context.meleeParams.thickness + 0.12,
         }
       );
 
-    if (
-      distance >
-        playerRadius + pickup.radius + (context.pickupRadiusBonus ?? 0) &&
-      !slashed
-    ) {
-      remaining.push(pickup);
+    if (distance > collectRadius && !slashed) {
+      remaining.push(activePickup);
       continue;
     }
 
-    if (pickup.kind === "gear") {
-      gearDelta += pickup.value;
+    if (activePickup.kind === "gear") {
+      gearDelta += activePickup.value;
       remaining.push({
-        ...pickup,
+        ...activePickup,
         collectedAt: now,
         collectedTo: [playerPosition[0], playerPosition[1], playerPosition[2]],
       });
       continue;
     }
 
-    if (pickup.kind === "key") {
-      keyDelta += pickup.value;
+    if (activePickup.kind === "key") {
+      keyDelta += activePickup.value;
       remaining.push({
-        ...pickup,
+        ...activePickup,
         collectedAt: now,
         collectedTo: [playerPosition[0], playerPosition[1], playerPosition[2]],
       });
       continue;
     }
 
-    const heal = Math.min(pickup.value, maxHealth - nextHealth);
+    const heal = Math.min(activePickup.value, maxHealth - nextHealth);
 
     if (heal <= 0) {
       remaining.push({
-        ...pickup,
+        ...activePickup,
         position: pushPickupAway(
-          pickup,
+          activePickup,
           playerPosition,
           distance,
           context.obstacles
@@ -259,7 +333,7 @@ export const collectPickups = (
 
     nextHealth += heal;
     remaining.push({
-      ...pickup,
+      ...activePickup,
       collectedAt: now,
       collectedTo: [playerPosition[0], playerPosition[1], playerPosition[2]],
     });
