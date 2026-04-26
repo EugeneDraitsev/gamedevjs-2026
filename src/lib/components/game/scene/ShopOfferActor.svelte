@@ -1,9 +1,129 @@
+<script module lang="ts">
+  import {
+    BoxGeometry,
+    CylinderGeometry,
+    MeshBasicMaterial,
+    MeshStandardMaterial,
+    RingGeometry,
+    SphereGeometry,
+    SpriteMaterial,
+    type Texture,
+  } from "three";
+
+  const offerBaseGeometry = new CylinderGeometry(0.62, 0.7, 0.36, 24);
+  const offerTopGeometry = new CylinderGeometry(0.55, 0.55, 0.04, 24);
+  const moduleOrbGeometry = new SphereGeometry(0.43, 36, 24);
+  const moduleRingWideGeometry = new RingGeometry(0.49, 0.57, 48);
+  const moduleRingThinGeometry = new RingGeometry(0.49, 0.55, 48);
+  const moduleWireGeometry = new SphereGeometry(0.43, 36, 24);
+  const healArmGeometry = new BoxGeometry(1, 1, 1);
+  const healGlowGeometry = new SphereGeometry(1, 12, 12);
+  const offerBaseMaterial = new MeshStandardMaterial({
+    color: "#1a1612",
+    metalness: 0.6,
+    roughness: 0.45,
+  });
+  const offerMaterialCache = new Map<
+    string,
+    {
+      healArm: MeshStandardMaterial;
+      healGlow: MeshBasicMaterial;
+      moduleOrb: MeshStandardMaterial;
+      moduleRingThin: MeshBasicMaterial;
+      moduleRingWide: MeshBasicMaterial;
+      moduleWire: MeshBasicMaterial;
+      top: MeshStandardMaterial;
+    }
+  >();
+  const iconSpriteMaterialCache = new WeakMap<Texture, SpriteMaterial>();
+
+  const getOfferMaterials = (accent: string) => {
+    const cached = offerMaterialCache.get(accent);
+
+    if (cached) {
+      return cached;
+    }
+
+    const materials = {
+      healArm: new MeshStandardMaterial({
+        color: accent,
+        emissive: accent,
+        emissiveIntensity: 0.42,
+        metalness: 0.5,
+        roughness: 0.2,
+      }),
+      healGlow: new MeshBasicMaterial({
+        color: accent,
+        depthWrite: false,
+        opacity: 0.12,
+        toneMapped: false,
+        transparent: true,
+      }),
+      moduleOrb: new MeshStandardMaterial({
+        color: accent,
+        emissive: accent,
+        emissiveIntensity: 0.13,
+        metalness: 0.18,
+        opacity: 0.42,
+        roughness: 0.14,
+        transparent: true,
+      }),
+      moduleRingThin: new MeshBasicMaterial({
+        color: accent,
+        opacity: 0.2,
+        transparent: true,
+      }),
+      moduleRingWide: new MeshBasicMaterial({
+        color: accent,
+        opacity: 0.28,
+        transparent: true,
+      }),
+      moduleWire: new MeshBasicMaterial({
+        color: accent,
+        depthWrite: false,
+        opacity: 0.08,
+        toneMapped: false,
+        transparent: true,
+        wireframe: true,
+      }),
+      top: new MeshStandardMaterial({
+        color: accent,
+        emissive: accent,
+        emissiveIntensity: 0.16,
+        metalness: 0.85,
+        roughness: 0.18,
+      }),
+    };
+
+    offerMaterialCache.set(accent, materials);
+    return materials;
+  };
+
+  const getIconSpriteMaterial = (texture: Texture) => {
+    const cached = iconSpriteMaterialCache.get(texture);
+
+    if (cached) {
+      return cached;
+    }
+
+    const material = new SpriteMaterial({
+      color: "#ffffff",
+      depthTest: false,
+      depthWrite: false,
+      map: texture,
+      opacity: 0.98,
+      transparent: true,
+    });
+
+    iconSpriteMaterialCache.set(texture, material);
+    return material;
+  };
+</script>
+
 <script lang="ts">
   import { T } from "@threlte/core";
   import { HTML as Sticker } from "@threlte/extras";
-  import { SRGBColorSpace, type Texture, TextureLoader } from "three";
   import gearCurrencyUrl from "$lib/assets/gear-currency.svg";
-  import { getMachineModuleIconUrl } from "$lib/config/machine-module-icons";
   import {
     getMachineModule,
     getMachineModuleKindAccent,
@@ -14,14 +134,19 @@
 
   let {
     animationNow,
+    labelOpacity = 1,
+    lightEnabled = true,
     offer,
+    showLabel = true,
   }: {
     animationNow: number;
+    labelOpacity?: number;
+    lightEnabled?: boolean;
     offer: ShopOffer;
+    showLabel?: boolean;
   } = $props();
 
   const scene = getGameSceneContext();
-  let iconTexture = $state<Texture | null>(null);
   const baseY = $derived(
     scene.currentRoomTemplate.layout === "outside-yard" ? offer.position[1] : 0
   );
@@ -46,6 +171,7 @@
   const isBigHeal = $derived(offer.kind === "heal-big");
   const armLong = $derived(isBigHeal ? 0.36 : 0.26);
   const armShort = $derived(isBigHeal ? 0.12 : 0.08);
+  const healGlowScale = $derived(armLong * 0.7);
   const offerName = $derived.by(() => {
     if (moduleTemplate) {
       return moduleTemplate.shortLabel;
@@ -53,158 +179,116 @@
     return offer.kind === "heal-big" ? "Repair +3" : "Repair +1";
   });
   const affordable = $derived(scene.pickups.gears >= offer.price);
-
-  $effect(() => {
-    if (!moduleId) {
-      iconTexture = null;
-      return;
-    }
-
-    let cancelled = false;
-
-    new TextureLoader().load(
-      getMachineModuleIconUrl(moduleId as MachineModuleId),
-      (texture) => {
-        texture.colorSpace = SRGBColorSpace;
-        texture.needsUpdate = true;
-
-        if (cancelled) {
-          texture.dispose();
-          return;
-        }
-
-        iconTexture = texture;
-      }
-    );
-
-    return () => {
-      cancelled = true;
-    };
-  });
+  const iconTexture = $derived(
+    moduleId
+      ? (scene.textures.machineModuleIcons[moduleId as MachineModuleId] ?? null)
+      : null
+  );
+  const offerMaterials = $derived(getOfferMaterials(accent));
+  const iconSpriteMaterial = $derived(
+    iconTexture ? getIconSpriteMaterial(iconTexture) : null
+  );
 </script>
 
 <T.Group position={[offer.position[0], baseY, offer.position[2]]}>
-  <T.Mesh castShadow position={[0, 0.18, 0]}>
-    <T.CylinderGeometry args={[0.62, 0.7, 0.36, 24]} />
-    <T.MeshStandardMaterial color="#1a1612" metalness={0.6} roughness={0.45} />
-  </T.Mesh>
+  <T.Mesh
+    castShadow
+    geometry={offerBaseGeometry}
+    material={offerBaseMaterial}
+    position={[0, 0.18, 0]}
+  />
 
-  <T.Mesh position={[0, 0.38, 0]}>
-    <T.CylinderGeometry args={[0.55, 0.55, 0.04, 24]} />
-    <T.MeshStandardMaterial
-      color={accent}
-      emissive={accent}
-      emissiveIntensity={0.16}
-      metalness={0.85}
-      roughness={0.18}
-    />
-  </T.Mesh>
+  <T.Mesh
+    geometry={offerTopGeometry}
+    material={offerMaterials.top}
+    position={[0, 0.38, 0]}
+  />
 
   <T.Group position={[0, 0.92 + bobOffset, 0]} rotation={[0, spin, 0]}>
     {#if offer.kind === "module"}
-      <T.Mesh castShadow>
-        <T.SphereGeometry args={[0.43, 36, 24]} />
-        <T.MeshStandardMaterial
-          color={accent}
-          emissive={accent}
-          emissiveIntensity={0.13}
-          metalness={0.18}
-          opacity={0.42}
-          roughness={0.14}
-          transparent
+      <T.Mesh
+        castShadow
+        geometry={moduleOrbGeometry}
+        material={offerMaterials.moduleOrb}
+      />
+
+      <T.Mesh
+        geometry={moduleRingWideGeometry}
+        material={offerMaterials.moduleRingWide}
+        rotation={[-Math.PI / 2, 0, 0]}
+      />
+
+      <T.Mesh
+        geometry={moduleRingThinGeometry}
+        material={offerMaterials.moduleRingThin}
+        rotation={[0, 0, Math.PI / 2]}
+      />
+
+      {#if iconSpriteMaterial}
+        <T.Sprite
+          material={iconSpriteMaterial}
+          position={[0, 0, 0]}
+          scale={[0.66, 0.66, 0.66]}
         />
-      </T.Mesh>
-
-      <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <T.RingGeometry args={[0.49, 0.57, 48]} />
-        <T.MeshBasicMaterial color={accent} opacity={0.28} transparent />
-      </T.Mesh>
-
-      <T.Mesh rotation={[0, 0, Math.PI / 2]}>
-        <T.RingGeometry args={[0.49, 0.55, 48]} />
-        <T.MeshBasicMaterial color={accent} opacity={0.2} transparent />
-      </T.Mesh>
-
-      {#if iconTexture}
-        <T.Sprite position={[0, 0, 0]} scale={[0.66, 0.66, 0.66]}>
-          <T.SpriteMaterial
-            color="#ffffff"
-            depthTest={false}
-            depthWrite={false}
-            map={iconTexture}
-            opacity={0.98}
-            transparent
-          />
-        </T.Sprite>
       {/if}
 
-      <T.Mesh scale={[1.34, 1.34, 1.34]}>
-        <T.SphereGeometry args={[0.43, 36, 24]} />
-        <T.MeshBasicMaterial
-          color={accent}
-          depthWrite={false}
-          opacity={0.08}
-          toneMapped={false}
-          transparent
-          wireframe
-        />
-      </T.Mesh>
+      <T.Mesh
+        geometry={moduleWireGeometry}
+        material={offerMaterials.moduleWire}
+        scale={[1.34, 1.34, 1.34]}
+      />
     {:else}
-      <T.Mesh castShadow>
-        <T.BoxGeometry args={[armLong, armShort, armShort]} />
-        <T.MeshStandardMaterial
-          color={accent}
-          emissive={accent}
-          emissiveIntensity={0.42}
-          metalness={0.5}
-          roughness={0.2}
-        />
-      </T.Mesh>
-      <T.Mesh castShadow rotation={[0, 0, Math.PI / 2]}>
-        <T.BoxGeometry args={[armLong, armShort, armShort]} />
-        <T.MeshStandardMaterial
-          color={accent}
-          emissive={accent}
-          emissiveIntensity={0.42}
-          metalness={0.5}
-          roughness={0.2}
-        />
-      </T.Mesh>
+      <T.Mesh
+        castShadow
+        geometry={healArmGeometry}
+        material={offerMaterials.healArm}
+        scale={[armLong, armShort, armShort]}
+      />
+      <T.Mesh
+        castShadow
+        geometry={healArmGeometry}
+        material={offerMaterials.healArm}
+        rotation={[0, 0, Math.PI / 2]}
+        scale={[armLong, armShort, armShort]}
+      />
 
-      <T.Mesh scale={[1.6, 1.6, 1.6]}>
-        <T.SphereGeometry args={[armLong * 0.7, 12, 12]} />
-        <T.MeshBasicMaterial
-          color={accent}
-          depthWrite={false}
-          opacity={0.12}
-          toneMapped={false}
-          transparent
-        />
-      </T.Mesh>
+      <T.Mesh
+        geometry={healGlowGeometry}
+        material={offerMaterials.healGlow}
+        scale={[
+          healGlowScale * 1.6,
+          healGlowScale * 1.6,
+          healGlowScale * 1.6,
+        ]}
+      />
     {/if}
   </T.Group>
 
-  <T.PointLight
-    color={accent}
-    distance={2.55}
-    intensity={0.32}
-    position={[0, 1.05, 0]}
-  />
+  {#if lightEnabled}
+    <T.PointLight
+      color={accent}
+      distance={2.55}
+      intensity={0.32}
+      position={[0, 1.05, 0]}
+    />
+  {/if}
 
-  <Sticker
-    pointerEvents="none"
-    position={[0, 0.5, 0.78]}
-    sprite
-    zIndexRange={[7, 0]}
-  >
-    <div class="shop-tag" class:affordable>
-      <span class="shop-tag-name">{offerName}</span>
-      <span class="shop-tag-price">
-        <img alt="" class="shop-tag-gear" src={gearCurrencyUrl}>
-        <span>{offer.price}</span>
-      </span>
-    </div>
-  </Sticker>
+  {#if showLabel}
+    <Sticker
+      pointerEvents="none"
+      position={[0, 0.5, 0.78]}
+      sprite
+      zIndexRange={[7, 0]}
+    >
+      <div class="shop-tag" class:affordable style:opacity={labelOpacity}>
+        <span class="shop-tag-name">{offerName}</span>
+        <span class="shop-tag-price">
+          <img alt="" class="shop-tag-gear" src={gearCurrencyUrl}>
+          <span>{offer.price}</span>
+        </span>
+      </div>
+    </Sticker>
+  {/if}
 </T.Group>
 
 <style>

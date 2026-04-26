@@ -87,7 +87,6 @@
 
 <script lang="ts">
   import { T } from "@threlte/core";
-  import { onMount } from "svelte";
   import { GreaterDepth } from "three";
   import BombActor from "$lib/components/game/scene/BombActor.svelte";
   import EnemyActor from "$lib/components/game/scene/EnemyActor.svelte";
@@ -97,7 +96,12 @@
   import ShopOfferActor from "$lib/components/game/scene/ShopOfferActor.svelte";
   import StealthBeamActor from "$lib/components/game/scene/StealthBeamActor.svelte";
   import WaterWake from "$lib/components/game/scene/WaterWake.svelte";
+  import {
+    getMachineModule,
+    getMachineModuleKindAccent,
+  } from "$lib/config/machine-modules";
   import { enemyTemplateById } from "$lib/config/room-templates";
+  import type { ShopOffer } from "$lib/config/shop-offers";
   import { outsidePlan } from "$lib/game/outside-chunk-context";
   import { beamDurationMs } from "$lib/game/scene-layout";
   import { getGameSceneContext } from "$lib/stores/scene-context";
@@ -115,24 +119,38 @@
   let {
     activeActorsVisible = true,
     actorWarmupEnabled = true,
+    shopWarmupEnabled = true,
+    warmupVisible = true,
   }: {
     activeActorsVisible?: boolean;
     actorWarmupEnabled?: boolean;
+    shopWarmupEnabled?: boolean;
+    warmupVisible?: boolean;
   } = $props();
 
   const scene = getGameSceneContext();
   const { combat, pickups, player, timing } = scene;
+  const inactiveLightPosition: Vec3 = [0, -32, 0];
   const outsideFinaleResolved = $derived(
     scene.currentRoomTemplate.id === "outside-start" &&
       scene.room.clearedSet.has(scene.currentRoom.id)
   );
   const combatActorsVisible = $derived(!outsideFinaleResolved);
+  const combatActorsPosition = $derived(
+    combatActorsVisible ? ([0, 0, 0] as Vec3) : inactiveLightPosition
+  );
+  const combatActorsScale = $derived(
+    combatActorsVisible ? ([1, 1, 1] as Vec3) : ([0.001, 0.001, 0.001] as Vec3)
+  );
   const beamSegmentCount = 6;
   const beamSegmentIndexes = Array.from(
     { length: beamSegmentCount },
     (_unused, index) => index
   );
   const beamParticleIndexes = [0, 1, 2];
+  const projectileLightSlots = [0, 1] as const;
+  const projectileImpactLightSlots = [0, 1] as const;
+  const shopLightSlots = [0, 1, 2, 3, 4] as const;
   const enemyWarmups: ActiveEnemy[] = [
     "scrap-runner",
     "coil-sentry",
@@ -274,6 +292,38 @@
       value: 1,
     },
   ];
+  const shopOfferWarmups: ShopOffer[] = [
+    {
+      id: "shop-warmup-module-a",
+      kind: "module",
+      moduleId: "arc-splitter-coil",
+      position: [-5.4, 0.6, -2.4],
+      price: 5,
+      value: 0,
+    },
+    {
+      id: "shop-warmup-module-b",
+      kind: "module",
+      moduleId: "rivet-press-core",
+      position: [-1.8, 0.6, -2.4],
+      price: 5,
+      value: 0,
+    },
+    {
+      id: "shop-warmup-heal-small",
+      kind: "heal-small",
+      position: [1.8, 0.6, -2.4],
+      price: 3,
+      value: 1,
+    },
+    {
+      id: "shop-warmup-heal-big",
+      kind: "heal-big",
+      position: [5.4, 0.6, -2.4],
+      price: 7,
+      value: 3,
+    },
+  ];
   const beamLaserPositionOffsetY = 0.03;
 
   const getBeamFade = (beam: ActiveBeam) => {
@@ -322,27 +372,6 @@
     return [scale, scale, scale];
   };
 
-  let actorWarmupVisible = $state(true);
-
-  onMount(() => {
-    if (!actorWarmupEnabled) {
-      actorWarmupVisible = false;
-      return;
-    }
-
-    let secondFrame = 0;
-    const firstFrame = requestAnimationFrame(() => {
-      secondFrame = requestAnimationFrame(() => {
-        actorWarmupVisible = false;
-      });
-    });
-
-    return () => {
-      cancelAnimationFrame(firstFrame);
-      cancelAnimationFrame(secondFrame);
-    };
-  });
-
   const playerHealPosition = $derived([
     player.lastPosition[0],
     player.lastPosition[1],
@@ -355,14 +384,94 @@
     }
     return outsidePlan().shopkeeper;
   });
+  const getShopOfferLightColor = (offer: ShopOffer) => {
+    if (offer.kind === "module" && offer.moduleId) {
+      return getMachineModuleKindAccent(getMachineModule(offer.moduleId).kind);
+    }
+
+    return offer.kind === "heal-big" ? "#22c55e" : "#7dffd7";
+  };
+  const shopLights = $derived.by(() => {
+    const lights: {
+      color: string;
+      distance: number;
+      intensity: number;
+      position: Vec3;
+    }[] = [];
+    let shopkeeper: { position: Vec3; rotationY: number } | null = null;
+
+    if (scene.currentRoom.kind === "shop") {
+      shopkeeper = { position: [0, 0, -5.5], rotationY: 0 };
+    } else if (outsideShopkeeper) {
+      shopkeeper = {
+        position: [
+          outsideShopkeeper.x,
+          outsideShopkeeper.y,
+          outsideShopkeeper.z,
+        ],
+        rotationY: outsideShopkeeper.rotationY,
+      };
+    }
+
+    if (shopkeeper) {
+      const eyePulse = 0.85 + Math.sin(timing.now / 220) * 0.18;
+      const bob = Math.sin(timing.now / 540) * 0.06;
+
+      lights.push({
+        color: "#ffc26a",
+        distance: 2.1,
+        intensity: eyePulse * 1.15,
+        position: [
+          shopkeeper.position[0] + Math.sin(shopkeeper.rotationY) * 0.5,
+          shopkeeper.position[1] + 1.84 + bob,
+          shopkeeper.position[2] + Math.cos(shopkeeper.rotationY) * 0.5,
+        ],
+      });
+    }
+
+    for (const offer of scene.availableShopOffers.slice(0, 4)) {
+      const baseY =
+        scene.currentRoomTemplate.layout === "outside-yard"
+          ? offer.position[1]
+          : 0;
+
+      lights.push({
+        color: getShopOfferLightColor(offer),
+        distance: 2.55,
+        intensity: 0.32,
+        position: [offer.position[0], baseY + 1.05, offer.position[2]],
+      });
+    }
+
+    return shopLightSlots.map((slot) => {
+      const light = lights[slot];
+
+      return {
+        color: light?.color ?? "#7dffd7",
+        distance: light?.distance ?? 1,
+        id: `shop-light-${slot}`,
+        intensity: light?.intensity ?? 0,
+        position: light?.position ?? inactiveLightPosition,
+      };
+    });
+  });
   const projectileLights = $derived.by(() => {
     timing.now;
 
-    return combat.projectiles.slice(-2).map((projectile) => ({
-      id: projectile.id,
-      position:
-        combat.projectilePositions.get(projectile.id) ?? projectile.position,
-    }));
+    const projectiles = combat.projectiles.slice(-projectileLightSlots.length);
+
+    return projectileLightSlots.map((slot) => {
+      const projectile = projectiles[slot];
+
+      return {
+        id: `projectile-light-${slot}`,
+        intensity: projectile ? 0.72 : 0,
+        position: projectile
+          ? (combat.projectilePositions.get(projectile.id) ??
+            projectile.position)
+          : inactiveLightPosition,
+      };
+    });
   });
   $effect(() => {
     const beam = combat.beams.at(-1);
@@ -379,17 +488,22 @@
     const beam = combat.beams.at(-1);
 
     if (!beam) {
-      return null;
+      return {
+        intensity: 0,
+        position: inactiveLightPosition,
+      };
     }
 
     const fade = getBeamFade(beam);
 
     if (fade <= 0) {
-      return null;
+      return {
+        intensity: 0,
+        position: inactiveLightPosition,
+      };
     }
 
     return {
-      id: beam.id,
       intensity: fade * fade * 6.4,
       position: [
         beam.position[0] + Math.sin(beam.rotationY) * 0.6,
@@ -400,78 +514,107 @@
   });
   const projectileImpactLights = $derived.by(() => {
     const now = timing.now;
+    const bursts = combat.projectileImpactBursts.slice(
+      -projectileImpactLightSlots.length
+    );
 
-    return combat.projectileImpactBursts
-      .slice(-2)
-      .map((burst) => {
-        const age = Math.min(1, (now - burst.createdAt) / 320);
-        const fade = 1 - age;
+    return projectileImpactLightSlots.map((slot) => {
+      const burst = bursts[slot];
 
+      if (!burst) {
         return {
-          id: burst.id,
-          intensity: fade * 1.1,
-          position: [
-            burst.position[0],
-            burst.position[1] + burst.radius * 0.18,
-            burst.position[2],
-          ] as Vec3,
+          id: `projectile-impact-light-${slot}`,
+          intensity: 0,
+          position: inactiveLightPosition,
         };
-      })
-      .filter((light) => light.intensity > 0.001);
+      }
+
+      const age = Math.min(1, (now - burst.createdAt) / 320);
+      const fade = 1 - age;
+      const intensity = fade * 1.1;
+
+      return {
+        id: `projectile-impact-light-${slot}`,
+        intensity,
+        position:
+          intensity > 0.001
+            ? ([
+                burst.position[0],
+                burst.position[1] + burst.radius * 0.18,
+                burst.position[2],
+              ] as Vec3)
+            : inactiveLightPosition,
+      };
+    });
   });
 </script>
 
-{#if actorWarmupEnabled}
+{#if actorWarmupEnabled || shopWarmupEnabled}
   <T.Group
-    visible={actorWarmupVisible}
+    visible={warmupVisible}
     position={[0, 0.02, 0]}
     scale={[0.001, 0.001, 0.001]}
   >
-    {#each enemyWarmups as enemy (enemy.id)}
-      <EnemyActor animationNow={0} {enemy} />
-    {/each}
+    {#if actorWarmupEnabled}
+      {#each enemyWarmups as enemy (enemy.id)}
+        <EnemyActor animationNow={0} {enemy} />
+      {/each}
 
-    {#each bombWarmups as bomb (bomb.id)}
-      <BombActor animationNow={0} {bomb} />
-    {/each}
+      {#each bombWarmups as bomb (bomb.id)}
+        <BombActor animationNow={0} {bomb} />
+      {/each}
 
-    {#each pickupWarmups as pickup (pickup.id)}
-      <PickupActor animationNow={0} {pickup} />
-    {/each}
+      {#each pickupWarmups as pickup (pickup.id)}
+        <PickupActor animationNow={0} {pickup} />
+      {/each}
 
-    {#each enemyShotWarmups as shot (shot.id)}
-      <T.Group position={shot.position}>
-        <T.Mesh renderOrder={28} scale={[1.35, 1.35, 1.35]}>
-          <T.SphereGeometry args={[shot.radius, 16, 16]} />
-          <T.MeshBasicMaterial
-            color="#ff8068"
-            depthFunc={GreaterDepth}
-            depthWrite={false}
-            opacity={0.36}
-            transparent
-          />
-        </T.Mesh>
+      {#each enemyShotWarmups as shot (shot.id)}
+        <T.Group position={shot.position}>
+          <T.Mesh renderOrder={28} scale={[1.35, 1.35, 1.35]}>
+            <T.SphereGeometry args={[shot.radius, 16, 16]} />
+            <T.MeshBasicMaterial
+              color="#ff8068"
+              depthFunc={GreaterDepth}
+              depthWrite={false}
+              opacity={0.36}
+              transparent
+            />
+          </T.Mesh>
 
-        <T.Mesh castShadow>
-          <T.SphereGeometry args={[shot.radius, 16, 16]} />
-          <T.MeshStandardMaterial
-            color={shot.color}
-            emissive={shot.color}
-            emissiveIntensity={0.7}
-            metalness={0.08}
-            roughness={0.16}
-          />
-        </T.Mesh>
-      </T.Group>
-    {/each}
+          <T.Mesh castShadow>
+            <T.SphereGeometry args={[shot.radius, 16, 16]} />
+            <T.MeshStandardMaterial
+              color={shot.color}
+              emissive={shot.color}
+              emissiveIntensity={0.7}
+              metalness={0.08}
+              roughness={0.16}
+            />
+          </T.Mesh>
+        </T.Group>
+      {/each}
 
-    {#each gateLaserWarmups as laser (laser.id)}
-      <GateKeeperArcLaser animationNow={900} {laser} />
-    {/each}
+      {#each gateLaserWarmups as laser (laser.id)}
+        <GateKeeperArcLaser animationNow={900} {laser} />
+      {/each}
 
-    {#each stealthBeamWarmups as beam (beam.id)}
-      <StealthBeamActor animationNow={900} {beam} />
-    {/each}
+      {#each stealthBeamWarmups as beam (beam.id)}
+        <StealthBeamActor animationNow={900} {beam} />
+      {/each}
+    {/if}
+
+    {#if shopWarmupEnabled}
+      <ShopkeeperActor animationNow={0} lightEnabled={false} />
+
+      {#each shopOfferWarmups as offer (offer.id)}
+        <ShopOfferActor
+          animationNow={0}
+          {offer}
+          labelOpacity={0}
+          lightEnabled={false}
+        />
+      {/each}
+    {/if}
 
     <T.Mesh
       geometry={projectileImpactRingGeometry}
@@ -516,25 +659,32 @@
   <T.PointLight
     color="#3aa7ff"
     distance={2.8}
-    intensity={0.72}
+    intensity={light.intensity}
     position={light.position}
   />
 {/each}
 
-{#if beamLight}
-  <T.PointLight
-    color="#ff2d55"
-    decay={1.4}
-    distance={8.8}
-    intensity={beamLight.intensity}
-    position={beamLight.position}
-  />
-{/if}
+<T.PointLight
+  color="#ff2d55"
+  decay={1.4}
+  distance={8.8}
+  intensity={beamLight.intensity}
+  position={beamLight.position}
+/>
 
 {#each projectileImpactLights as light (light.id)}
   <T.PointLight
     color="#9be6ff"
     distance={2.8}
+    intensity={light.intensity}
+    position={light.position}
+  />
+{/each}
+
+{#each shopLights as light (light.id)}
+  <T.PointLight
+    color={light.color}
+    distance={light.distance}
     intensity={light.intensity}
     position={light.position}
   />
@@ -546,22 +696,23 @@
   {/each}
 
   {#if scene.currentRoom.kind === "shop"}
-    <ShopkeeperActor animationNow={timing.now} />
+    <ShopkeeperActor animationNow={timing.now} lightEnabled={false} />
   {/if}
 
   {#if outsideShopkeeper}
     <ShopkeeperActor
       animationNow={timing.now}
+      lightEnabled={false}
       position={[outsideShopkeeper.x, outsideShopkeeper.y, outsideShopkeeper.z]}
       rotationY={outsideShopkeeper.rotationY}
     />
   {/if}
 
   {#each scene.availableShopOffers as offer (offer.id)}
-    <ShopOfferActor animationNow={timing.now} {offer} />
+    <ShopOfferActor animationNow={timing.now} {offer} lightEnabled={false} />
   {/each}
 
-  <T.Group visible={combatActorsVisible}>
+  <T.Group position={combatActorsPosition} scale={combatActorsScale}>
     {#each combat.enemies as enemy (enemy.id)}
       <EnemyActor animationNow={timing.now} {enemy} />
     {/each}

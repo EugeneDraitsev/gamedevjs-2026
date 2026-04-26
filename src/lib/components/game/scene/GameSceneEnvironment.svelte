@@ -8,6 +8,8 @@
   import RoomPlatforms from "$lib/components/game/scene/environment/RoomPlatforms.svelte";
   import RoomTemplateEnvironment from "$lib/components/game/scene/environment/RoomTemplateEnvironment.svelte";
   import RoomWalls from "$lib/components/game/scene/environment/RoomWalls.svelte";
+  import { getMachineModule } from "$lib/config/machine-modules";
+  import { getRoomHazards } from "$lib/game/scene-layout";
   import { getGameSceneContext } from "$lib/stores/scene-context";
   import type { Vec3, WallFacing } from "$lib/types/game";
 
@@ -36,6 +38,15 @@
   const bossDecoratedWallFacings: WallFacing[] = ["east", "south", "west"];
   const bossGearlessWallFacings: WallFacing[] = ["south"];
   const maxLampLights = 8;
+  const lavaHazardWarmups = [
+    ...getRoomHazards("lava-lane"),
+    ...getRoomHazards("lava-ring"),
+    ...getRoomHazards("lava-bridge"),
+    ...getRoomHazards("lava-cross"),
+    ...getRoomHazards("lava-gauntlet"),
+    ...getRoomHazards("boss-bomber"),
+  ];
+  const artifactPedestalWarmupTemplate = getMachineModule("arc-splitter-coil");
   const decoratedWallFacings = $derived(
     scene.currentRoom.kind === "boss" ? bossDecoratedWallFacings : null
   );
@@ -157,6 +168,17 @@
 />
 
 <T.Group position={[0, 0.08, 0]} scale={[0.001, 0.001, 0.001]}>
+  <RoomHazards
+    animationNow={0}
+    lavaSurfaceTexture={textures.lavaSurface}
+    roomHazards={lavaHazardWarmups}
+  />
+
+  <RoomArtifactPedestal
+    animationNow={0}
+    currentArtifactTemplate={artifactPedestalWarmupTemplate}
+  />
+
   {#each [textures.treasureFloor, textures.bossFloor, textures.bossDoor, textures.lavaSurface, textures.bossBanner] as texture}
     {#if texture}
       <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>

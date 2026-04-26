@@ -133,6 +133,9 @@
     scene.currentRoomTemplate.environment === "core-prison" &&
       corePrisonSealHits < corePrisonSealHitsRequired
   );
+  const machineModuleIconPreloadTextures = $derived.by(() =>
+    Object.values(textures.machineModuleIcons)
+  );
   const outsidePreloadTextures = $derived.by(() => [
     textures.outsideEarth,
     textures.outsideEarthDecals,
@@ -143,10 +146,11 @@
   ]);
   const warmupPreloadTextures = $derived.by(() => {
     if (outside) {
-      return outsidePreloadTextures;
+      return [...machineModuleIconPreloadTextures, ...outsidePreloadTextures];
     }
 
     return [
+      ...machineModuleIconPreloadTextures,
       textures.bossBanner,
       textures.bossDoor,
       textures.bossFloor,
@@ -840,6 +844,7 @@
       <GameSceneActors
         activeActorsVisible={!outside || sceneReady}
         actorWarmupEnabled={!outside}
+        warmupVisible={!sceneReady}
       />
 
       {#if showPlayer}

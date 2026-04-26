@@ -682,6 +682,7 @@
     gameMusic.preload();
     gameMusic.syncMix(settings);
     gameSfx.syncMix(settings);
+    gameSfx.warmupGameplayEvents();
 
     const coarseQuery = window.matchMedia("(pointer: coarse)");
     const onCoarseChange = (event: MediaQueryListEvent) => {

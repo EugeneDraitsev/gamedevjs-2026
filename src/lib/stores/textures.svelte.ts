@@ -24,6 +24,8 @@ import outsideRockDecalTextureUrl from "$lib/assets/outside-rock-decals.png";
 import outsideRocksTextureUrl from "$lib/assets/outside-rocks.png";
 import outsideWaterTextureUrl from "$lib/assets/outside-water.png";
 import outsideWaterDecalTextureUrl from "$lib/assets/outside-water-decals.png";
+import { machineModuleIconUrls } from "$lib/config/machine-module-icons";
+import type { MachineModuleId } from "$lib/config/machine-modules";
 
 const textureCache = new Map<string, Texture>();
 const textureLoader = new TextureLoader();
@@ -79,6 +81,26 @@ const waitForNextFrame = (signal?: AbortSignal) =>
   });
 
 const textureAssignments: TextureAssignment[] = [
+  {
+    critical: true,
+    outsideCritical: true,
+    load: (store) => {
+      let nextIcons = store.machineModuleIcons;
+
+      for (const [id, url] of Object.entries(machineModuleIconUrls) as [
+        MachineModuleId,
+        string,
+      ][]) {
+        if (nextIcons[id]) {
+          continue;
+        }
+
+        nextIcons = { ...nextIcons, [id]: makeTexture(url) };
+      }
+
+      store.machineModuleIcons = nextIcons;
+    },
+  },
   {
     critical: true,
     load: (store) => {
@@ -244,6 +266,7 @@ export class TextureStore {
   foundryFloorDecals = $state<Texture | null>(null);
   foundryWall = $state<Texture | null>(null);
   lavaSurface = $state<Texture | null>(null);
+  machineModuleIcons = $state<Partial<Record<MachineModuleId, Texture>>>({});
   outsideEarth = $state<Texture | null>(null);
   outsideEarthDecals = $state<Texture | null>(null);
   outsideRockDecals = $state<Texture | null>(null);

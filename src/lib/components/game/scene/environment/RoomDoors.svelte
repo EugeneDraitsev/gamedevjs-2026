@@ -33,6 +33,13 @@
     (sealHorizontal(seal) ? seal.args[0] : seal.args[2]) * 2;
   const sealOpacity = (seal: DoorSeal) => (seal.position[2] > 0 ? 0.28 : 1);
   const sealSolid = (seal: DoorSeal) => sealOpacity(seal) >= 1;
+  const gateVisualOpacity = $derived(
+    Math.max(0.001, Math.min(1, (0.998 - doorOpenAmount) / 0.018))
+  );
+  const sealVisualOpacity = (seal: DoorSeal) =>
+    sealOpacity(seal) * gateVisualOpacity;
+  const sealVisualDepthWrite = (seal: DoorSeal) =>
+    sealSolid(seal) && gateVisualOpacity > 0.98;
   const gateSides = [-1, 1];
   const gateBarOffsets = [-0.28, 0, 0.28];
   const gateRails = [-1.24, 0.92];
@@ -86,10 +93,10 @@
         </T.Group>
       {/if}
 
-      {#if doorOpenAmount < 0.98}
+      {#if doorOpenAmount <= 1}
         {#each gateSides as side}
           <T.Mesh
-            castShadow={sealSolid(seal)}
+            castShadow={sealVisualDepthWrite(seal)}
             receiveShadow
             position={sealPosition(
               seal,
@@ -103,15 +110,15 @@
             <T.MeshStandardMaterial
               color="#25231d"
               metalness={0.34}
-              opacity={sealOpacity(seal)}
+              opacity={sealVisualOpacity(seal)}
               roughness={0.66}
-              transparent={!sealSolid(seal)}
-              depthWrite={sealSolid(seal)}
+              transparent
+              depthWrite={sealVisualDepthWrite(seal)}
             />
           </T.Mesh>
 
           <T.Mesh
-            castShadow={sealSolid(seal)}
+            castShadow={sealVisualDepthWrite(seal)}
             receiveShadow
             position={sealPosition(
               seal,
@@ -123,17 +130,17 @@
             <T.MeshStandardMaterial
               color={seal.trimColor ?? "#5d4528"}
               metalness={0.58}
-              opacity={sealOpacity(seal)}
+              opacity={sealVisualOpacity(seal)}
               roughness={0.42}
-              transparent={!sealSolid(seal)}
-              depthWrite={sealSolid(seal)}
+              transparent
+              depthWrite={sealVisualDepthWrite(seal)}
             />
           </T.Mesh>
         {/each}
 
         {#each [-seal.args[1] - 0.02, seal.args[1] - 0.14] as y}
           <T.Mesh
-            castShadow={sealSolid(seal)}
+            castShadow={sealVisualDepthWrite(seal)}
             receiveShadow
             position={sealPosition(seal, 0, y)}
           >
@@ -143,10 +150,10 @@
             <T.MeshStandardMaterial
               color={seal.trimColor ?? "#5d4528"}
               metalness={0.62}
-              opacity={sealOpacity(seal)}
+              opacity={sealVisualOpacity(seal)}
               roughness={0.38}
-              transparent={!sealSolid(seal)}
-              depthWrite={sealSolid(seal)}
+              transparent
+              depthWrite={sealVisualDepthWrite(seal)}
             />
           </T.Mesh>
         {/each}
@@ -162,7 +169,7 @@
           >
             {#each gateBarOffsets as offset}
               <T.Mesh
-                castShadow={sealSolid(seal)}
+                castShadow={sealVisualDepthWrite(seal)}
                 receiveShadow
                 position={sealPosition(seal, offset, -0.1)}
               >
@@ -172,17 +179,17 @@
                 <T.MeshStandardMaterial
                   color="#191712"
                   metalness={0.78}
-                  opacity={sealOpacity(seal)}
+                  opacity={sealVisualOpacity(seal)}
                   roughness={0.32}
-                  transparent={!sealSolid(seal)}
-                  depthWrite={sealSolid(seal)}
+                  transparent
+                  depthWrite={sealVisualDepthWrite(seal)}
                 />
               </T.Mesh>
             {/each}
 
             {#each gateRails as y}
               <T.Mesh
-                castShadow={sealSolid(seal)}
+                castShadow={sealVisualDepthWrite(seal)}
                 receiveShadow
                 position={sealPosition(seal, 0, y)}
               >
@@ -190,16 +197,16 @@
                 <T.MeshStandardMaterial
                   color={seal.trimColor ?? "#5d4528"}
                   metalness={0.72}
-                  opacity={sealOpacity(seal)}
+                  opacity={sealVisualOpacity(seal)}
                   roughness={0.36}
-                  transparent={!sealSolid(seal)}
-                  depthWrite={sealSolid(seal)}
+                  transparent
+                  depthWrite={sealVisualDepthWrite(seal)}
                 />
               </T.Mesh>
             {/each}
 
             <T.Mesh
-              castShadow={sealSolid(seal)}
+              castShadow={sealVisualDepthWrite(seal)}
               receiveShadow
               position={sealPosition(seal, 0, -0.38)}
             >
@@ -209,17 +216,17 @@
                 emissive={seal.emissive ?? "#1b130c"}
                 emissiveIntensity={0.12}
                 metalness={0.76}
-                opacity={sealOpacity(seal)}
+                opacity={sealVisualOpacity(seal)}
                 roughness={0.3}
-                transparent={!sealSolid(seal)}
-                depthWrite={sealSolid(seal)}
+                transparent
+                depthWrite={sealVisualDepthWrite(seal)}
               />
             </T.Mesh>
 
             {#each gateRivetRows as y}
               {#each gateRivetOffsets as offset}
                 <T.Mesh
-                  castShadow={sealSolid(seal)}
+                  castShadow={sealVisualDepthWrite(seal)}
                   position={sealPosition(seal, offset, y)}
                 >
                   <T.BoxGeometry args={sealBox(seal, 0.11, 0.11, 0.2)} />
@@ -228,10 +235,10 @@
                     emissive="#5d2d08"
                     emissiveIntensity={0.16}
                     metalness={0.78}
-                    opacity={sealOpacity(seal)}
+                    opacity={sealVisualOpacity(seal)}
                     roughness={0.26}
-                    transparent={!sealSolid(seal)}
-                    depthWrite={sealSolid(seal)}
+                    transparent
+                    depthWrite={sealVisualDepthWrite(seal)}
                   />
                 </T.Mesh>
               {/each}

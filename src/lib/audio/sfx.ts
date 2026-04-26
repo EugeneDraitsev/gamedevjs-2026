@@ -326,6 +326,9 @@ const enemyHitSlapVariants = [
 
 class GameSfxManager {
   #ducked = false;
+  #enemyDeathQueued = false;
+  #enemyDeathQueuedIntensity = 0;
+  #gameplayWarmupDone = false;
   readonly #lastFiredAt = new Map<string, number>();
   #laserWarmupKey = "";
   #mix: SfxMixSettings = defaultSfxMix;
@@ -437,6 +440,72 @@ class GameSfxManager {
     gain.disconnect();
     panner.disconnect();
     root.disconnect();
+  }
+
+  warmupGameplayEvents() {
+    if (
+      this.#gameplayWarmupDone ||
+      typeof window === "undefined" ||
+      !this.#mix.masterSoundEnabled ||
+      !this.#mix.sfxSoundEnabled ||
+      this.#mix.masterVolume <= 0 ||
+      this.#mix.sfxVolume <= 0
+    ) {
+      return;
+    }
+
+    const context = this.#getContext();
+    const output = this.#getOutput();
+
+    if (!(context && output)) {
+      return;
+    }
+
+    this.#gameplayWarmupDone = true;
+    const noiseBuffer = getSharedNoiseBuffer(context);
+    const start = context.currentTime + 0.02;
+    const stop = start + 0.035;
+    const root = context.createGain();
+    const gain = context.createGain();
+    const filter = context.createBiquadFilter();
+    const panner = context.createStereoPanner();
+
+    root.gain.setValueAtTime(silentLevel, context.currentTime);
+    gain.gain.setValueAtTime(silentLevel, context.currentTime);
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(960, context.currentTime);
+    filter.Q.setValueAtTime(2.2, context.currentTime);
+
+    filter.connect(gain);
+    gain.connect(panner);
+    panner.connect(root);
+    root.connect(output);
+
+    for (const type of ["sine", "triangle", "sawtooth"] as OscillatorType[]) {
+      const tone = context.createOscillator();
+
+      tone.type = type;
+      tone.frequency.setValueAtTime(220, context.currentTime);
+      tone.connect(filter);
+      tone.start(start);
+      tone.stop(stop);
+      tone.onended = () => tone.disconnect();
+    }
+
+    const noise = context.createBufferSource();
+
+    noise.buffer = noiseBuffer;
+    noise.connect(filter);
+    noise.start(start);
+    noise.stop(stop);
+    noise.onended = () => noise.disconnect();
+
+    window.setTimeout(() => {
+      filter.disconnect();
+      gain.disconnect();
+      panner.disconnect();
+      root.disconnect();
+    }, 120);
   }
 
   playArtifactPickup() {
@@ -591,6 +660,33 @@ class GameSfxManager {
   }
 
   playEnemyDeath(intensity = 0.5) {
+    const power = clamp01(intensity);
+
+    if (typeof window !== "undefined") {
+      this.#enemyDeathQueuedIntensity = Math.max(
+        this.#enemyDeathQueuedIntensity,
+        power
+      );
+
+      if (this.#enemyDeathQueued) {
+        return;
+      }
+
+      this.#enemyDeathQueued = true;
+      window.setTimeout(() => {
+        const queuedPower = this.#enemyDeathQueuedIntensity;
+
+        this.#enemyDeathQueued = false;
+        this.#enemyDeathQueuedIntensity = 0;
+        this.#playEnemyDeathNow(queuedPower);
+      }, 0);
+      return;
+    }
+
+    this.#playEnemyDeathNow(power);
+  }
+
+  #playEnemyDeathNow(power: number) {
     const shot = this.#beginOneShot(this.#scaledGain("death", 1.05), 0.92);
 
     if (!shot) {
@@ -598,7 +694,6 @@ class GameSfxManager {
     }
 
     const { context, root, start } = shot;
-    const power = clamp01(intensity);
 
     playTone(context, root, {
       duration: 0.18,
@@ -664,7 +759,7 @@ class GameSfxManager {
       type: "sawtooth",
     });
 
-    const shardCount = 10;
+    const shardCount = 5 + Math.round(power * 2);
 
     for (let index = 0; index < shardCount; index += 1) {
       const shardStart = start + 0.04 + randomBetween(0, 0.46);
@@ -686,7 +781,7 @@ class GameSfxManager {
       });
     }
 
-    const stressPopCount = 8;
+    const stressPopCount = 3 + Math.round(power * 2);
 
     for (let index = 0; index < stressPopCount; index += 1) {
       const popStart = start + 0.02 + randomBetween(0, 0.44);
@@ -706,7 +801,9 @@ class GameSfxManager {
       });
     }
 
-    for (let index = 0; index < 3; index += 1) {
+    const chunkCount = 1 + Math.round(power);
+
+    for (let index = 0; index < chunkCount; index += 1) {
       const chunkStart = start + 0.18 + randomBetween(0, 0.4);
       const chunkFreq = randomBetween(60, 140);
       const chunkPan = randomBetween(-0.3, 0.3);

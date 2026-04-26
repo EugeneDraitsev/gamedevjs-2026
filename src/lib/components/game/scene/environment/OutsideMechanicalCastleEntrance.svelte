@@ -353,49 +353,49 @@
   ];
   const signalLights = [-18.2, -11.4, 11.4, 18.2];
   const gateGlowVertex = `
-              varying vec2 vUv;
+                varying vec2 vUv;
 
-              void main() {
-                vUv = uv;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-              }
-            `;
+                void main() {
+                  vUv = uv;
+                  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+              `;
   const gateGlowFragment = `
-              varying vec2 vUv;
-              uniform vec3 uLockedColor;
-              uniform vec3 uOpenColor;
-              uniform float uTime;
-              uniform float uUnlocked;
+                varying vec2 vUv;
+                uniform vec3 uLockedColor;
+                uniform vec3 uOpenColor;
+                uniform float uTime;
+                uniform float uUnlocked;
 
-              float line(float value, float width) {
-                return smoothstep(width, 0.0, abs(value));
-              }
+                float line(float value, float width) {
+                  return smoothstep(width, 0.0, abs(value));
+                }
 
-              void main() {
-                vec2 uv = vUv;
-                vec3 color = mix(uLockedColor, uOpenColor, uUnlocked);
-                float pulse = 0.62 + 0.38 * sin(uTime * 3.2);
-                float sideRail = line(abs(uv.x - 0.5) - 0.43, 0.018);
-                float topRail = line(uv.y - 0.84, 0.02);
-                float bottomRail = line(uv.y - 0.13, 0.016);
-                float vertical = line(fract(uv.x * 7.0 + uTime * 0.08) - 0.5, 0.032);
-                float horizontal = line(fract(uv.y * 9.0 - uTime * 0.11) - 0.5, 0.026);
-                float diagonal = line(fract((uv.x + uv.y) * 5.0 + uTime * 0.12) - 0.5, 0.022);
-                float coreMask = smoothstep(0.02, 0.2, uv.x) *
-                  smoothstep(0.02, 0.2, 1.0 - uv.x) *
-                  smoothstep(0.02, 0.18, uv.y) *
-                  smoothstep(0.02, 0.18, 1.0 - uv.y);
-                float circuit = max(max(vertical * 0.72, horizontal * 0.56), diagonal * 0.44);
-                circuit = max(circuit, max(sideRail, max(topRail, bottomRail)));
-                float centerGlow = smoothstep(0.52, 0.0, distance(uv, vec2(0.5, 0.55)));
-                float alpha = coreMask * min(
-                  0.88,
-                  circuit * (0.58 + pulse * 0.7) + centerGlow * (0.34 + uUnlocked * 0.18)
-                );
+                void main() {
+                  vec2 uv = vUv;
+                  vec3 color = mix(uLockedColor, uOpenColor, uUnlocked);
+                  float pulse = 0.62 + 0.38 * sin(uTime * 3.2);
+                  float sideRail = line(abs(uv.x - 0.5) - 0.43, 0.018);
+                  float topRail = line(uv.y - 0.84, 0.02);
+                  float bottomRail = line(uv.y - 0.13, 0.016);
+                  float vertical = line(fract(uv.x * 7.0 + uTime * 0.08) - 0.5, 0.032);
+                  float horizontal = line(fract(uv.y * 9.0 - uTime * 0.11) - 0.5, 0.026);
+                  float diagonal = line(fract((uv.x + uv.y) * 5.0 + uTime * 0.12) - 0.5, 0.022);
+                  float coreMask = smoothstep(0.02, 0.2, uv.x) *
+                    smoothstep(0.02, 0.2, 1.0 - uv.x) *
+                    smoothstep(0.02, 0.18, uv.y) *
+                    smoothstep(0.02, 0.18, 1.0 - uv.y);
+                  float circuit = max(max(vertical * 0.72, horizontal * 0.56), diagonal * 0.44);
+                  circuit = max(circuit, max(sideRail, max(topRail, bottomRail)));
+                  float centerGlow = smoothstep(0.52, 0.0, distance(uv, vec2(0.5, 0.55)));
+                  float alpha = coreMask * min(
+                    0.88,
+                    circuit * (0.58 + pulse * 0.7) + centerGlow * (0.34 + uUnlocked * 0.18)
+                  );
 
-                gl_FragColor = vec4(color * (2.9 + pulse * 1.65 + uUnlocked * 0.9), alpha);
-              }
-            `;
+                  gl_FragColor = vec4(color * (2.9 + pulse * 1.65 + uUnlocked * 0.9), alpha);
+                }
+              `;
 </script>
 
 <script lang="ts">
@@ -416,6 +416,8 @@
   const baseY = outsideGroundY(0, -78.4);
   const pulse = $derived(0.72 + Math.sin(animationNow * 0.0052) * 0.28);
   const gateLeafOffset = $derived(unlocked ? 6.35 : 1.18);
+  const openPassageOpacity = $derived(unlocked ? 1 : 0.001);
+  const openPassageScale = $derived(unlocked ? 1 : 0.001);
   const gateGlowUniforms = {
     uLockedColor: { value: new Color("#ffb24d") },
     uOpenColor: { value: new Color("#73ffe4") },
@@ -587,46 +589,53 @@
     </T.Group>
   {/each}
 
-  {#if unlocked}
-    <T.Group position={[0, 0.06, -5.8]}>
-      <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-        <T.PlaneGeometry args={[7.4, 16.5]} />
+  <T.Group
+    position={[0, 0.06, -5.8]}
+    scale={[openPassageScale, openPassageScale, openPassageScale]}
+  >
+    <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+      <T.PlaneGeometry args={[7.4, 16.5]} />
+      <T.MeshStandardMaterial
+        color="#24261b"
+        emissive="#080a06"
+        emissiveIntensity={0.12}
+        metalness={0.18}
+        opacity={openPassageOpacity}
+        roughness={0.9}
+        transparent
+      />
+    </T.Mesh>
+
+    {#each [-1, 1] as side}
+      <T.Mesh castShadow receiveShadow position={[side * 4.25, 3.2, -1.2]}>
+        <T.BoxGeometry args={[0.46, 6.4, 13.5]} />
         <T.MeshStandardMaterial
-          color="#24261b"
-          emissive="#080a06"
-          emissiveIntensity={0.12}
-          metalness={0.18}
-          roughness={0.9}
+          color="#141915"
+          emissive="#040806"
+          emissiveIntensity={0.08}
+          metalness={0.48}
+          opacity={openPassageOpacity}
+          roughness={0.72}
+          transparent
         />
       </T.Mesh>
+    {/each}
 
-      {#each [-1, 1] as side}
-        <T.Mesh castShadow receiveShadow position={[side * 4.25, 3.2, -1.2]}>
-          <T.BoxGeometry args={[0.46, 6.4, 13.5]} />
-          <T.MeshStandardMaterial
-            color="#141915"
-            emissive="#040806"
-            emissiveIntensity={0.08}
-            metalness={0.48}
-            roughness={0.72}
-          />
-        </T.Mesh>
-      {/each}
-
-      {#each [-6.2, -2.6, 1] as z}
-        <T.Mesh castShadow receiveShadow position={[0, 6.55, z]}>
-          <T.BoxGeometry args={[8.8, 0.34, 0.52]} />
-          <T.MeshStandardMaterial
-            color="#65461f"
-            emissive="#1d0e03"
-            emissiveIntensity={0.12}
-            metalness={0.78}
-            roughness={0.32}
-          />
-        </T.Mesh>
-      {/each}
-    </T.Group>
-  {/if}
+    {#each [-6.2, -2.6, 1] as z}
+      <T.Mesh castShadow receiveShadow position={[0, 6.55, z]}>
+        <T.BoxGeometry args={[8.8, 0.34, 0.52]} />
+        <T.MeshStandardMaterial
+          color="#65461f"
+          emissive="#1d0e03"
+          emissiveIntensity={0.12}
+          metalness={0.78}
+          opacity={openPassageOpacity}
+          roughness={0.32}
+          transparent
+        />
+      </T.Mesh>
+    {/each}
+  </T.Group>
 
   <FoundryGearSet
     {animationNow}
