@@ -73,3 +73,7 @@ bun run vercel-build
 
 That command builds Storybook into `static/storybook` before the app build, so
 the deployed `/storybook` route can serve the static bundle.
+
+## License
+
+MIT
