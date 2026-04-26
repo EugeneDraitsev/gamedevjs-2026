@@ -7,6 +7,7 @@
     type Texture,
   } from "three";
   import type { RoomTemplate } from "$lib/config/room-templates";
+  import { cachedPlane } from "$lib/game/cached-geometries";
   import type { RoomBounds } from "$lib/game/scene-layout";
 
   const roomNoise = (roomId: string, salt: number) => {
@@ -165,13 +166,14 @@
 
     {#if !(outside || isBossFloor)}
       <T.Mesh
+        geometry={cachedPlane(
+          bounds.floorHalfWidth * 2,
+          bounds.floorHalfDepth * 2
+        )}
         position={[0, 0.36, 0]}
         receiveShadow
         rotation={[-Math.PI / 2, 0, 0]}
       >
-        <T.PlaneGeometry
-          args={[bounds.floorHalfWidth * 2, bounds.floorHalfDepth * 2]}
-        />
         <T.MeshStandardMaterial
           map={foundryFloorTexture}
           metalness={0.16}
@@ -206,13 +208,14 @@
 
 {#if currentRoomTemplate.layout === "gear-floor" && treasureFloorTexture}
   <T.Mesh
+    geometry={cachedPlane(
+      bounds.floorHalfWidth * 2,
+      bounds.floorHalfDepth * 2
+    )}
     position={[0, 0.031, 0]}
     receiveShadow
     rotation={[-Math.PI / 2, 0, 0]}
   >
-    <T.PlaneGeometry
-      args={[bounds.floorHalfWidth * 2, bounds.floorHalfDepth * 2]}
-    />
     <T.MeshStandardMaterial
       bind:ref={treasureFloorMaterial}
       map={treasureFloorTexture}
@@ -231,13 +234,14 @@
 
 {#if isBossFloor && bossFloorTexture}
   <T.Mesh
+    geometry={cachedPlane(
+      bounds.floorHalfWidth * 2,
+      bounds.floorHalfDepth * 2
+    )}
     position={[0, 0.045, 0]}
     receiveShadow
     rotation={[-Math.PI / 2, 0, 0]}
   >
-    <T.PlaneGeometry
-      args={[bounds.floorHalfWidth * 2, bounds.floorHalfDepth * 2]}
-    />
     <T.MeshStandardMaterial
       bind:ref={bossFloorMaterial}
       map={bossFloorTexture}

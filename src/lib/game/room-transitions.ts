@@ -6,6 +6,11 @@ import {
   roomTemplateById,
 } from "$lib/config/room-templates";
 import {
+  markTransitionApplyEnd,
+  markTransitionApplyStart,
+  markTransitionTrigger,
+} from "$lib/debug/transition-perf";
+import {
   getEntryDirectionFromTarget,
   getRoomBounds,
   getRoomEntryTarget,
@@ -81,12 +86,21 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
   room.lastTransitionAt = now;
   room.transitionPending = true;
   timing.beginRoomTransition(now);
+  markTransitionTrigger({
+    fromKind: currentRoom.kind,
+    fromRoomId: currentRoom.id,
+    fromTpl: currentRoom.templateId,
+    toKind: nextRoom.kind,
+    toRoomId: nextRoom.id,
+    toTpl: nextRoom.templateId,
+  });
 
   const applyTransition = () => {
     if (!room.transitionPending) {
       return;
     }
 
+    markTransitionApplyStart();
     const appliedAt = performance.now();
 
     room.transitionPending = false;
@@ -113,6 +127,7 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
     }
 
     room.markExplored(transition.roomId);
+    markTransitionApplyEnd();
   };
 
   if (typeof requestAnimationFrame === "undefined") {

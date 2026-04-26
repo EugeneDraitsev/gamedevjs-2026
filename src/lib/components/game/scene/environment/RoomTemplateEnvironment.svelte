@@ -17,6 +17,15 @@
   import StartingMachineSetpiece from "$lib/components/game/scene/environment/StartingMachineSetpiece.svelte";
   import FoundryGearSet from "$lib/components/game/scene/environment/walls/FoundryGearSet.svelte";
   import type { RoomEnvironmentId } from "$lib/config/room-templates";
+  import {
+    cachedBox,
+    cachedCone,
+    cachedCylinder,
+    cachedPlane,
+    cachedRing,
+    cachedSphere,
+    cachedTorus,
+  } from "$lib/game/cached-geometries";
   import { outsideGroundY } from "$lib/game/outside-chunk-context";
   import { gearTeeth, treasureGearMounts } from "$lib/game/scene-layout";
   import type { SceneFloorPalette, Vec3 } from "$lib/types/game";
@@ -949,8 +958,11 @@
 
 {#if environment === "treasure-gears"}
   <T.Group position={[0, 0.18, 0]}>
-    <T.Mesh castShadow receiveShadow>
-      <T.CylinderGeometry args={[1.55, 1.92, 0.36, 8]} />
+    <T.Mesh
+      castShadow
+      geometry={cachedCylinder(1.55, 1.92, 0.36, 8)}
+      receiveShadow
+    >
       <T.MeshStandardMaterial
         color="#10283a"
         metalness={0.42}
@@ -959,32 +971,41 @@
     </T.Mesh>
 
     <T.Mesh
-      receiveShadow
+      geometry={cachedRing(1.68, 2.12, 8)}
       position={[0, 0.21, 0]}
+      receiveShadow
       rotation={[-Math.PI / 2, 0, 0]}
     >
-      <T.RingGeometry args={[1.68, 2.12, 8]} />
       <T.MeshBasicMaterial color="#ffd166" opacity={0.42} transparent />
     </T.Mesh>
 
-    <T.Mesh position={[0, 0.25, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <T.RingGeometry args={[0.72, 0.9, 48]} />
+    <T.Mesh
+      geometry={cachedRing(0.72, 0.9, 48)}
+      position={[0, 0.25, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
       <T.MeshBasicMaterial color="#8ac6ff" opacity={0.62} transparent />
     </T.Mesh>
 
     {#each [-1, 1] as x}
       {#each [-1, 1] as z}
         <T.Group position={[x * 2.55, 0.15, z * 2.2]}>
-          <T.Mesh castShadow receiveShadow>
-            <T.CylinderGeometry args={[0.22, 0.34, 0.5, 6]} />
+          <T.Mesh
+            castShadow
+            geometry={cachedCylinder(0.22, 0.34, 0.5, 6)}
+            receiveShadow
+          >
             <T.MeshStandardMaterial
               color="#183142"
               metalness={0.48}
               roughness={0.48}
             />
           </T.Mesh>
-          <T.Mesh castShadow position={[0, 0.39, 0]}>
-            <T.SphereGeometry args={[0.18, 14, 10]} />
+          <T.Mesh
+            castShadow
+            geometry={cachedSphere(0.18, 14, 10)}
+            position={[0, 0.39, 0]}
+          >
             <T.MeshStandardMaterial
               color="#8ac6ff"
               emissive="#8ac6ff"
@@ -999,8 +1020,10 @@
 
   {#each treasureGearMounts as mount, index}
     <T.Group position={mount.position}>
-      <T.Mesh receiveShadow>
-        <T.BoxGeometry args={mount.panel} />
+      <T.Mesh
+        geometry={cachedBox(mount.panel[0], mount.panel[1], mount.panel[2])}
+        receiveShadow
+      >
         <T.MeshStandardMaterial
           color="#10202f"
           metalness={0.52}
@@ -1008,8 +1031,11 @@
         />
       </T.Mesh>
 
-      <T.Mesh castShadow position={[0, 0, 0.2]}>
-        <T.TorusGeometry args={[mount.size, 0.16, 12, 30]} />
+      <T.Mesh
+        castShadow
+        geometry={cachedTorus(mount.size, 0.16, 12, 30)}
+        position={[0, 0, 0.2]}
+      >
         <T.MeshStandardMaterial
           color={mount.position[2] < 0 ? "#ffd166" : "#8ac6ff"}
           emissive={mount.position[2] < 0 ? "#ffd166" : "#8ac6ff"}
@@ -1019,8 +1045,11 @@
         />
       </T.Mesh>
 
-      <T.Mesh castShadow position={[0, 0, 0.22]}>
-        <T.CylinderGeometry args={[0.34, 0.34, 0.24, 20]} />
+      <T.Mesh
+        castShadow
+        geometry={cachedCylinder(0.34, 0.34, 0.24, 20)}
+        position={[0, 0, 0.22]}
+      >
         <T.MeshStandardMaterial
           color="#dfeeff"
           metalness={0.4}
@@ -1031,10 +1060,10 @@
       {#each gearTeeth as tooth, toothIndex}
         <T.Mesh
           castShadow
+          geometry={cachedBox(0.26, 0.44, 0.2)}
           position={[tooth.x * mount.size, tooth.y * mount.size, 0.2]}
           rotation={[0, 0, tooth.rotation + (index + toothIndex) * 0.03]}
         >
-          <T.BoxGeometry args={[0.26, 0.44, 0.2]} />
           <T.MeshStandardMaterial
             color={index < 2 ? "#ffd166" : "#8ac6ff"}
             metalness={0.7}
@@ -1048,8 +1077,12 @@
 
 {#if environment === "boss-gears"}
   <T.Group position={[0, 2.25, -7.28]}>
-    <T.Mesh castShadow receiveShadow position={[0, 1.62, 0.12]}>
-      <T.BoxGeometry args={[15.2, 0.18, 0.18]} />
+    <T.Mesh
+      castShadow
+      geometry={cachedBox(15.2, 0.18, 0.18)}
+      position={[0, 1.62, 0.12]}
+      receiveShadow
+    >
       <T.MeshStandardMaterial
         color="#7b5430"
         metalness={0.72}
@@ -1066,8 +1099,12 @@
         ]}
         scale={[1, x === 0 ? Math.max(0.08, 1 - bannerLift * 0.72) : 1, 1]}
       >
-        <T.Mesh castShadow receiveShadow position={[0, 0.04, 0]}>
-          <T.PlaneGeometry args={[2.7, 3.25]} />
+        <T.Mesh
+          castShadow
+          geometry={cachedPlane(2.7, 3.25)}
+          position={[0, 0.04, 0]}
+          receiveShadow
+        >
           <T.MeshStandardMaterial
             color={bossBannerTexture ? "#ffffff" : "#5b1718"}
             emissive="#210708"
@@ -1081,8 +1118,12 @@
           />
         </T.Mesh>
         {#each [-1, 1] as side}
-          <T.Mesh castShadow receiveShadow position={[side * 0.98, 0.03, 0.03]}>
-            <T.BoxGeometry args={[0.08, 2.92, 0.08]} />
+          <T.Mesh
+            castShadow
+            geometry={cachedBox(0.08, 2.92, 0.08)}
+            position={[side * 0.98, 0.03, 0.03]}
+            receiveShadow
+          >
             <T.MeshStandardMaterial
               color="#9b6938"
               metalness={0.68}
@@ -1092,8 +1133,12 @@
             />
           </T.Mesh>
         {/each}
-        <T.Mesh castShadow receiveShadow position={[0, -1.33, 0.04]}>
-          <T.BoxGeometry args={[1.75, 0.08, 0.08]} />
+        <T.Mesh
+          castShadow
+          geometry={cachedBox(1.75, 0.08, 0.08)}
+          position={[0, -1.33, 0.04]}
+          receiveShadow
+        >
           <T.MeshStandardMaterial
             color="#c08545"
             metalness={0.7}
@@ -1123,24 +1168,35 @@
 
   {#each [-1, 1] as side}
     <T.Group position={[side * 6.4, 0.46, -4.95]}>
-      <T.Mesh castShadow receiveShadow>
-        <T.CylinderGeometry args={[0.46, 0.62, 0.38, 6]} />
+      <T.Mesh
+        castShadow
+        geometry={cachedCylinder(0.46, 0.62, 0.38, 6)}
+        receiveShadow
+      >
         <T.MeshStandardMaterial
           color="#22160f"
           metalness={0.5}
           roughness={0.62}
         />
       </T.Mesh>
-      <T.Mesh castShadow receiveShadow position={[0, 0.62, 0]}>
-        <T.BoxGeometry args={[0.72, 0.9, 0.72]} />
+      <T.Mesh
+        castShadow
+        geometry={cachedBox(0.72, 0.9, 0.72)}
+        position={[0, 0.62, 0]}
+        receiveShadow
+      >
         <T.MeshStandardMaterial
           color="#382516"
           metalness={0.42}
           roughness={0.58}
         />
       </T.Mesh>
-      <T.Mesh castShadow receiveShadow position={[0, 1.18, 0]}>
-        <T.ConeGeometry args={[0.38, 0.58, 6]} />
+      <T.Mesh
+        castShadow
+        geometry={cachedCone(0.38, 0.58, 6)}
+        position={[0, 1.18, 0]}
+        receiveShadow
+      >
         <T.MeshStandardMaterial
           color="#af6b32"
           emissive="#5d190c"

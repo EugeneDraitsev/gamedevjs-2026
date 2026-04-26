@@ -1,5 +1,6 @@
 <script lang="ts">
   import { T } from "@threlte/core";
+  import { cachedBox, cachedCylinder } from "$lib/game/cached-geometries";
 
   let {
     light = false,
@@ -17,19 +18,24 @@
 </script>
 
 <T.Group position={[x, y, 0.34]}>
-  <T.Mesh castShadow position={[0, 0, -0.03]}>
-    <T.BoxGeometry args={[0.44, 0.72, 0.12]} />
+  <T.Mesh
+    castShadow
+    geometry={cachedBox(0.44, 0.72, 0.12)}
+    position={[0, 0, -0.03]}
+  >
     <T.MeshStandardMaterial color="#1b1510" metalness={0.72} roughness={0.36} />
   </T.Mesh>
 
-  <T.Mesh>
-    <T.CylinderGeometry args={[0.13, 0.13, 0.52, 10]} />
+  <T.Mesh geometry={cachedCylinder(0.13, 0.13, 0.52, 10)}>
     <T.MeshBasicMaterial color={light ? "#ffc46d" : "#ffb257"} />
   </T.Mesh>
 
   {#each bars as bar}
-    <T.Mesh castShadow position={[bar, 0, 0.14]}>
-      <T.BoxGeometry args={[0.035, 0.62, 0.04]} />
+    <T.Mesh
+      castShadow
+      geometry={cachedBox(0.035, 0.62, 0.04)}
+      position={[bar, 0, 0.14]}
+    >
       <T.MeshStandardMaterial
         color={trimColor}
         metalness={0.74}
@@ -39,8 +45,11 @@
   {/each}
 
   {#each [-0.3, 0.3] as row}
-    <T.Mesh castShadow position={[0, row, 0.14]}>
-      <T.BoxGeometry args={[0.38, 0.045, 0.05]} />
+    <T.Mesh
+      castShadow
+      geometry={cachedBox(0.38, 0.045, 0.05)}
+      position={[0, row, 0.14]}
+    >
       <T.MeshStandardMaterial
         color={trimColor}
         metalness={0.76}

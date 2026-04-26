@@ -60,6 +60,7 @@
 
 <script lang="ts">
   import { T } from "@threlte/core";
+  import { cachedBox } from "$lib/game/cached-geometries";
 
   let {
     animationNow = 0,
@@ -93,10 +94,14 @@
 
 {#each roomHazards as hazard, index (hazard.id)}
   <T.Group position={hazard.position}>
-    <T.Mesh receiveShadow>
-      <T.BoxGeometry
-        args={[hazard.args[0] * 2, hazard.args[1] * 2, hazard.args[2] * 2]}
-      />
+    <T.Mesh
+      geometry={cachedBox(
+        hazard.args[0] * 2,
+        hazard.args[1] * 2,
+        hazard.args[2] * 2
+      )}
+      receiveShadow
+    >
       <T.MeshStandardMaterial
         color="#090100"
         metalness={0.12}

@@ -24,6 +24,10 @@
     WallTheme,
   } from "$lib/config/scene-settings";
   import { createSceneSettings } from "$lib/config/scene-settings";
+  import {
+    disableTransitionPerf,
+    enableTransitionPerf,
+  } from "$lib/debug/transition-perf";
   import { cheats } from "$lib/stores/cheats.svelte";
 
   interface DebugPaneProps {
@@ -159,8 +163,12 @@
   });
 
   onMount(() => {
+    enableTransitionPerf();
+
     if (!statsContainer) {
-      return;
+      return () => {
+        disableTransitionPerf();
+      };
     }
 
     const stats = new Stats();
@@ -184,6 +192,7 @@
     return () => {
       cancelAnimationFrame(frameId);
       stats.dom.remove();
+      disableTransitionPerf();
     };
   });
 

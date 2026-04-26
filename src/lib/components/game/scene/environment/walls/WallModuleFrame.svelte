@@ -31,6 +31,7 @@
 <script lang="ts">
   import { T } from "@threlte/core";
   import type { Texture } from "three";
+  import { cachedBox } from "$lib/game/cached-geometries";
 
   let {
     baseColor = "#2f332f",
@@ -68,8 +69,12 @@
 </script>
 
 <T.Group>
-  <T.Mesh castShadow receiveShadow position={[0, 0, 0.02]}>
-    <T.BoxGeometry args={[width, height, 0.1]} />
+  <T.Mesh
+    castShadow
+    geometry={cachedBox(width, height, 0.1)}
+    position={[0, 0, 0.02]}
+    receiveShadow
+  >
     <T.MeshStandardMaterial
       map={wallTexture}
       color="#8d7c6a"
@@ -101,8 +106,12 @@
   {/if}
 
   {#each [-1, 1] as side}
-    <T.Mesh castShadow receiveShadow position={[side * postX, 0, 0.17]}>
-      <T.BoxGeometry args={[0.28, height + 0.04, 0.3]} />
+    <T.Mesh
+      castShadow
+      geometry={cachedBox(0.28, height + 0.04, 0.3)}
+      position={[side * postX, 0, 0.17]}
+      receiveShadow
+    >
       <T.MeshStandardMaterial
         color="#2a2923"
         metalness={0.54}
@@ -113,10 +122,10 @@
     {#each [-1, 1] as capY}
       <T.Mesh
         castShadow
-        receiveShadow
+        geometry={cachedBox(0.42, 0.28, 0.3)}
         position={[side * postX, capY * railY, 0.3]}
+        receiveShadow
       >
-        <T.BoxGeometry args={[0.42, 0.28, 0.3]} />
         <T.MeshStandardMaterial
           color={trimColor}
           metalness={0.72}
@@ -127,8 +136,12 @@
   {/each}
 
   {#each [-1, 1] as side}
-    <T.Mesh castShadow receiveShadow position={[0, side * railY, 0.24]}>
-      <T.BoxGeometry args={[width + 0.08, 0.18, 0.24]} />
+    <T.Mesh
+      castShadow
+      geometry={cachedBox(width + 0.08, 0.18, 0.24)}
+      position={[0, side * railY, 0.24]}
+      receiveShadow
+    >
       <T.MeshStandardMaterial
         color={trimColor}
         metalness={0.72}

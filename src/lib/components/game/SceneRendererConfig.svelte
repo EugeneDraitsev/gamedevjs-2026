@@ -1,12 +1,17 @@
 <script lang="ts">
   import { useThrelte } from "@threlte/core";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     ACESFilmicToneMapping,
     Color,
     SRGBColorSpace,
     type Texture,
   } from "three";
+  import {
+    clearTransitionRefs,
+    setTransitionRenderer,
+    setTransitionScene,
+  } from "$lib/debug/transition-perf";
 
   let {
     backgroundColor = "#050403",
@@ -100,6 +105,8 @@
     renderer.setClearColor(background, 1);
     renderer.toneMapping = ACESFilmicToneMapping;
     renderer.toneMappingExposure = exposure;
+    setTransitionRenderer(renderer);
+    setTransitionScene(scene);
     invalidate();
 
     return () => {
@@ -114,6 +121,10 @@
         scene.environment = null;
       }
     };
+  });
+
+  onDestroy(() => {
+    clearTransitionRefs();
   });
 
   onMount(() => {
