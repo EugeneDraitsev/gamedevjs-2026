@@ -1,34 +1,75 @@
-# gamedevjs-2026
+# Orb Knight
 
-SvelteKit + TypeScript starter using:
+Break out of the machine. Reach the castle road.
 
-- `bun` for package management and scripts
-- `@threlte/core` and `@threlte/extras` for the 3D scene
-- `@threlte/rapier` with Rapier for simple rigid-body physics
+[Play the live demo](https://gamedevjs-2026-orb-knight.vercel.app/)
 
-## Run locally
+Orb Knight is a browser-only SvelteKit action game about a tiny brass machine
+with a sword, a gun, and a suspicious amount of dungeon machinery. Fight through
+procedural foundry rooms, collect gears, rebuild your loadout, and push toward
+the castle road.
+
+## Screenshots
+
+![Orb Knight main menu](static/screenshots/orb-knight-menu.webp)
+
+![Orb Knight gameplay](static/screenshots/orb-knight-gameplay.webp)
+
+![Orb Knight loadout screen](static/screenshots/orb-knight-loadout.webp)
+
+## What is in the demo
+
+- Third-person 3D action built with SvelteKit, Threlte, Three.js, and Rapier.
+- Seeded dungeon runs with room transitions, pickups, shops, treasure rooms, and
+  boss encounters.
+- A machine loadout system with attack, body, utility, and melee modules.
+- Gear currency, healing pickups, artifact rewards, and persistent run progress.
+- Runtime settings for camera, lighting, physics, graphics, audio, and combat
+  feel.
+- Storybook playgrounds for fast combat, room, player, and UI iteration.
+
+## Controls
+
+| Action | Input |
+| --- | --- |
+| Move | WASD or arrow keys |
+| Shoot | Left mouse button |
+| Sword | Right mouse button or F |
+| Jump | Space |
+| Loadout | E |
+| Settings | Esc |
+
+## Tech Stack
+
+- SvelteKit with SSR disabled for browser-only gameplay
+- Svelte 5 runes
+- Threlte and Three.js for rendering
+- Rapier for physics
+- Bun for scripts and package management
+- Vitest, svelte-check, and Ultracite for verification
+- Storybook for focused gameplay sandboxes
+
+## Run Locally
 
 ```sh
+bun install
 bun run dev
 ```
 
-Open the app and you should see a minimal third-person prototype with:
-
-- a player-controlled ball
-- a `svelte-tweakpane-ui` debug pane with Camera, Physics, Lighting, and Debug sections
-- a fixed follow camera with live angle/FOV tuning
-- a free orbit debug camera mode
-- physics wireframe and camera helper toggles
-- jump on `Space`
-- a compact arena with a ramp and a couple of obstacles
-- shadow and gravity tuning controls for quick scene iteration
-
-## Useful commands
+## Useful Commands
 
 ```sh
 bun run check
-bun run lint
-bun run typecheck
-bun run fix
+bun run test
+bun run storybook
 bun run build
 ```
+
+Production deploys use:
+
+```sh
+bun run vercel-build
+```
+
+That command builds Storybook into `static/storybook` before the app build, so
+the deployed `/storybook` route can serve the static bundle.
