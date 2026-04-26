@@ -40,45 +40,45 @@
   const maxAge = 2.6;
   const maxSegments = 30;
   const vertexShader = /* glsl */ `
-                                      varying vec2 vUv;
-                                      void main() {
-                                        vUv = uv;
-                                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                                      }
-                                    `;
+                                        varying vec2 vUv;
+                                        void main() {
+                                          vUv = uv;
+                                          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                                        }
+                                      `;
   const fragmentShader = /* glsl */ `
-                                      ${glslHash}
-                                      ${glslValueNoise}
-                                      uniform float uAge;
-                                      uniform float uOpacity;
-                                      uniform float uTime;
-                                      varying vec2 vUv;
+                                        ${glslHash}
+                                        ${glslValueNoise}
+                                        uniform float uAge;
+                                        uniform float uOpacity;
+                                        uniform float uTime;
+                                        varying vec2 vUv;
 
-                                      void main() {
-                                        vec2 p = vec2((vUv.x - 0.5) * 2.0, vUv.y);
-                                        float life = 1.0 - smoothstep(0.5, 1.0, uAge);
-                                        float grow = smoothstep(0.02, 0.22, uAge);
-                                        float yMask = 1.0 - smoothstep(grow * 0.86, max(grow, 0.02), p.y);
-                                        float y = p.y / max(grow, 0.08);
-                                        float fade = smoothstep(0.0, 0.08, p.y) * (1.0 - smoothstep(0.82, 1.0, y));
-                                        float noise = fbm2(vec2(p.x * 8.0, p.y * 12.0 - uTime * 1.8));
-                                        float bendNoise = fbm2(vec2(p.y * 5.0 + uTime * 0.35, p.x * 4.0 + uAge * 2.0));
-                                        float bend = sin(p.y * 9.0 + uAge * 6.0 + noise * 3.0) * (0.025 + y * 0.075);
-                                        float curvedX = p.x + (bend + (bendNoise - 0.5) * 0.1 * y) * smoothstep(0.03, 0.5, p.y);
-                                        float spread = 0.06 + y * 0.28 + uAge * 0.38 + (noise - 0.5) * 0.08 + sin(y * 6.0 + uAge * 4.0) * 0.035 * y;
-                                        float waveBand = 0.55 + 0.45 * sin(y * 18.0 + curvedX * 7.0 + uTime * 1.2);
-                                        float arm = 1.0 - smoothstep(0.025, 0.145, abs(abs(curvedX) - spread));
-                                        float inside = 1.0 - smoothstep(spread * 0.72, spread * 1.06, abs(curvedX));
-                                        float wash = inside * smoothstep(0.05, 0.34, p.y) * (1.0 - smoothstep(0.72, 1.0, p.y));
-                                        float center = (1.0 - smoothstep(0.03, 0.15, abs(curvedX))) * exp(-p.y * 1.2);
-                                        float foam = smoothstep(0.45, 0.9, fbm2(vec2(curvedX * 18.0 + sin(y * 7.0) * 0.8, p.y * 24.0 - uTime * 3.0)));
-                                        float wake = fade * yMask * life * (arm * (0.32 + noise * 0.26) * waveBand + wash * foam * 0.24 + center * 0.1);
-                                        vec3 col = vec3(wake * 0.68, wake * 0.9, wake);
-                                        float alpha = wake * uOpacity;
-                                        if (alpha < 0.008) discard;
-                                        gl_FragColor = vec4(col, alpha);
-                                      }
-                                    `;
+                                        void main() {
+                                          vec2 p = vec2((vUv.x - 0.5) * 2.0, vUv.y);
+                                          float life = 1.0 - smoothstep(0.5, 1.0, uAge);
+                                          float grow = smoothstep(0.02, 0.22, uAge);
+                                          float yMask = 1.0 - smoothstep(grow * 0.86, max(grow, 0.02), p.y);
+                                          float y = p.y / max(grow, 0.08);
+                                          float fade = smoothstep(0.0, 0.08, p.y) * (1.0 - smoothstep(0.82, 1.0, y));
+                                          float noise = fbm2(vec2(p.x * 8.0, p.y * 12.0 - uTime * 1.8));
+                                          float bendNoise = fbm2(vec2(p.y * 5.0 + uTime * 0.35, p.x * 4.0 + uAge * 2.0));
+                                          float bend = sin(p.y * 9.0 + uAge * 6.0 + noise * 3.0) * (0.025 + y * 0.075);
+                                          float curvedX = p.x + (bend + (bendNoise - 0.5) * 0.1 * y) * smoothstep(0.03, 0.5, p.y);
+                                          float spread = 0.06 + y * 0.28 + uAge * 0.38 + (noise - 0.5) * 0.08 + sin(y * 6.0 + uAge * 4.0) * 0.035 * y;
+                                          float waveBand = 0.55 + 0.45 * sin(y * 18.0 + curvedX * 7.0 + uTime * 1.2);
+                                          float arm = 1.0 - smoothstep(0.025, 0.145, abs(abs(curvedX) - spread));
+                                          float inside = 1.0 - smoothstep(spread * 0.72, spread * 1.06, abs(curvedX));
+                                          float wash = inside * smoothstep(0.05, 0.34, p.y) * (1.0 - smoothstep(0.72, 1.0, p.y));
+                                          float center = (1.0 - smoothstep(0.03, 0.15, abs(curvedX))) * exp(-p.y * 1.2);
+                                          float foam = smoothstep(0.45, 0.9, fbm2(vec2(curvedX * 18.0 + sin(y * 7.0) * 0.8, p.y * 24.0 - uTime * 3.0)));
+                                          float wake = fade * yMask * life * (arm * (0.32 + noise * 0.26) * waveBand + wash * foam * 0.24 + center * 0.1);
+                                          vec3 col = vec3(wake * 0.68, wake * 0.9, wake);
+                                          float alpha = wake * uOpacity;
+                                          if (alpha < 0.008) discard;
+                                          gl_FragColor = vec4(col, alpha);
+                                        }
+                                      `;
 
   const makeMaterial = () =>
     new ShaderMaterial({

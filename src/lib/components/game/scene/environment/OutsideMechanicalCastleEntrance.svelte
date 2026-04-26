@@ -353,49 +353,49 @@
   ];
   const signalLights = [-18.2, -11.4, 11.4, 18.2];
   const gateGlowVertex = `
-                  varying vec2 vUv;
+                    varying vec2 vUv;
 
-                  void main() {
-                    vUv = uv;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                  }
-                `;
+                    void main() {
+                      vUv = uv;
+                      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                  `;
   const gateGlowFragment = `
-                  varying vec2 vUv;
-                  uniform vec3 uLockedColor;
-                  uniform vec3 uOpenColor;
-                  uniform float uTime;
-                  uniform float uUnlocked;
+                    varying vec2 vUv;
+                    uniform vec3 uLockedColor;
+                    uniform vec3 uOpenColor;
+                    uniform float uTime;
+                    uniform float uUnlocked;
 
-                  float line(float value, float width) {
-                    return smoothstep(width, 0.0, abs(value));
-                  }
+                    float line(float value, float width) {
+                      return smoothstep(width, 0.0, abs(value));
+                    }
 
-                  void main() {
-                    vec2 uv = vUv;
-                    vec3 color = mix(uLockedColor, uOpenColor, uUnlocked);
-                    float pulse = 0.62 + 0.38 * sin(uTime * 3.2);
-                    float sideRail = line(abs(uv.x - 0.5) - 0.43, 0.018);
-                    float topRail = line(uv.y - 0.84, 0.02);
-                    float bottomRail = line(uv.y - 0.13, 0.016);
-                    float vertical = line(fract(uv.x * 7.0 + uTime * 0.08) - 0.5, 0.032);
-                    float horizontal = line(fract(uv.y * 9.0 - uTime * 0.11) - 0.5, 0.026);
-                    float diagonal = line(fract((uv.x + uv.y) * 5.0 + uTime * 0.12) - 0.5, 0.022);
-                    float coreMask = smoothstep(0.02, 0.2, uv.x) *
-                      smoothstep(0.02, 0.2, 1.0 - uv.x) *
-                      smoothstep(0.02, 0.18, uv.y) *
-                      smoothstep(0.02, 0.18, 1.0 - uv.y);
-                    float circuit = max(max(vertical * 0.72, horizontal * 0.56), diagonal * 0.44);
-                    circuit = max(circuit, max(sideRail, max(topRail, bottomRail)));
-                    float centerGlow = smoothstep(0.52, 0.0, distance(uv, vec2(0.5, 0.55)));
-                    float alpha = coreMask * min(
-                      0.88,
-                      circuit * (0.58 + pulse * 0.7) + centerGlow * (0.34 + uUnlocked * 0.18)
-                    );
+                    void main() {
+                      vec2 uv = vUv;
+                      vec3 color = mix(uLockedColor, uOpenColor, uUnlocked);
+                      float pulse = 0.62 + 0.38 * sin(uTime * 3.2);
+                      float sideRail = line(abs(uv.x - 0.5) - 0.43, 0.018);
+                      float topRail = line(uv.y - 0.84, 0.02);
+                      float bottomRail = line(uv.y - 0.13, 0.016);
+                      float vertical = line(fract(uv.x * 7.0 + uTime * 0.08) - 0.5, 0.032);
+                      float horizontal = line(fract(uv.y * 9.0 - uTime * 0.11) - 0.5, 0.026);
+                      float diagonal = line(fract((uv.x + uv.y) * 5.0 + uTime * 0.12) - 0.5, 0.022);
+                      float coreMask = smoothstep(0.02, 0.2, uv.x) *
+                        smoothstep(0.02, 0.2, 1.0 - uv.x) *
+                        smoothstep(0.02, 0.18, uv.y) *
+                        smoothstep(0.02, 0.18, 1.0 - uv.y);
+                      float circuit = max(max(vertical * 0.72, horizontal * 0.56), diagonal * 0.44);
+                      circuit = max(circuit, max(sideRail, max(topRail, bottomRail)));
+                      float centerGlow = smoothstep(0.52, 0.0, distance(uv, vec2(0.5, 0.55)));
+                      float alpha = coreMask * min(
+                        0.88,
+                        circuit * (0.58 + pulse * 0.7) + centerGlow * (0.34 + uUnlocked * 0.18)
+                      );
 
-                    gl_FragColor = vec4(color * (2.9 + pulse * 1.65 + uUnlocked * 0.9), alpha);
-                  }
-                `;
+                      gl_FragColor = vec4(color * (2.9 + pulse * 1.65 + uUnlocked * 0.9), alpha);
+                    }
+                  `;
 </script>
 
 <script lang="ts">
