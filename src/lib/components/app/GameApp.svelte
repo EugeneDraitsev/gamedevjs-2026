@@ -18,7 +18,7 @@
   import SceneLoadingOverlay from "$lib/components/app/SceneLoadingOverlay.svelte";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import MobileControls from "$lib/components/game/MobileControls.svelte";
-  import MachineBayModal from "$lib/components/machine-bay/MachineBayModal.svelte";
+  import LoadoutModal from "$lib/components/loadout/LoadoutModal.svelte";
   import { createDungeonLayout } from "$lib/config/dungeon-layout";
   import {
     computeMachineStats,
@@ -99,7 +99,7 @@
   let settingsOpen = $state(false);
   let howToPlayOpen = $state(false);
   let sceneResetKey = $state(0);
-  let machineBayOpen = $state(false);
+  let loadoutOpen = $state(false);
   let demoCompleteOpen = $state(false);
   let collectedArtifactRooms = $state<string[]>([]);
   let floorIndex = $state(initialDungeonFloor);
@@ -137,7 +137,7 @@
   const machineStats = $derived(computeMachineStats(machineLoadout));
   const controlsLocked = $derived(
     settingsOpen ||
-      machineBayOpen ||
+      loadoutOpen ||
       demoCompleteOpen ||
       deathModalOpen ||
       playerDeathPending ||
@@ -234,7 +234,7 @@
 
     resetFloorAdvanceTransition();
     settingsOpen = false;
-    machineBayOpen = false;
+    loadoutOpen = false;
     demoCompleteOpen = false;
     collectedArtifactRooms = [];
     floorIndex = nextFloor;
@@ -266,13 +266,13 @@
 
   const openDemoComplete = () => {
     settingsOpen = false;
-    machineBayOpen = false;
+    loadoutOpen = false;
     demoCompleteOpen = true;
   };
 
   const openSettings = () => {
     demoCompleteOpen = false;
-    machineBayOpen = false;
+    loadoutOpen = false;
     howToPlayOpen = false;
     settingsOpen = true;
   };
@@ -283,8 +283,8 @@
       return;
     }
 
-    if (machineBayOpen) {
-      machineBayOpen = false;
+    if (loadoutOpen) {
+      loadoutOpen = false;
       return;
     }
 
@@ -340,12 +340,12 @@
     });
   };
 
-  const openMachineBay = () => {
+  const openLoadout = () => {
     if (settingsOpen || demoCompleteOpen) {
       return;
     }
 
-    machineBayOpen = true;
+    loadoutOpen = true;
   };
 
   const withDebugParam = (path: string) => {
@@ -532,7 +532,7 @@
     clearFloorAdvanceTimers();
     floorAdvancePending = true;
     settingsOpen = false;
-    machineBayOpen = false;
+    loadoutOpen = false;
     demoCompleteOpen = false;
     floorAdvanceTarget = nextFloor;
     floorAdvancePhase = "closing";
@@ -716,7 +716,7 @@
         !deathModalOpen &&
         !playerDeathPending
       ) {
-        machineBayOpen = !machineBayOpen;
+        loadoutOpen = !loadoutOpen;
         event.preventDefault();
       }
     };
@@ -782,7 +782,7 @@
         onMusicCue={handleMusicCue}
         onLoadProgress={(progress) => (sceneLoadProgress = progress)}
         onOpenSettings={openSettings}
-        onOpenWeaponLab={openMachineBay}
+        onOpenLoadout={openLoadout}
         onPlayerDeath={handlePlayerDeath}
         onPurchaseShopOffer={purchaseShopOffer}
         onReady={() => (sceneReady = true)}
@@ -861,17 +861,17 @@
     </AppModalShell>
   {/if}
 
-  <MachineBayModal
+  <LoadoutModal
     {gearCount}
     {machineLoadout}
     {machineStats}
     {moduleInventory}
     {newModuleIds}
-    onClose={() => (machineBayOpen = false)}
+    onClose={() => (loadoutOpen = false)}
     onEjectModule={ejectModule}
     onInstallModule={installModule}
     onMarkModuleSeen={markModuleSeen}
-    open={machineBayOpen}
+    open={loadoutOpen}
   />
 
   {#if deathModalOpen}

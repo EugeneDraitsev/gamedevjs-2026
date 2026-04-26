@@ -4,11 +4,11 @@
   import { getGameSceneContext } from "$lib/stores/scene-context";
 
   interface GameHudProps {
+    onOpenLoadout?: () => void;
     onOpenSettings?: () => void;
-    onOpenWeaponLab?: () => void;
   }
 
-  let { onOpenSettings, onOpenWeaponLab }: GameHudProps = $props();
+  let { onOpenLoadout, onOpenSettings }: GameHudProps = $props();
 
   const scene = getGameSceneContext();
   const { pickups, player } = scene;
@@ -46,7 +46,7 @@
       type="button"
       class="hud-icon-button"
       aria-label="Open Loadout"
-      onclick={onOpenWeaponLab}
+      onclick={onOpenLoadout}
     >
       <img class="hud-icon" src={orbKnightIconUrl} alt="" aria-hidden="true">
       <span class="hud-hint hud-icon-hint" aria-hidden="true">E</span>

@@ -9,7 +9,7 @@
     type MachineSlotId,
   } from "$lib/config/machine-modules";
 
-  interface MachineBayOrbPreviewProps {
+  interface LoadoutOrbPreviewProps {
     highlightedSlotId?: MachineSlotId | null;
     machineLoadout?: MachineLoadout;
   }
@@ -17,7 +17,7 @@
   let {
     highlightedSlotId = null,
     machineLoadout = createDefaultMachineLoadout(),
-  }: MachineBayOrbPreviewProps = $props();
+  }: LoadoutOrbPreviewProps = $props();
 </script>
 
 <div class="orb-preview" role="img" aria-label="Machine chassis preview">

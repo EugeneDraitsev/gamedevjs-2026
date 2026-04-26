@@ -4,7 +4,7 @@
   import AppModalShell from "$lib/components/app/AppModalShell.svelte";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import GameScene from "$lib/components/game/GameScene.svelte";
-  import MachineBayModal from "$lib/components/machine-bay/MachineBayModal.svelte";
+  import LoadoutModal from "$lib/components/loadout/LoadoutModal.svelte";
   import {
     computeMachineStats,
     createDefaultMachineLoadout,
@@ -37,7 +37,7 @@
 
   let settings = $state<SceneSettings>(createSceneSettings());
   let settingsOpen = $state(false);
-  let machineBayOpen = $state(false);
+  let loadoutOpen = $state(false);
   let presetId = $state(combatPresets[0].id);
   let restartTick = $state(0);
   let infiniteHealth = $state(false);
@@ -83,7 +83,7 @@
 
   const restart = () => {
     settingsOpen = false;
-    machineBayOpen = false;
+    loadoutOpen = false;
     restartTick += 1;
   };
 
@@ -97,13 +97,13 @@
   };
 
   const openSettings = () => {
-    machineBayOpen = false;
+    loadoutOpen = false;
     settingsOpen = true;
   };
 
-  const openMachineBay = () => {
+  const openLoadout = () => {
     settingsOpen = false;
-    machineBayOpen = true;
+    loadoutOpen = true;
   };
 
   const removeInventoryModule = (moduleId: MachineModuleId) => {
@@ -180,8 +180,8 @@
       }
 
       if (event.code === "Escape") {
-        if (machineBayOpen) {
-          machineBayOpen = false;
+        if (loadoutOpen) {
+          loadoutOpen = false;
         } else {
           settingsOpen = !settingsOpen;
         }
@@ -191,7 +191,7 @@
       }
 
       if (event.code === "KeyE" && !event.repeat) {
-        machineBayOpen = !machineBayOpen;
+        loadoutOpen = !loadoutOpen;
         settingsOpen = false;
         event.preventDefault();
       }
@@ -214,7 +214,7 @@
   {#key sceneKey}
     <GameScene
       collectedArtifactRoomIds={[]}
-      controlsLocked={settingsOpen || machineBayOpen}
+      controlsLocked={settingsOpen || loadoutOpen}
       {dungeon}
       enemySpawnOverride={{
         enemyCount: currentPreset.enemyCount,
@@ -227,7 +227,7 @@
       {machineStats}
       onCollectArtifact={noop}
       onOpenSettings={openSettings}
-      onOpenWeaponLab={openMachineBay}
+      onOpenLoadout={openLoadout}
       {settings}
       weaponBuild={machineStats.weaponBuild}
     />
@@ -244,7 +244,7 @@
         <Checkbox bind:value={infiniteHealth} label="Infinite Health" />
         <Button on:click={giveAllModules} title="Give all modules" />
         <Button on:click={() => cheats.requestRevealMap()} title="Reveal map" />
-        <Button on:click={openMachineBay} title="Open loadout (E)" />
+        <Button on:click={openLoadout} title="Open Loadout (E)" />
       </Folder>
       <p class="hint">{currentPreset.description}</p>
     </Pane>
@@ -269,15 +269,15 @@
     </AppModalShell>
   {/if}
 
-  <MachineBayModal
+  <LoadoutModal
     gearCount={0}
     {machineLoadout}
     {machineStats}
     {moduleInventory}
-    onClose={() => (machineBayOpen = false)}
+    onClose={() => (loadoutOpen = false)}
     onEjectModule={ejectModule}
     onInstallModule={installModule}
-    open={machineBayOpen}
+    open={loadoutOpen}
   />
 </main>
 

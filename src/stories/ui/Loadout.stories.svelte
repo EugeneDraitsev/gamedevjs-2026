@@ -1,10 +1,10 @@
 <script module lang="ts">
   import { defineMeta } from "@storybook/addon-svelte-csf";
-  import MachineBayShowcase from "../_helpers/MachineBayShowcase.svelte";
+  import LoadoutShowcase from "../_helpers/LoadoutShowcase.svelte";
 
   const { Story } = defineMeta({
     title: "UI/Loadout",
-    component: MachineBayShowcase,
+    component: LoadoutShowcase,
     parameters: {
       layout: "fullscreen",
     },

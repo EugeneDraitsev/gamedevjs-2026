@@ -2,7 +2,7 @@
   import { T } from "@threlte/core";
   import { onDestroy } from "svelte";
   import OrbKnight from "$lib/components/game/OrbKnight.svelte";
-  import MachineModuleGlyph from "$lib/components/machine-bay/MachineModuleGlyph.svelte";
+  import MachineModuleGlyph from "$lib/components/loadout/MachineModuleGlyph.svelte";
   import {
     computeMachineStats,
     createDefaultMachineLoadout,

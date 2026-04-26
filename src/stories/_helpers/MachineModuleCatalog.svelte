@@ -1,5 +1,5 @@
 <script lang="ts">
-  import MachineModuleGlyph from "$lib/components/machine-bay/MachineModuleGlyph.svelte";
+  import MachineModuleGlyph from "$lib/components/loadout/MachineModuleGlyph.svelte";
   import {
     getMachineModuleKindAccent,
     getMachineModuleRarityAccent,

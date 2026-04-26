@@ -53,8 +53,8 @@ export interface GameSceneProps {
   onGearCountChange?: (gearCount: number) => void;
   onLoadProgress?: (progress: SceneLoadProgress) => void;
   onMusicCue?: (cue: MusicCue, options?: MusicTransitionOptions) => void;
+  onOpenLoadout?: () => void;
   onOpenSettings?: () => void;
-  onOpenWeaponLab?: () => void;
   onPlayerDeath?: () => void;
   onPurchaseShopOffer?: (offer: ShopOffer) => void;
   onReady?: () => void;

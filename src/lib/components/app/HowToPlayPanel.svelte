@@ -70,7 +70,7 @@
       <div class="how-to-icon key-wide" aria-hidden="true"><kbd>E</kbd></div>
       <div>
         <strong>Loadout</strong>
-        <p>Open the machine bay and install modules between fights.</p>
+        <p>Open Loadout and install modules between fights.</p>
       </div>
     </article>
   </div>

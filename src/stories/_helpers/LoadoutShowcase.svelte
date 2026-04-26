@@ -1,5 +1,5 @@
 <script lang="ts">
-  import MachineBayModal from "$lib/components/machine-bay/MachineBayModal.svelte";
+  import LoadoutModal from "$lib/components/loadout/LoadoutModal.svelte";
   import {
     computeMachineStats,
     createDefaultMachineLoadout,
@@ -119,7 +119,7 @@
 </script>
 
 <div class="showcase-shell">
-  <MachineBayModal
+  <LoadoutModal
     {gearCount}
     {machineLoadout}
     {machineStats}

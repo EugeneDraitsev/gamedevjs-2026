@@ -126,7 +126,7 @@
       machineStats={currentWeapon.machineStats}
       onCollectArtifact={noop}
       onOpenSettings={openSettings}
-      onOpenWeaponLab={noop}
+      onOpenLoadout={noop}
       {settings}
       weaponBuild={currentWeapon.weaponBuild}
     />

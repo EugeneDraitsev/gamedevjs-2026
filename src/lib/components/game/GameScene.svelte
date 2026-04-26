@@ -77,9 +77,9 @@
     onEndDemo,
     onGearCountChange,
     onLoadProgress,
+    onOpenLoadout,
     onMusicCue,
     onOpenSettings,
-    onOpenWeaponLab,
     onPlayerDeath,
     onPurchaseShopOffer,
     onReady,
@@ -874,7 +874,7 @@
   {#if scene.sceneUiVisible}
     <GameMinimap {onOpenSettings} />
 
-    <GameHud {onOpenSettings} {onOpenWeaponLab} />
+    <GameHud {onOpenLoadout} {onOpenSettings} />
   {/if}
 
   <SceneLoadingOverlay

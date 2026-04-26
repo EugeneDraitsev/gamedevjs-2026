@@ -22,10 +22,10 @@
     machineSlots,
     moduleFitsSlot,
   } from "$lib/config/machine-modules";
-  import MachineBayOrbPreview from "./MachineBayOrbPreview.svelte";
+  import LoadoutOrbPreview from "./LoadoutOrbPreview.svelte";
   import MachineModuleGlyph from "./MachineModuleGlyph.svelte";
 
-  interface MachineBayModalProps {
+  interface LoadoutModalProps {
     gearCount: number;
     machineLoadout: MachineLoadout;
     machineStats: MachineStats;
@@ -41,7 +41,7 @@
     open?: boolean;
   }
 
-  const baySlotOrder = [
+  const loadoutSlotOrder = [
     "attack",
     "body",
     "utility-c",
@@ -96,9 +96,9 @@
     onInstallModule,
     onMarkModuleSeen,
     open = false,
-  }: MachineBayModalProps = $props();
+  }: LoadoutModalProps = $props();
 
-  const audioDuckReason = createAudioDuckReason("machine-bay");
+  const audioDuckReason = createAudioDuckReason("loadout");
   let selectedSlotId = $state<MachineSlotId | null>(null);
   let viewingModuleId = $state<MachineModuleId | null>(null);
 
@@ -191,7 +191,7 @@
   };
 
   const socketViews = $derived(
-    baySlotOrder.map((slotId) => {
+    loadoutSlotOrder.map((slotId) => {
       const slot = slotById[slotId];
       const moduleId = machineLoadout[slotId];
       const template = moduleId ? getMachineModule(moduleId) : null;
@@ -383,9 +383,9 @@
 
 {#if open}
   <div class="backdrop">
-    <section class="bay" aria-label="Orb Knight Loadout">
-      <header class="bay-header">
-        <div class="bay-heading"><strong>Loadout</strong></div>
+    <section class="loadout" aria-label="Orb Knight Loadout">
+      <header class="loadout-header">
+        <div class="loadout-heading"><strong>Loadout</strong></div>
 
         <div class="machine-summary" aria-label="Loadout stats">
           {#each statReadouts as stat}
@@ -434,7 +434,7 @@
         </button>
       </header>
 
-      <div class:menu-open={selectedSlotId !== null} class="bay-layout">
+      <div class:menu-open={selectedSlotId !== null} class="loadout-layout">
         <nav class="socket-rail" aria-label="Loadout sockets">
           {#each socketViews as socket (socket.slot.id)}
             <button
@@ -558,7 +558,7 @@
                   <div class="detail-actions">
                     {#if selectedIsEquipped}
                       <button
-                        class="bay-button equipped"
+                        class="loadout-button equipped"
                         type="button"
                         disabled
                       >
@@ -566,7 +566,7 @@
                       </button>
                       {#if !selectedSlotRequired}
                         <button
-                          class="bay-button secondary"
+                          class="loadout-button secondary"
                           type="button"
                           onclick={ejectSelectedModule}
                         >
@@ -578,7 +578,7 @@
                       {/if}
                     {:else}
                       <button
-                        class="bay-button"
+                        class="loadout-button"
                         disabled={!selectedCanEquip}
                         type="button"
                         onclick={equipViewedModule}
@@ -603,7 +603,7 @@
 
         <section class="hero-stage" aria-label="Orb Knight preview">
           <div class="model-port">
-            <MachineBayOrbPreview
+            <LoadoutOrbPreview
               highlightedSlotId={selectedSlotId}
               machineLoadout={previewLoadout}
             />
@@ -635,11 +635,11 @@
     backdrop-filter: blur(14px);
   }
 
-  .bay {
-    --bay-line: rgba(252, 211, 77, 0.18);
-    --bay-panel: rgba(5, 12, 15, 0.94);
-    --bay-panel-strong: rgba(9, 17, 20, 0.98);
-    --bay-text: #f3f8f7;
+  .loadout {
+    --loadout-line: rgba(252, 211, 77, 0.18);
+    --loadout-panel: rgba(5, 12, 15, 0.94);
+    --loadout-panel-strong: rgba(9, 17, 20, 0.98);
+    --loadout-text: #f3f8f7;
 
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
@@ -648,7 +648,7 @@
     min-block-size: 0;
     overflow: hidden;
     font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
-    color: var(--bay-text);
+    color: var(--loadout-text);
     background:
       linear-gradient(180deg, rgba(16, 20, 19, 0.98), rgba(3, 8, 11, 0.99)),
       repeating-linear-gradient(
@@ -663,33 +663,33 @@
       inset 0 0 0 1px rgba(255, 255, 255, 0.025);
   }
 
-  .bay-header,
+  .loadout-header,
   .machine-summary,
   .detail-head,
   .detail-actions,
   .tag-row,
-  .bay-button {
+  .loadout-button {
     display: flex;
     align-items: center;
   }
 
-  .bay-header {
+  .loadout-header {
     gap: 0.8rem;
     min-block-size: 4.35rem;
     padding: 0.65rem 0.75rem 0.65rem 1rem;
     background:
       linear-gradient(180deg, rgba(22, 28, 27, 0.84), rgba(7, 13, 15, 0.92)),
       linear-gradient(90deg, rgba(225, 151, 45, 0.1), transparent 56%);
-    border-bottom: 1px solid var(--bay-line);
+    border-bottom: 1px solid var(--loadout-line);
   }
 
-  .bay-heading {
+  .loadout-heading {
     display: grid;
     gap: 0.12rem;
     min-inline-size: 10rem;
   }
 
-  .bay-heading strong {
+  .loadout-heading strong {
     font-size: clamp(1rem, 1.5vw, 1.18rem);
     line-height: 1;
     text-transform: uppercase;
@@ -843,7 +843,7 @@
     stroke-linecap: round;
   }
 
-  .bay-layout {
+  .loadout-layout {
     position: relative;
     display: grid;
     grid-template-columns: 4rem minmax(0, 1fr);
@@ -1212,7 +1212,7 @@
     border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  .bay-button {
+  .loadout-button {
     gap: 0.36rem;
     justify-content: center;
     min-inline-size: 8.6rem;
@@ -1230,7 +1230,7 @@
     border-radius: 6px;
   }
 
-  .bay-button svg {
+  .loadout-button svg {
     flex: 0 0 auto;
     inline-size: 0.82rem;
     block-size: 0.82rem;
@@ -1241,14 +1241,14 @@
     stroke-linejoin: round;
   }
 
-  .bay-button.secondary {
+  .loadout-button.secondary {
     color: rgba(240, 247, 252, 0.88);
     background: rgba(255, 255, 255, 0.065);
     border-color: rgba(255, 255, 255, 0.13);
   }
 
-  .bay-button.equipped,
-  .bay-button:disabled {
+  .loadout-button.equipped,
+  .loadout-button:disabled {
     color: #4ade80;
     cursor: default;
     background: rgba(14, 40, 24, 0.95);
@@ -1290,13 +1290,13 @@
 
   .close-button:hover,
   .close-button:focus-visible,
-  .bay-button:hover,
-  .bay-button:focus-visible {
+  .loadout-button:hover,
+  .loadout-button:focus-visible {
     filter: brightness(1.08);
   }
 
   @media (max-width: 1060px) {
-    .bay-layout {
+    .loadout-layout {
       grid-template-rows: minmax(26rem, 1fr) minmax(16rem, 0.68fr);
       grid-template-columns: 4rem minmax(0, 1fr);
       overflow: auto;
@@ -1312,7 +1312,7 @@
       align-items: start;
     }
 
-    .bay {
+    .loadout {
       block-size: 820px;
     }
   }
@@ -1326,7 +1326,7 @@
       padding: 0;
     }
 
-    .bay {
+    .loadout {
       inline-size: 100dvw;
       max-inline-size: none;
       block-size: 100dvh;
@@ -1334,7 +1334,7 @@
       border-radius: 0;
     }
 
-    .bay-header {
+    .loadout-header {
       display: grid;
       grid-template-columns: 1fr auto;
       gap: 0.58rem;
@@ -1343,11 +1343,11 @@
       padding: 0.58rem 0.62rem;
     }
 
-    .bay-heading {
+    .loadout-heading {
       min-inline-size: 0;
     }
 
-    .bay-heading strong {
+    .loadout-heading strong {
       font-size: 0.98rem;
     }
 
@@ -1393,7 +1393,7 @@
       font-size: 0.78rem;
     }
 
-    .bay-layout {
+    .loadout-layout {
       display: block;
       padding: 0.65rem;
       overflow: auto;
@@ -1454,7 +1454,7 @@
       align-items: stretch;
     }
 
-    .bay-button {
+    .loadout-button {
       flex: 1 1 100%;
     }
   }

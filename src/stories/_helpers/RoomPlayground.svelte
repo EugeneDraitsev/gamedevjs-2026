@@ -152,7 +152,7 @@
       machineStats={playgroundMachineStats}
       onCollectArtifact={noop}
       onOpenSettings={openSettings}
-      onOpenWeaponLab={noop}
+      onOpenLoadout={noop}
       {settings}
       {showPlayer}
       weaponBuild={playgroundWeaponBuild}
