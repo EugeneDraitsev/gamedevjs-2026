@@ -3,6 +3,7 @@
   import { Collider, RigidBody } from "@threlte/rapier";
   import type { Texture } from "three";
   import FoundryWallKit from "$lib/components/game/scene/environment/walls/FoundryWallKit.svelte";
+  import { cachedBox } from "$lib/game/cached-geometries";
   import type { StaticWall, WallFacing } from "$lib/types/game";
 
   let {
@@ -43,12 +44,14 @@
 
       <T.Mesh
         castShadow={wallOpaque(wall)}
+        geometry={cachedBox(
+          wall.args[0] * 2,
+          wall.args[1] * 1.55,
+          wall.args[2] * 2
+        )}
         position={[0, -0.25, 0]}
         receiveShadow
       >
-        <T.BoxGeometry
-          args={[wall.args[0] * 2, wall.args[1] * 1.55, wall.args[2] * 2]}
-        />
         <T.MeshStandardMaterial
           color={wall.color}
           metalness={0.1}

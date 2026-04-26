@@ -299,4 +299,46 @@
       roughness={0.42}
     />
   </T.Mesh>
+
+  <RoomTemplateEnvironment
+    animationNow={0}
+    bossBannerTexture={textures.bossBanner}
+    corePrisonSealBrokenAt={0}
+    corePrisonSealHits={0}
+    corePrisonSealHitsRequired={2}
+    corePrisonSealLocked={false}
+    currentFloorPalette={scene.currentFloorPalette}
+    environment="boss-gears"
+    floorExitOpenAmount={0}
+    outsideGateUnlocked={false}
+    outsideDetailLevel={0}
+    startAnimationAt={0}
+    outsideEarthDecalTexture={null}
+    outsideEarthTexture={null}
+    outsideRockDecalTexture={null}
+    outsideRocksTexture={null}
+    outsideWaterDecalTexture={null}
+    outsideWaterTexture={null}
+  />
+
+  <RoomTemplateEnvironment
+    animationNow={0}
+    bossBannerTexture={null}
+    corePrisonSealBrokenAt={0}
+    corePrisonSealHits={0}
+    corePrisonSealHitsRequired={2}
+    corePrisonSealLocked={false}
+    currentFloorPalette={scene.currentFloorPalette}
+    environment="treasure-gears"
+    floorExitOpenAmount={0}
+    outsideGateUnlocked={false}
+    outsideDetailLevel={0}
+    startAnimationAt={0}
+    outsideEarthDecalTexture={null}
+    outsideEarthTexture={null}
+    outsideRockDecalTexture={null}
+    outsideRocksTexture={null}
+    outsideWaterDecalTexture={null}
+    outsideWaterTexture={null}
+  />
 </T.Group>
