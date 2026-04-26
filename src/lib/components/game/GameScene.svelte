@@ -517,6 +517,7 @@
 
     handlePlayerPositionChange({
       combat,
+      completedBossRoomIds: scene.collectedArtifactRoomSet,
       currentArtifactType: scene.currentArtifactType,
       currentRoom: scene.currentRoom,
       currentRoomUnlocked: scene.currentRoomUnlocked,

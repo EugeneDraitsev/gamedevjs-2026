@@ -279,6 +279,7 @@ export class GameSceneStore {
     artifactPickupProgress: this.timing.artifactPickupProgress,
     bossDeathProgress: this.timing.bossDeathProgress,
     bossDeathStartedAt: this.timing.bossDeathStartedAt,
+    bossIntroEnemyId: this.timing.bossIntroEnemyId,
     bossIntroStartedAt: this.timing.bossIntroStartedAt,
     bossIntroProgress: this.timing.bossIntroProgress,
     bossIntroTitle: this.timing.bossIntroTitle,

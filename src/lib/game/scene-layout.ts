@@ -51,7 +51,7 @@ export const enemyShotTtlMs = 2200;
 export const damagePopupDurationMs = 760;
 export const artifactPickupDurationMs = 2800;
 export const bossDeathDurationMs = 1500;
-export const bossIntroDurationMs = 2400;
+export const bossIntroDurationMs = 4500;
 export const floorIntroDurationMs = 3100;
 export const playerDeathAnimationMs = 1500;
 export const playerDeathOverlayMs = 1100;
@@ -1088,13 +1088,31 @@ export const getTransition = (room: DungeonRoom, position: Vec3) => {
 export const getRevealedDoors = (room: DungeonRoom) =>
   Object.keys(room.exits) as DungeonRoomDirection[];
 
+const outsidePickupY = 0.54;
+const outsidePoiGearOffset = 1.05;
+const outsidePoiGearValue = 1;
+
+const createOutsidePoiGearPickups = (now: number): ActivePickup[] =>
+  outsidePlan().pois.map((poi) => ({
+    createdAt: now,
+    id: `outside-poi-gear-${poi.id}`,
+    kind: "gear" as const,
+    position: [
+      poi.x + Math.sin(poi.rotationY) * outsidePoiGearOffset,
+      outsidePickupY,
+      poi.z + Math.cos(poi.rotationY) * outsidePoiGearOffset,
+    ] as Vec3,
+    radius: 0.38,
+    value: outsidePoiGearValue,
+  }));
+
 export const createOutsidePickups = (now = performance.now()): ActivePickup[] =>
   [
     {
       createdAt: now,
       id: "outside-gear-south",
       kind: "gear",
-      position: [-19, 0.54, 33],
+      position: [-19, outsidePickupY, 33],
       radius: 0.38,
       value: 2,
     },
@@ -1102,7 +1120,7 @@ export const createOutsidePickups = (now = performance.now()): ActivePickup[] =>
       createdAt: now,
       id: "outside-heal-south",
       kind: "heal",
-      position: [-13, 0.54, 39],
+      position: [-13, outsidePickupY, 39],
       radius: 0.46,
       value: 1,
     },
@@ -1110,7 +1128,7 @@ export const createOutsidePickups = (now = performance.now()): ActivePickup[] =>
       createdAt: now,
       id: "outside-gear-mid",
       kind: "gear",
-      position: [20, 0.54, -16],
+      position: [20, outsidePickupY, -16],
       radius: 0.38,
       value: 2,
     },
@@ -1118,7 +1136,7 @@ export const createOutsidePickups = (now = performance.now()): ActivePickup[] =>
       createdAt: now,
       id: "outside-heal-mid",
       kind: "heal",
-      position: [14, 0.54, -10],
+      position: [14, outsidePickupY, -10],
       radius: 0.46,
       value: 1,
     },
@@ -1126,7 +1144,7 @@ export const createOutsidePickups = (now = performance.now()): ActivePickup[] =>
       createdAt: now,
       id: "outside-gear-north",
       kind: "gear",
-      position: [-18, 0.54, -58],
+      position: [-18, outsidePickupY, -58],
       radius: 0.38,
       value: 3,
     },
@@ -1134,10 +1152,11 @@ export const createOutsidePickups = (now = performance.now()): ActivePickup[] =>
       createdAt: now,
       id: "outside-heal-north",
       kind: "heal",
-      position: [-11, 0.54, -64],
+      position: [-11, outsidePickupY, -64],
       radius: 0.46,
       value: 1,
     },
+    ...createOutsidePoiGearPickups(now),
   ] satisfies ActivePickup[];
 
 export const getEntryDirectionFromTarget = (

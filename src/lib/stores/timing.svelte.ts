@@ -11,6 +11,7 @@ import {
 
 export class TimingStore {
   now = $state(0);
+  bossIntroEnemyId = $state("");
   bossIntroStartedAt = $state(0);
   bossIntroTitle = $state("");
   bossDeathStartedAt = $state(0);
@@ -104,7 +105,8 @@ export class TimingStore {
       this.now - this.playerDeathStartedAt >= playerDeathAnimationMs
   );
 
-  beginBossIntro(title: string, at: number) {
+  beginBossIntro(title: string, enemyId: string, at: number) {
+    this.bossIntroEnemyId = enemyId;
     this.bossIntroStartedAt = at;
     this.bossIntroTitle = title;
   }
@@ -134,6 +136,7 @@ export class TimingStore {
     this.floorIntroStartedAt =
       typeof performance === "undefined" ? 0 : performance.now();
     this.enemyWakeUntil = 0;
+    this.bossIntroEnemyId = "";
     this.bossIntroStartedAt = 0;
     this.bossIntroTitle = "";
     this.bossDeathStartedAt = 0;

@@ -100,6 +100,8 @@ const baseMachineHealth = 6;
 const baseMagazineSize = 8;
 const baseReloadDurationMs = 900;
 const baseShootCooldownMs = 350;
+const swordMeleeDamageMultiplier = 1.5;
+const axeMeleeDamageMultiplier = 1.75;
 
 export const machineSlots: Array<{
   id: MachineSlotId;
@@ -349,7 +351,7 @@ const createStatDraft = (): MachineStatDraft => ({
   magazineBonus: 0,
   magazineSizeOverride: null,
   maxHealthBonus: 0,
-  meleeDamageMultiplier: 1,
+  meleeDamageMultiplier: swordMeleeDamageMultiplier,
   pickupRadiusBonus: 0,
   reflectedShotsSeekEnemies: false,
   reloadMultiplier: 1,
@@ -415,7 +417,7 @@ const applyModuleToDraft = (
     case "parry-reflector":
       break;
     case "cleaver-axe-head":
-      draft.meleeDamageMultiplier *= 1.65;
+      draft.meleeDamageMultiplier = axeMeleeDamageMultiplier;
       draft.reflectedShotsSeekEnemies = true;
       break;
     default:
@@ -480,12 +482,7 @@ const applyDamageMultiplier = (
 ): WeaponBuild => {
   const damage = Math.max(1, Math.round(weaponBuild.damage * damageMultiplier));
   const burstDamage = Math.max(1, Math.round(damage * weaponBuild.pelletCount));
-  const meleeDamage = Math.max(
-    1,
-    Math.round(
-      weaponBuild.meleeDamage * damageMultiplier * meleeDamageMultiplier
-    )
-  );
+  const meleeDamage = Math.max(1, Math.round(damage * meleeDamageMultiplier));
 
   return {
     ...weaponBuild,

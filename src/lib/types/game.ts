@@ -344,6 +344,7 @@ export interface SceneOverlayProps {
   artifactPickupProgress: number;
   bossDeathProgress: number;
   bossDeathStartedAt?: number;
+  bossIntroEnemyId: string;
   bossIntroProgress: number;
   bossIntroStartedAt?: number;
   bossIntroTitle: string;

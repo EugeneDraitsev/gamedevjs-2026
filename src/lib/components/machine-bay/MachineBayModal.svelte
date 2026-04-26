@@ -133,6 +133,31 @@
 
     return (lowerIsBetter ? delta < 0 : delta > 0) ? "buff" : "nerf";
   };
+  const damageDeltaKind = (rangedDelta: number, meleeDelta: number) => {
+    const meaningfulDeltas = [rangedDelta, meleeDelta].filter(
+      (delta) => Math.abs(delta) >= 0.005
+    );
+
+    if (meaningfulDeltas.length === 0) {
+      return "flat";
+    }
+
+    return meaningfulDeltas.reduce((sum, delta) => sum + delta, 0) > 0
+      ? "buff"
+      : "nerf";
+  };
+  const formatDamageValue = (rangedDamage: number, meleeDamage: number) =>
+    `${rangedDamage}/${meleeDamage}`;
+  const formatDamageDelta = (rangedDelta: number, meleeDelta: number) => {
+    const rangedLabel = formatCompactDelta(rangedDelta);
+    const meleeLabel = formatCompactDelta(meleeDelta);
+
+    if (!(rangedLabel || meleeLabel)) {
+      return null;
+    }
+
+    return `${rangedLabel ?? "+0"}/${meleeLabel ?? "+0"}`;
+  };
 
   const slotById = Object.fromEntries(
     machineSlots.map((slot) => [slot.id, slot])
@@ -239,6 +264,9 @@
   const previewStats = $derived(computeMachineStats(previewLoadout));
   const statReadouts = $derived.by(() => {
     const damageDelta = previewStats.damage - machineStats.damage;
+    const meleeDamageDelta =
+      previewStats.weaponBuild.meleeDamage -
+      machineStats.weaponBuild.meleeDamage;
     const fireRateDelta = previewStats.fireRate - machineStats.fireRate;
     const healthDelta = previewStats.maxHealth - machineStats.maxHealth;
     const magazineDelta = previewStats.magazineSize - machineStats.magazineSize;
@@ -248,12 +276,15 @@
     return [
       {
         accent: machineStatAccent,
-        deltaKind: deltaKind(damageDelta),
-        deltaLabel: formatCompactDelta(damageDelta),
-        description: "Damage dealt by each shot.",
+        deltaKind: damageDeltaKind(damageDelta, meleeDamageDelta),
+        deltaLabel: formatDamageDelta(damageDelta, meleeDamageDelta),
+        description: "Ranged damage first, melee damage second.",
         iconUrl: damageStatIconUrl,
         label: "Damage",
-        value: `${previewStats.damage}`,
+        value: formatDamageValue(
+          previewStats.damage,
+          previewStats.weaponBuild.meleeDamage
+        ),
       },
       {
         accent: machineStatAccent,

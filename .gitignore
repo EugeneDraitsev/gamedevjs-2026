@@ -34,3 +34,4 @@ vite.config.ts.timestamp-*
 .claude
 output
 .playwright-cli
+/.codex/

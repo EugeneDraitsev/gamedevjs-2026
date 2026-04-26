@@ -383,21 +383,21 @@
     topColor: { value: new Color("#d9e1d9") },
   };
   const outsideHazeVertex = `
-                                                  varying vec2 vUv;
-                                                  void main() {
-                                                    vUv = uv;
-                                                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                                                  }
-                                                `;
+                                                    varying vec2 vUv;
+                                                    void main() {
+                                                      vUv = uv;
+                                                      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                                                    }
+                                                  `;
   const outsideHazeFragment = `
-                                                  varying vec2 vUv;
-                                                  uniform vec3 bottomColor;
-                                                  uniform vec3 topColor;
-                                                  void main() {
-                                                    vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
-                                                    gl_FragColor = vec4(color, 0.42);
-                                                  }
-                                                `;
+                                                    varying vec2 vUv;
+                                                    uniform vec3 bottomColor;
+                                                    uniform vec3 topColor;
+                                                    void main() {
+                                                      vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
+                                                      gl_FragColor = vec4(color, 0.42);
+                                                    }
+                                                  `;
 
   let {
     animationNow = 0,

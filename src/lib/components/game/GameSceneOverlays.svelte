@@ -48,8 +48,9 @@
     />
   {/key}
 
-  {#key `${overlays.bossIntroStartedAt ?? 0}:${overlays.bossIntroTitle}`}
+  {#key `${overlays.bossIntroStartedAt ?? 0}:${overlays.bossIntroEnemyId}:${overlays.bossIntroTitle}`}
     <BossIntroOverlay
+      bossIntroEnemyId={overlays.bossIntroEnemyId}
       bossIntroProgress={overlays.bossIntroProgress}
       bossIntroTitle={overlays.bossIntroTitle}
     />

@@ -92,6 +92,41 @@ describe("machine modules", () => {
     expect(axeStats.damage).toBe(defaults.damage);
   });
 
+  it("scales melee damage from single-shot damage for sword and axe forms", () => {
+    const swordStats = computeMachineStats(createDefaultMachineLoadout());
+    const axeStats = computeMachineStats({
+      ...createDefaultMachineLoadout(),
+      "utility-c": "cleaver-axe-head",
+    });
+    const splitSwordStats = computeMachineStats({
+      ...createDefaultMachineLoadout(),
+      attack: "arc-splitter-coil",
+    });
+    const splitAxeStats = computeMachineStats({
+      ...createDefaultMachineLoadout(),
+      attack: "arc-splitter-coil",
+      "utility-c": "cleaver-axe-head",
+    });
+
+    expect(swordStats.weaponBuild.meleeDamage).toBe(
+      Math.round(swordStats.weaponBuild.damage * 1.5)
+    );
+    expect(axeStats.weaponBuild.meleeDamage).toBe(
+      Math.round(axeStats.weaponBuild.damage * 1.75)
+    );
+    expect(splitSwordStats.weaponBuild.pelletCount).toBe(3);
+    expect(splitSwordStats.weaponBuild.meleeDamage).toBe(
+      Math.round(splitSwordStats.weaponBuild.damage * 1.5)
+    );
+    expect(splitSwordStats.weaponBuild.meleeDamage).toBeLessThan(
+      Math.round(splitSwordStats.damage * 1.5)
+    );
+    expect(splitAxeStats.weaponBuild.pelletCount).toBe(3);
+    expect(splitAxeStats.weaponBuild.meleeDamage).toBe(
+      Math.round(splitAxeStats.weaponBuild.damage * 1.75)
+    );
+  });
+
   it("normalizes invalid or duplicate saved loadouts", () => {
     const normalized = normalizeMachineLoadout({
       attack: "ammo-hopper",

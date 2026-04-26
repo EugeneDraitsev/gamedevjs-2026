@@ -21,6 +21,7 @@ import type { Vec3 } from "$lib/types/game";
 
 interface TransitionArgs {
   combat: CombatStore;
+  completedBossRoomIds?: Set<string>;
   currentArtifactType: MachineModuleId | null;
   currentRoom: DungeonRoom;
   currentRoomUnlocked: boolean;
@@ -35,6 +36,7 @@ interface TransitionArgs {
 export const handlePlayerPositionChange = (args: TransitionArgs) => {
   const {
     combat,
+    completedBossRoomIds,
     currentArtifactType,
     currentRoom,
     currentRoomUnlocked,
@@ -98,13 +100,16 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
     timing.lastHazardAt = appliedAt;
     player.impactVelocity = null;
 
-    if (nextRoom.kind === "boss") {
-      const title =
-        enemyTemplateById[
-          roomTemplateById[nextRoom.templateId].enemyTemplateId ?? ""
-        ]?.label ?? "Boss";
+    const nextTemplate = roomTemplateById[nextRoom.templateId];
+    const bossAlreadyResolved =
+      room.clearedSet.has(nextRoom.id) ||
+      (completedBossRoomIds?.has(nextRoom.id) ?? false);
 
-      timing.beginBossIntro(title, appliedAt);
+    if (nextRoom.kind === "boss" && !bossAlreadyResolved) {
+      const enemyId = nextTemplate.enemyTemplateId ?? "";
+      const title = enemyTemplateById[enemyId]?.label ?? "Boss";
+
+      timing.beginBossIntro(title, enemyId, appliedAt);
     }
 
     room.markExplored(transition.roomId);
@@ -143,6 +148,7 @@ export const resetPlayerAfterDeath = ({
   combat.projectilePositions.clear();
   timing.enemyWakeUntil = 0;
   timing.lastHazardAt = now;
+  timing.bossIntroEnemyId = "";
   timing.bossIntroStartedAt = 0;
   timing.bossIntroTitle = "";
   room.currentId = dungeon.startRoomId;
