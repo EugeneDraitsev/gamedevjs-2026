@@ -2,7 +2,7 @@
 
 Break out of the machine. Reach the castle road.
 
-[Play the live demo](https://gamedevjs-2026-orb-knight.vercel.app/)
+[Play the live demo](https://eugenedraitsev.itch.io/orb-knight)
 
 Orb Knight is a browser-only SvelteKit action game about a tiny brass machine
 with a sword, a gun, and a suspicious amount of dungeon machinery. Fight through
