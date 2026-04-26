@@ -144,33 +144,27 @@
     textures.outsideWater,
     textures.outsideWaterDecals,
   ]);
-  const warmupPreloadTextures = $derived.by(() => {
-    if (outside) {
-      return [...machineModuleIconPreloadTextures, ...outsidePreloadTextures];
-    }
-
-    return [
-      ...machineModuleIconPreloadTextures,
-      textures.bossBanner,
-      textures.bossDoor,
-      textures.bossFloor,
-      textures.bossFloorHeight,
-      textures.bossFloorNormal,
-      textures.foundryFloor,
-      textures.foundryFloorDecals,
-      textures.foundryWall,
-      textures.lavaSurface,
-      textures.outsideEarth,
-      textures.outsideEarthDecals,
-      textures.outsideRockDecals,
-      textures.outsideRocks,
-      textures.outsideWater,
-      textures.outsideWaterDecals,
-      textures.treasureFloor,
-      textures.treasureFloorHeight,
-      textures.treasureFloorNormal,
-    ];
-  });
+  const warmupPreloadTextures = $derived.by(() => [
+    ...machineModuleIconPreloadTextures,
+    textures.bossBanner,
+    textures.bossDoor,
+    textures.bossFloor,
+    textures.bossFloorHeight,
+    textures.bossFloorNormal,
+    textures.foundryFloor,
+    textures.foundryFloorDecals,
+    textures.foundryWall,
+    textures.lavaSurface,
+    textures.outsideEarth,
+    textures.outsideEarthDecals,
+    textures.outsideRockDecals,
+    textures.outsideRocks,
+    textures.outsideWater,
+    textures.outsideWaterDecals,
+    textures.treasureFloor,
+    textures.treasureFloorHeight,
+    textures.treasureFloorNormal,
+  ]);
   const blockingPreloadTextures = $derived.by(() => {
     if (outside) {
       return outsidePreloadTextures;
@@ -723,10 +717,10 @@
       textures.loadOutsideCritical();
     } else {
       textures.loadGameplayCritical();
-      textures
-        .loadDeferred({ signal: textureLoadAbort.signal })
-        .catch(() => undefined);
     }
+    textures
+      .loadDeferred({ signal: textureLoadAbort.signal })
+      .catch(() => undefined);
 
     let frameId = 0;
     let previousTime = performance.now();
@@ -840,11 +834,12 @@
         {corePrisonSealHitsRequired}
         {corePrisonSealLocked}
         {outsideDetailLevel}
+        warmupVisible={!sceneReady}
       />
 
       <GameSceneActors
         activeActorsVisible={!outside || sceneReady}
-        actorWarmupEnabled={!outside}
+        actorWarmupEnabled
         warmupVisible={!sceneReady}
       />
 

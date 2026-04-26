@@ -1,9 +1,15 @@
 <script module lang="ts">
-  import { PlaneGeometry } from "three";
+  import {
+    Color,
+    MeshStandardMaterial,
+    PlaneGeometry,
+    type Texture,
+  } from "three";
   import type { RoomHazard } from "$lib/types/game";
 
   const lavaTileSize = 2.1;
   const lavaGeometries = new Map<string, PlaneGeometry>();
+  let sharedLavaMaterial: MeshStandardMaterial | null = null;
 
   const getLavaGeometry = (hazard: RoomHazard) => {
     const key = `${hazard.id}:${hazard.args[0]}:${hazard.args[2]}:${hazard.position[0]}:${hazard.position[2]}`;
@@ -29,11 +35,31 @@
 
     return geometry;
   };
+
+  const getLavaMaterial = (texture: Texture) => {
+    if (sharedLavaMaterial) {
+      if (sharedLavaMaterial.map !== texture) {
+        sharedLavaMaterial.map = texture;
+        sharedLavaMaterial.needsUpdate = true;
+      }
+      return sharedLavaMaterial;
+    }
+
+    sharedLavaMaterial = new MeshStandardMaterial({
+      color: new Color().setHSL(20 / 360, 1, 0.22),
+      emissive: new Color("#ff3200"),
+      emissiveIntensity: 0.38,
+      map: texture,
+      metalness: 0.04,
+      roughness: 0.28,
+    });
+
+    return sharedLavaMaterial;
+  };
 </script>
 
 <script lang="ts">
   import { T } from "@threlte/core";
-  import type { Texture } from "three";
 
   let {
     animationNow = 0,
@@ -45,7 +71,24 @@
     roomHazards: RoomHazard[];
   } = $props();
 
-  const lavaPulse = $derived(0.5 + Math.sin(animationNow * 0.003) * 0.5);
+  const lavaMaterial = $derived(
+    lavaSurfaceTexture ? getLavaMaterial(lavaSurfaceTexture) : null
+  );
+
+  $effect(() => {
+    if (!lavaMaterial) {
+      return;
+    }
+
+    const pulse = 0.5 + Math.sin(animationNow * 0.003) * 0.5;
+
+    lavaMaterial.color.setHSL(
+      (20 + pulse * 8) / 360,
+      1,
+      (22 + pulse * 10) / 100
+    );
+    lavaMaterial.emissiveIntensity = 0.38 + pulse * 0.3;
+  });
 </script>
 
 {#each roomHazards as hazard, index (hazard.id)}
@@ -61,22 +104,14 @@
       />
     </T.Mesh>
 
-    {#if lavaSurfaceTexture}
+    {#if lavaMaterial}
       <T.Mesh
         geometry={getLavaGeometry(hazard)}
+        material={lavaMaterial}
         position={[0, hazard.args[1] + 0.02 + index * 0.006, 0]}
         receiveShadow
         rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <T.MeshStandardMaterial
-          color={`hsl(${20 + lavaPulse * 8} 100% ${22 + lavaPulse * 10}%)`}
-          emissive="#ff3200"
-          emissiveIntensity={0.38 + lavaPulse * 0.3}
-          map={lavaSurfaceTexture}
-          metalness={0.04}
-          roughness={0.28}
-        />
-      </T.Mesh>
+      />
     {/if}
   </T.Group>
 {/each}

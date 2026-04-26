@@ -19,6 +19,7 @@
     corePrisonSealHitsRequired?: number;
     corePrisonSealLocked?: boolean;
     outsideDetailLevel?: number;
+    warmupVisible?: boolean;
   }
 
   let {
@@ -27,6 +28,7 @@
     corePrisonSealHitsRequired = 2,
     corePrisonSealLocked = true,
     outsideDetailLevel = 3,
+    warmupVisible = false,
   }: Props = $props();
 
   const scene = getGameSceneContext();
@@ -167,7 +169,11 @@
   openAmount={scene.floorExitOpenAmount}
 />
 
-<T.Group position={[0, 0.08, 0]} scale={[0.001, 0.001, 0.001]}>
+<T.Group
+  position={[0, 0.08, 0]}
+  scale={[0.001, 0.001, 0.001]}
+  visible={warmupVisible}
+>
   <RoomHazards
     animationNow={0}
     lavaSurfaceTexture={textures.lavaSurface}
@@ -179,7 +185,7 @@
     currentArtifactTemplate={artifactPedestalWarmupTemplate}
   />
 
-  {#each [textures.treasureFloor, textures.bossFloor, textures.bossDoor, textures.lavaSurface, textures.bossBanner] as texture}
+  {#each [textures.treasureFloor, textures.bossFloor, textures.bossDoor, textures.lavaSurface, textures.bossBanner, textures.foundryFloor, textures.foundryWall] as texture}
     {#if texture}
       <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
         <T.PlaneGeometry args={[4, 4]} />
@@ -193,6 +199,64 @@
       </T.Mesh>
     {/if}
   {/each}
+
+  {#if textures.bossFloor && textures.bossFloorHeight}
+    <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
+      <T.PlaneGeometry args={[4, 4]} />
+      <T.MeshStandardMaterial
+        map={textures.bossFloor}
+        bumpMap={textures.bossFloorHeight}
+        bumpScale={1.4}
+        metalness={0.24}
+        roughness={0.64}
+      />
+    </T.Mesh>
+  {/if}
+
+  {#if textures.bossFloor && textures.bossFloorNormal}
+    <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
+      <T.PlaneGeometry args={[4, 4]} />
+      <T.MeshStandardMaterial
+        map={textures.bossFloor}
+        normalMap={textures.bossFloorNormal}
+        normalScale={[2.2, 2.2]}
+        metalness={0.24}
+        roughness={0.64}
+      />
+    </T.Mesh>
+  {/if}
+
+  {#if textures.treasureFloor && textures.treasureFloorHeight}
+    <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
+      <T.PlaneGeometry args={[4, 4]} />
+      <T.MeshStandardMaterial
+        map={textures.treasureFloor}
+        bumpMap={textures.treasureFloorHeight}
+        bumpScale={1.4}
+        transparent
+        alphaTest={0.08}
+        metalness={0.22}
+        opacity={0.92}
+        roughness={0.66}
+      />
+    </T.Mesh>
+  {/if}
+
+  {#if textures.treasureFloor && textures.treasureFloorNormal}
+    <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
+      <T.PlaneGeometry args={[4, 4]} />
+      <T.MeshStandardMaterial
+        map={textures.treasureFloor}
+        normalMap={textures.treasureFloorNormal}
+        normalScale={[2, 2]}
+        transparent
+        alphaTest={0.08}
+        metalness={0.22}
+        opacity={0.92}
+        roughness={0.66}
+      />
+    </T.Mesh>
+  {/if}
 
   <T.Mesh>
     <T.BoxGeometry args={[1, 1, 1]} />
