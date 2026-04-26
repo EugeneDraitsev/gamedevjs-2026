@@ -126,7 +126,7 @@
 {#if currentArtifactTemplate}
   <T.Group position={[0, 0.9 + Math.sin(animationNow * 0.006) * 0.08, 0]}>
     <T.Mesh
-      castShadow
+      castShadow={false}
       geometry={pedestalBaseGeometry}
       material={pedestalBaseMaterial}
       receiveShadow
@@ -134,7 +134,7 @@
 
     <T.Group position={[0, 0.72, 0]}>
       <T.Mesh
-        castShadow
+        castShadow={false}
         geometry={artifactOrbGeometry}
         material={artifactMaterials.orb}
       />

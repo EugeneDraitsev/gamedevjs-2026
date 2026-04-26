@@ -69,6 +69,10 @@
 <script lang="ts">
   import { T } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
+  import {
+    markTransitionPhaseEnd,
+    markTransitionPhaseStart,
+  } from "$lib/debug/transition-perf";
   import { cachedBox, cachedCylinder } from "$lib/game/cached-geometries";
   import type { RoomPlatform } from "$lib/types/game";
 
@@ -78,6 +82,21 @@
   }: { animationNow?: number; roomPlatforms: RoomPlatform[] } = $props();
 
   const beltSlots = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+  let flushStartedAt = 0;
+
+  $effect.pre(() => {
+    roomPlatforms;
+    flushStartedAt = markTransitionPhaseStart();
+  });
+
+  $effect(() => {
+    roomPlatforms;
+    markTransitionPhaseEnd("flush-room-platforms", flushStartedAt, () => ({
+      conveyors: roomPlatforms.filter((platform) => platform.conveyor).length,
+      platforms: roomPlatforms.length,
+    }));
+  });
+
   const beltSlotZ = (slot: number, platform: RoomPlatform) => {
     const spacing = 0.14;
     const conveyorZ = platform.conveyor?.[2] ?? 0;
@@ -99,7 +118,7 @@
         restitution={0.04}
       />
       <T.Mesh
-        castShadow
+        castShadow={false}
         geometry={platform.shape === "hex"
           ? cachedCylinder(
               platform.args[0],
@@ -121,7 +140,7 @@
 
       {#if platform.shape === "hex"}
         <T.Mesh
-          castShadow
+          castShadow={false}
           geometry={cachedCylinder(
             platform.args[0] * 0.94,
             platform.args[0] * 0.94,
@@ -133,7 +152,7 @@
           receiveShadow
         />
         <T.Mesh
-          castShadow
+          castShadow={false}
           geometry={cachedCylinder(
             platform.args[0] * 0.74,
             platform.args[0] * 0.74,
@@ -146,7 +165,7 @@
         />
       {:else}
         <T.Mesh
-          castShadow
+          castShadow={false}
           geometry={cachedBox(
             platform.args[0] * 1.72,
             0.05,
@@ -160,7 +179,7 @@
         {#if platform.conveyor}
           {#each [-1, 1] as end}
             <T.Mesh
-              castShadow
+              castShadow={false}
               geometry={cachedCylinder(0.16, 0.16, platform.args[0] * 1.72, 14)}
               material={platformConveyorRollerMaterial}
               position={[0, platform.args[1] + 0.12, end * platform.args[2] * 0.88]}
@@ -171,7 +190,7 @@
 
           {#each beltSlots as slot}
             <T.Mesh
-              castShadow
+              castShadow={false}
               geometry={cachedBox(platform.args[0] * 1.42, 0.08, 0.08)}
               material={platformConveyorSlatMaterial}
               position={[0, platform.args[1] + 0.145, beltSlotZ(slot, platform)]}
@@ -181,7 +200,7 @@
 
           {#each [-1, 1] as side}
             <T.Mesh
-              castShadow
+              castShadow={false}
               geometry={cachedCylinder(0.05, 0.05, platform.args[2] * 1.64, 8)}
               material={platformConveyorRailMaterial}
               position={[
@@ -195,14 +214,14 @@
           {/each}
         {:else}
           <T.Mesh
-            castShadow
+            castShadow={false}
             geometry={cachedBox(platform.args[0] * 1.2, 0.03, 0.045)}
             material={platformCrossBraceMaterial}
             position={[0, platform.args[1] + 0.065, 0]}
             receiveShadow
           />
           <T.Mesh
-            castShadow
+            castShadow={false}
             geometry={cachedBox(0.045, 0.03, platform.args[2] * 1.2)}
             material={platformCrossBraceMaterial}
             position={[0, platform.args[1] + 0.065, 0]}
@@ -212,14 +231,14 @@
 
         {#each [-1, 1] as side}
           <T.Mesh
-            castShadow
+            castShadow={false}
             geometry={cachedBox(platform.args[0] * 1.9, 0.08, 0.12)}
             material={platformSideTrimMaterial}
             position={[0, platform.args[1] + 0.07, side * platform.args[2] * 0.92]}
             receiveShadow
           />
           <T.Mesh
-            castShadow
+            castShadow={false}
             geometry={cachedBox(0.12, 0.08, platform.args[2] * 1.9)}
             material={platformSideTrimMaterial}
             position={[side * platform.args[0] * 0.92, platform.args[1] + 0.07, 0]}
@@ -230,7 +249,7 @@
         {#each [-1, 1] as x}
           {#each [-1, 1] as z}
             <T.Mesh
-              castShadow
+              castShadow={false}
               geometry={cachedBox(0.2, 0.1, 0.2)}
               material={platformCornerStudMaterial}
               position={[

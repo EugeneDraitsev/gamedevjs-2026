@@ -19,7 +19,7 @@
 <T.Group>
   {#each [-1, 1] as side}
     <T.Mesh
-      castShadow
+      castShadow={false}
       geometry={cachedBox(0.32, height, 0.36)}
       position={[side * postX, 0, 0.18]}
       receiveShadow
@@ -31,7 +31,7 @@
       />
     </T.Mesh>
     <T.Mesh
-      castShadow
+      castShadow={false}
       geometry={cachedBox(0.12, height * 0.62, 0.1)}
       position={[side * postX * 0.78, 0, 0.38]}
     >
@@ -44,7 +44,7 @@
   {/each}
 
   <T.Mesh
-    castShadow
+    castShadow={false}
     geometry={cachedBox(width + 0.55, 0.32, 0.4)}
     position={[0, railY, 0.22]}
     receiveShadow

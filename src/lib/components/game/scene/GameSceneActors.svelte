@@ -7,6 +7,7 @@
     MeshBasicMaterial,
     RingGeometry,
     SphereGeometry,
+    TorusGeometry,
   } from "three";
 
   const beamLaserHaloGeometry = new CylinderGeometry(0.82, 0.58, 1, 12);
@@ -16,6 +17,9 @@
   const beamLaserParticleGeometry = new SphereGeometry(0.12, 8, 6);
   const projectileImpactRingGeometry = new RingGeometry(0.34, 0.43, 36);
   const projectileImpactSparkGeometry = new BoxGeometry(1, 1, 1);
+  const deflectBurstShardGeometry = new BoxGeometry(1, 1, 1);
+  const healBurstRingGeometry = new TorusGeometry(0.44, 0.018, 8, 42);
+  const healBurstParticleGeometry = new SphereGeometry(1, 10, 10);
   const beamLaserHaloMaterial = new MeshBasicMaterial({
     blending: additiveBlending,
     color: "#ff1746",
@@ -83,6 +87,45 @@
     toneMapped: false,
     transparent: true,
   });
+  const deflectBurstMaterials = new Map<string, MeshBasicMaterial>();
+  const healBurstRingMaterial = new MeshBasicMaterial({
+    color: "#7dffd7",
+    depthWrite: false,
+    opacity: 0.46,
+    toneMapped: false,
+    transparent: true,
+  });
+  const getDeflectBurstMaterial = (color: string) => {
+    const cached = deflectBurstMaterials.get(color);
+
+    if (cached) {
+      return cached;
+    }
+
+    const material = new MeshBasicMaterial({
+      color,
+      depthWrite: false,
+      opacity: 0.68,
+      transparent: true,
+    });
+
+    deflectBurstMaterials.set(color, material);
+    return material;
+  };
+  const healBurstParticleMaterial = new MeshBasicMaterial({
+    color: "#9defff",
+    depthWrite: false,
+    opacity: 0.72,
+    toneMapped: false,
+    transparent: true,
+  });
+  const healBurstParticleAltMaterial = new MeshBasicMaterial({
+    color: "#7dffd7",
+    depthWrite: false,
+    opacity: 0.72,
+    toneMapped: false,
+    transparent: true,
+  });
 </script>
 
 <script lang="ts">
@@ -144,6 +187,7 @@
     combatActorsVisible ? ([1, 1, 1] as Vec3) : ([0.001, 0.001, 0.001] as Vec3)
   );
   const beamSegmentCount = 6;
+  const pickupWarmupNow = 360;
   const beamSegmentIndexes = Array.from(
     { length: beamSegmentCount },
     (_unused, index) => index
@@ -492,6 +536,14 @@
     beamLaserHeadMaterial.opacity = softFade * 0.98;
     beamLaserParticleMaterial.opacity = softFade * 0.5;
   });
+  $effect(() => {
+    const healBurst = scene.healBurstsRendered.at(-1);
+    const fade = healBurst?.fade ?? 0;
+
+    healBurstRingMaterial.opacity = fade * 0.46;
+    healBurstParticleMaterial.opacity = fade * 0.72;
+    healBurstParticleAltMaterial.opacity = fade * 0.72;
+  });
   const beamLight = $derived.by(() => {
     const beam = combat.beams.at(-1);
 
@@ -573,7 +625,7 @@
       {/each}
 
       {#each pickupWarmups as pickup (pickup.id)}
-        <PickupActor animationNow={0} {pickup} />
+        <PickupActor animationNow={pickupWarmupNow} {pickup} />
       {/each}
 
       {#each enemyShotWarmups as shot (shot.id)}
@@ -693,6 +745,15 @@
     <T.Mesh
       geometry={beamLaserParticleGeometry}
       material={beamLaserParticleMaterial}
+    />
+    <T.Mesh
+      geometry={healBurstRingGeometry}
+      material={healBurstRingMaterial}
+      rotation={[-Math.PI / 2, 0, 0]}
+    />
+    <T.Mesh
+      geometry={healBurstParticleGeometry}
+      material={healBurstParticleMaterial}
     />
   </T.Group>
 {/if}
@@ -859,24 +920,16 @@
     <T.Group position={burst.position}>
       {#each burst.shards as shard, shardIndex (shardIndex)}
         <T.Mesh
+          geometry={deflectBurstShardGeometry}
+          material={getDeflectBurstMaterial(burst.color)}
           position={shard.position}
           rotation={shard.rotation}
-          scale={[shard.scale, shard.scale, shard.scale]}
-        >
-          <T.BoxGeometry
-            args={[
-            burst.radius * 0.55,
-            burst.radius * 0.55,
-            burst.radius * 0.55,
+          scale={[
+            burst.radius * 0.55 * shard.scale,
+            burst.radius * 0.55 * shard.scale,
+            burst.radius * 0.55 * shard.scale,
           ]}
-          />
-          <T.MeshBasicMaterial
-            color={burst.color}
-            depthWrite={false}
-            opacity={burst.fade}
-            transparent
-          />
-        </T.Mesh>
+        />
       {/each}
     </T.Group>
   {/each}
@@ -915,33 +968,21 @@
   {#each scene.healBurstsRendered as burst (burst.id)}
     <T.Group position={playerHealPosition}>
       <T.Mesh
+        geometry={healBurstRingGeometry}
+        material={healBurstRingMaterial}
         position={[0, 0.92 + burst.age * 0.52, 0]}
         rotation={[-Math.PI / 2, 0, burst.age * 4.8]}
         scale={[1 + burst.age * 0.55, 1 + burst.age * 0.55, 1]}
-      >
-        <T.TorusGeometry args={[0.44, 0.018, 8, 42]} />
-        <T.MeshBasicMaterial
-          color="#7dffd7"
-          depthWrite={false}
-          opacity={burst.fade * 0.46}
-          toneMapped={false}
-          transparent
-        />
-      </T.Mesh>
+      />
       {#each burst.particles as particle, index (index)}
         <T.Mesh
+          geometry={healBurstParticleGeometry}
+          material={particle.color === "#7dffd7"
+            ? healBurstParticleAltMaterial
+            : healBurstParticleMaterial}
           position={particle.position}
           scale={[particle.scale, particle.scale, particle.scale]}
-        >
-          <T.SphereGeometry args={[1, 10, 10]} />
-          <T.MeshBasicMaterial
-            color={particle.color}
-            depthWrite={false}
-            opacity={particle.opacity}
-            toneMapped={false}
-            transparent
-          />
-        </T.Mesh>
+        />
       {/each}
     </T.Group>
   {/each}

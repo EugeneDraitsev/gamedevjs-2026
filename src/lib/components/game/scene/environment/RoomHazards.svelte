@@ -60,6 +60,10 @@
 
 <script lang="ts">
   import { T } from "@threlte/core";
+  import {
+    markTransitionPhaseEnd,
+    markTransitionPhaseStart,
+  } from "$lib/debug/transition-perf";
   import { cachedBox } from "$lib/game/cached-geometries";
 
   let {
@@ -75,6 +79,19 @@
   const lavaMaterial = $derived(
     lavaSurfaceTexture ? getLavaMaterial(lavaSurfaceTexture) : null
   );
+  let flushStartedAt = 0;
+
+  $effect.pre(() => {
+    roomHazards;
+    flushStartedAt = markTransitionPhaseStart();
+  });
+
+  $effect(() => {
+    roomHazards;
+    markTransitionPhaseEnd("flush-room-hazards", flushStartedAt, () => ({
+      hazards: roomHazards.length,
+    }));
+  });
 
   $effect(() => {
     if (!lavaMaterial) {

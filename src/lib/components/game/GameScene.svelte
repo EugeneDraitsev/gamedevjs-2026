@@ -22,6 +22,14 @@
   import GameSceneEnvironment from "$lib/components/game/scene/GameSceneEnvironment.svelte";
   import { createDefaultMachineLoadout } from "$lib/config/machine-modules";
   import { roomTemplateById } from "$lib/config/room-templates";
+  import {
+    enableTransitionPerf,
+    markGameFrameEnd,
+    markGameFrameStart,
+    markRuntimeTrace,
+    markTransitionPhaseEnd,
+    markTransitionPhaseStart,
+  } from "$lib/debug/transition-perf";
   import { stepEnemies } from "$lib/game/enemy-stepper";
   import {
     applyMeleeDeflects,
@@ -165,6 +173,20 @@
     textures.treasureFloorHeight,
     textures.treasureFloorNormal,
   ]);
+  const indoorPreloadTextures = $derived.by(() => [
+    textures.bossBanner,
+    textures.bossDoor,
+    textures.bossFloor,
+    textures.bossFloorHeight,
+    textures.bossFloorNormal,
+    textures.foundryFloor,
+    textures.foundryFloorDecals,
+    textures.foundryWall,
+    textures.lavaSurface,
+    textures.treasureFloor,
+    textures.treasureFloorHeight,
+    textures.treasureFloorNormal,
+  ]);
   const blockingPreloadTextures = $derived.by(() => {
     if (outside) {
       return outsidePreloadTextures;
@@ -175,34 +197,20 @@
       scene.currentRoomTemplate.layout === "boss-crucible" ||
       scene.currentRoomTemplate.layout === "boss-bomber"
     ) {
-      return [
-        textures.bossBanner,
-        textures.bossDoor,
-        textures.bossFloor,
-        textures.bossFloorHeight,
-        textures.bossFloorNormal,
-        textures.foundryFloorDecals,
-        textures.foundryWall,
-      ];
+      return indoorPreloadTextures;
     }
 
     if (scene.currentRoomTemplate.layout === "gear-floor") {
-      return [
-        textures.foundryFloorDecals,
-        textures.foundryWall,
-        textures.treasureFloor,
-        textures.treasureFloorHeight,
-        textures.treasureFloorNormal,
-      ];
+      return indoorPreloadTextures;
     }
 
-    return [
-      textures.foundryFloor,
-      textures.foundryFloorDecals,
-      textures.foundryWall,
-      textures.lavaSurface,
-    ];
+    return indoorPreloadTextures;
   });
+  const shouldAutoEnableTransitionPerf = () => {
+    const params = new URLSearchParams(window.location.search);
+
+    return params.get("debug") === "true" || params.get("rtperf") === "1";
+  };
   const markSceneReady = () => {
     if (sceneReady) {
       return;
@@ -224,6 +232,40 @@
   };
 
   setGameSceneContext(scene);
+
+  let roomFlushStartedAt = 0;
+
+  $effect.pre(() => {
+    const currentRoom = scene.currentRoom;
+
+    currentRoom.id;
+    currentRoom.templateId;
+    roomFlushStartedAt = markTransitionPhaseStart();
+  });
+
+  $effect(() => {
+    const currentRoom = scene.currentRoom;
+
+    currentRoom.id;
+    currentRoom.templateId;
+
+    const info = untrack(() => ({
+      doors: scene.roomDoors.length,
+      hazards: scene.roomHazards.length,
+      nodesHint:
+        scene.roomWalls.length +
+        scene.roomDoors.length +
+        scene.roomDoorSeals.length +
+        scene.roomHazards.length +
+        scene.roomPlatforms.length,
+      platforms: scene.roomPlatforms.length,
+      roomId: currentRoom.id,
+      templateId: currentRoom.templateId,
+      walls: scene.roomWalls.length,
+    }));
+
+    markTransitionPhaseEnd("svelte-room-flush", roomFlushStartedAt, () => info);
+  });
 
   $effect(() => {
     syncSceneInputs();
@@ -327,11 +369,14 @@
     const currentRoom = scene.currentRoom;
     const currentRoomTemplate = scene.currentRoomTemplate;
     let spawnFrame = 0;
+    const resetPhaseStartedAt = markTransitionPhaseStart();
+    let pendingAfterReset = false;
 
     untrack(() => {
       enemySpawnPending =
         currentRoomTemplate.spawnPattern !== "none" &&
         !room.clearedSet.has(currentRoom.id);
+      pendingAfterReset = enemySpawnPending;
       if (currentRoomTemplate.layout === "outside-yard") {
         pickups.seedRoom(
           currentRoom.id,
@@ -353,8 +398,16 @@
           : 0;
     });
 
+    markTransitionPhaseEnd("room-effect-reset", resetPhaseStartedAt, () => ({
+      enemySpawnPending: pendingAfterReset,
+      roomId: currentRoom.id,
+      spawnPattern: currentRoomTemplate.spawnPattern,
+      templateId: currentRoom.templateId,
+    }));
+
     spawnFrame = requestAnimationFrame(() => {
-      combat.enemies = createRoomEnemies(
+      const spawnPhaseStartedAt = markTransitionPhaseStart();
+      const enemies = createRoomEnemies(
         currentRoom,
         enemySpawnOverride
           ? { ...currentRoomTemplate, ...enemySpawnOverride }
@@ -362,7 +415,15 @@
         untrack(() => room.entryDirection),
         untrack(() => room.clearedSet)
       );
+
+      combat.enemies = enemies;
       enemySpawnPending = false;
+      markTransitionPhaseEnd("spawn-enemies", spawnPhaseStartedAt, () => ({
+        enemies: enemies.length,
+        override: Boolean(enemySpawnOverride),
+        roomId: currentRoom.id,
+        templateId: currentRoom.templateId,
+      }));
     });
 
     return () => {
@@ -660,6 +721,18 @@
     });
     const playerTookDamage = result.nextHealth < player.health;
 
+    if (result.lootSpawned || result.roomCleared || result.doorStartedOpening) {
+      markRuntimeTrace("room-clear-runtime", () => ({
+        doorStartedOpening: result.doorStartedOpening,
+        enemies: combat.enemies.length,
+        lootSpawned: result.lootSpawned,
+        pickupKinds: pickups.items.map((pickup) => pickup.kind),
+        roomCleared: result.roomCleared,
+        roomId: scene.currentRoom.id,
+        templateId: scene.currentRoomTemplate.id,
+      }));
+    }
+
     if (result.doorStartedOpening) {
       gameSfx.playDoorOpen();
     }
@@ -711,6 +784,10 @@
   };
 
   onMount(() => {
+    if (shouldAutoEnableTransitionPerf()) {
+      enableTransitionPerf();
+    }
+
     const textureLoadAbort = new AbortController();
 
     if (outside) {
@@ -726,6 +803,7 @@
     let previousTime = performance.now();
 
     const frame = (time: number) => {
+      const gameFrameStartedAt = markGameFrameStart();
       const delta = Math.min(0.05, (time - previousTime) / 1000);
 
       previousTime = time;
@@ -735,6 +813,22 @@
         textures.advanceLava(delta);
       } else {
         tick(time, delta);
+      }
+
+      if (gameFrameStartedAt > 0) {
+        markGameFrameEnd(gameFrameStartedAt, () => ({
+          beams: combat.beams.length,
+          bombs: combat.bombs.length,
+          deltaSec: delta,
+          enemies: combat.enemies.length,
+          enemyShots: combat.enemyShots.length,
+          gateLasers: combat.gateLasers.length,
+          playerDeathActive: timing.playerDeathActive,
+          projectiles: combat.projectiles.length,
+          roomId: scene.currentRoom.id,
+          spawnPending: enemySpawnPending,
+          templateId: scene.currentRoom.templateId,
+        }));
       }
 
       frameId = window.requestAnimationFrame(frame);

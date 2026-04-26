@@ -24,6 +24,7 @@
     shadowsEnabled = true,
     showEnvironmentMap = false,
     warmupTextures = [],
+    warmupRenderPasses = 4,
   }: {
     backgroundColor?: string;
     compileBeforeReady?: boolean;
@@ -38,6 +39,7 @@
     preloadTextures?: Array<Texture | null>;
     shadowsEnabled?: boolean;
     showEnvironmentMap?: boolean;
+    warmupRenderPasses?: number;
     warmupTextures?: Array<Texture | null>;
   } = $props();
 
@@ -158,6 +160,23 @@
       }
     };
 
+    const runReadyWarmupRenderPass = (remaining: number) => {
+      if (canceled) {
+        return;
+      }
+
+      warmupRender();
+
+      if (remaining > 1) {
+        frame = requestAnimationFrame(() =>
+          runReadyWarmupRenderPass(remaining - 1)
+        );
+        return;
+      }
+
+      frame = requestAnimationFrame(ready);
+    };
+
     const warmup = () => {
       if (canceled) {
         return;
@@ -195,12 +214,13 @@
           renderer
             .compileAsync(scene, camera.current)
             .catch(() => undefined)
-            .finally(() =>
-              requestAnimationFrame(() => {
-                warmupRender();
-                requestAnimationFrame(ready);
-              })
-            );
+            .finally(() => {
+              const passCount = Math.max(1, Math.floor(warmupRenderPasses));
+
+              frame = requestAnimationFrame(() =>
+                runReadyWarmupRenderPass(passCount)
+              );
+            });
         }
 
         return;
@@ -236,7 +256,9 @@
       }
     };
 
-    frame = requestAnimationFrame(preload);
+    frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(preload);
+    });
 
     return () => {
       canceled = true;

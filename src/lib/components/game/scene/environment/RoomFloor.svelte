@@ -2,11 +2,18 @@
   import { T } from "@threlte/core";
   import { Collider, RigidBody } from "@threlte/rapier";
   import {
+    InstancedMesh,
+    MeshBasicMaterial,
     type MeshStandardMaterial,
+    Object3D,
     PlaneGeometry,
     type Texture,
   } from "three";
   import type { RoomTemplate } from "$lib/config/room-templates";
+  import {
+    markTransitionPhaseEnd,
+    markTransitionPhaseStart,
+  } from "$lib/debug/transition-perf";
   import { cachedPlane } from "$lib/game/cached-geometries";
   import type { RoomBounds } from "$lib/game/scene-layout";
 
@@ -65,6 +72,28 @@
       source.height
     ),
   }));
+  const floorMarkMaterialCache = new WeakMap<Texture, MeshBasicMaterial>();
+  const getFloorMarkMaterial = (texture: Texture) => {
+    const cached = floorMarkMaterialCache.get(texture);
+
+    if (cached) {
+      return cached;
+    }
+
+    const material = new MeshBasicMaterial({
+      alphaTest: 0.04,
+      color: "#312a21",
+      depthWrite: false,
+      map: texture,
+      opacity: 0.28,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      transparent: true,
+    });
+
+    floorMarkMaterialCache.set(texture, material);
+    return material;
+  };
 
   let {
     bossFloorHeightTexture = null,
@@ -114,6 +143,7 @@
             roomNoise(currentRoomId, 101 + index * 37) * decalSources.length
           )
         ];
+      const sourceIndex = decalSources.indexOf(source);
       const depth = 0.5 + roomNoise(currentRoomId, 307 + index * 41) * 1.35;
       const width =
         depth *
@@ -122,9 +152,8 @@
 
       return {
         depth,
-        geometry: source.geometry,
-        opacity: 0.2 + roomNoise(currentRoomId, 701 + index * 47) * 0.16,
         rotation: roomNoise(currentRoomId, 907 + index * 53) * Math.PI * 2,
+        sourceIndex,
         width,
         x:
           (roomNoise(currentRoomId, 1103 + index * 59) - 0.5) *
@@ -137,6 +166,58 @@
       };
     })
   );
+  const floorMarkMeshes = $derived.by(() => {
+    if (!foundryFloorDecalTexture) {
+      return [] as InstancedMesh[];
+    }
+
+    const material = getFloorMarkMaterial(foundryFloorDecalTexture);
+    const dummy = new Object3D();
+
+    return decalSources.flatMap((source, sourceIndex) => {
+      const marks = floorMarks.filter(
+        (mark) => mark.sourceIndex === sourceIndex
+      );
+
+      if (marks.length === 0) {
+        return [];
+      }
+
+      const mesh = new InstancedMesh(source.geometry, material, marks.length);
+
+      marks.forEach((mark, index) => {
+        dummy.position.set(mark.x, 0.365 + index * 0.0002, mark.z);
+        dummy.rotation.set(-Math.PI / 2, 0, mark.rotation);
+        dummy.scale.set(mark.width, mark.depth, 1);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(index, dummy.matrix);
+      });
+      mesh.count = marks.length;
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      return [mesh];
+    });
+  });
+  let flushStartedAt = 0;
+
+  $effect.pre(() => {
+    currentRoomId;
+    currentRoomTemplate.id;
+    bounds;
+    flushStartedAt = markTransitionPhaseStart();
+  });
+
+  $effect(() => {
+    currentRoomId;
+    currentRoomTemplate.id;
+    bounds;
+    markTransitionPhaseEnd("flush-room-floor", flushStartedAt, () => ({
+      floorMarks: floorMarks.length,
+      layout: currentRoomTemplate.layout,
+      roomId: currentRoomId,
+      templateId: currentRoomTemplate.id,
+    }));
+  });
 
   $effect(() => {
     bossFloorHeightTexture;
@@ -181,27 +262,9 @@
         />
       </T.Mesh>
 
-      {#if foundryFloorDecalTexture}
-        {#each floorMarks as mark, index}
-          <T.Mesh
-            geometry={mark.geometry}
-            position={[mark.x, 0.365 + index * 0.0002, mark.z]}
-            rotation={[-Math.PI / 2, 0, mark.rotation]}
-            scale={[mark.width, mark.depth, 1]}
-          >
-            <T.MeshBasicMaterial
-              map={foundryFloorDecalTexture}
-              color="#312a21"
-              transparent
-              alphaTest={0.04}
-              depthWrite={false}
-              opacity={mark.opacity}
-              polygonOffset
-              polygonOffsetFactor={-1}
-            />
-          </T.Mesh>
-        {/each}
-      {/if}
+      {#each floorMarkMeshes as mesh (mesh.uuid)}
+        <T is={mesh} />
+      {/each}
     {/if}
   </RigidBody>
 </T.Group>

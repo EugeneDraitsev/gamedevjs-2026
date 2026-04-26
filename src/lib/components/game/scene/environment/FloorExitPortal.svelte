@@ -85,7 +85,7 @@
 
   {#each [-1, 1] as side}
     <T.Mesh
-      castShadow={visibleAmount > 0.02}
+      castShadow={false}
       receiveShadow={visibleAmount > 0.02}
       position={[
         side * (0.72 + easedOpen * 0.78),
@@ -109,7 +109,7 @@
   {/each}
 
   <T.Mesh
-    castShadow={visibleAmount > 0.02}
+    castShadow={false}
     receiveShadow={visibleAmount > 0.02}
     position={[0, 1.5 + easedOpen * 0.52, 0.02]}
     scale={[

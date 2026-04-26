@@ -47,7 +47,9 @@
     return [0, 0, 0];
   };
   const span = $derived(wallSpan(wall));
-  const moduleCount = $derived(Math.max(1, Math.round(span / 3.2)));
+  const moduleCount = $derived(
+    Math.max(1, Math.min(3, Math.round(span / 3.2)))
+  );
   const moduleWidth = $derived(span / moduleCount);
   const modules = $derived(
     Array.from({ length: moduleCount }, (_, index) => index)

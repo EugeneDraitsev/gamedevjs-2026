@@ -8,10 +8,24 @@
   import RoomPlatforms from "$lib/components/game/scene/environment/RoomPlatforms.svelte";
   import RoomTemplateEnvironment from "$lib/components/game/scene/environment/RoomTemplateEnvironment.svelte";
   import RoomWalls from "$lib/components/game/scene/environment/RoomWalls.svelte";
+  import InstancedFoundryWallKits from "$lib/components/game/scene/environment/walls/InstancedFoundryWallKits.svelte";
   import { getMachineModule } from "$lib/config/machine-modules";
+  import {
+    markTransitionPhaseEnd,
+    markTransitionPhaseStart,
+  } from "$lib/debug/transition-perf";
+  import { cachedBox } from "$lib/game/cached-geometries";
+  import { foundryWallKitLampPositions } from "$lib/game/foundry-wall-kit-layout";
   import { getRoomHazards } from "$lib/game/scene-layout";
   import { getGameSceneContext } from "$lib/stores/scene-context";
-  import type { Vec3, WallFacing } from "$lib/types/game";
+  import type {
+    DoorMarker,
+    DoorSeal,
+    RoomPlatform,
+    StaticWall,
+    Vec3,
+    WallFacing,
+  } from "$lib/types/game";
 
   interface Props {
     corePrisonSealBrokenAt?: number;
@@ -39,6 +53,7 @@
   );
   const bossDecoratedWallFacings: WallFacing[] = ["east", "south", "west"];
   const bossGearlessWallFacings: WallFacing[] = ["south"];
+  const inactiveLightPosition: Vec3 = [0, -32, 0];
   const maxLampLights = 8;
   const lavaHazardWarmups = [
     ...getRoomHazards("lava-lane"),
@@ -49,42 +64,138 @@
     ...getRoomHazards("boss-bomber"),
   ];
   const artifactPedestalWarmupTemplate = getMachineModule("arc-splitter-coil");
+  const wallKitWarmups: StaticWall[] = [
+    {
+      args: [8, 1.9, 0.16],
+      color: "#2f332f",
+      facing: "north",
+      id: "warmup-wallkit-long",
+      lamp: true,
+      position: [0, 2.1, 0],
+      style: "mechanic",
+      trimColor: "#7b4b22",
+    },
+    {
+      args: [4.8, 1.9, 0.16],
+      color: "#2f332f",
+      facing: "south",
+      id: "warmup-wallkit-three",
+      lamp: true,
+      position: [0, 2.1, 2],
+      style: "mechanic",
+      trimColor: "#7b4b22",
+    },
+  ];
+  const roomDoorWarmups: DoorMarker[] = [
+    {
+      args: [0.95, 0.05, 0.45],
+      boss: true,
+      color: "#ffd166",
+      emissive: "#ffd166",
+      id: "warmup-boss-door",
+      position: [0, 0.03, 0],
+      style: "mechanic",
+      trimColor: "#7b4b22",
+    },
+  ];
+  const roomDoorSealWarmups: DoorSeal[] = [
+    {
+      args: [1.8, 2.2, 0.16],
+      color: "#9dd6ff",
+      emissive: "#ffd166",
+      id: "warmup-mechanic-seal",
+      position: [0, 2.1, 0],
+      style: "mechanic",
+      trimColor: "#7b4b22",
+    },
+  ];
+  const roomPlatformWarmups: RoomPlatform[] = [
+    {
+      args: [2.2, 0.2, 1.2],
+      color: "#2f4559",
+      id: "warmup-box-platform",
+      position: [0, 0.2, 0],
+    },
+    {
+      args: [1.1, 0.46, 1.1],
+      color: "#55738a",
+      id: "warmup-hex-platform",
+      position: [3.4, 0.46, 0],
+      shape: "hex",
+    },
+    {
+      args: [1.15, 0.18, 2.2],
+      color: "#31495f",
+      conveyor: [0, 0, 3.08],
+      id: "warmup-conveyor-platform",
+      position: [-3.4, 0.18, 0],
+    },
+  ];
   const decoratedWallFacings = $derived(
     scene.currentRoom.kind === "boss" ? bossDecoratedWallFacings : null
   );
   const gearlessWallFacings = $derived(
     scene.currentRoom.kind === "boss" ? bossGearlessWallFacings : null
   );
-  const lampLightPositions = $derived(
-    scene.roomWalls
-      .filter(
-        (wall) =>
-          wall.lamp &&
-          wall.style === "mechanic" &&
-          (!wall.opacity || wall.opacity >= 1)
-      )
-      .slice(0, maxLampLights)
-      .map((wall) => {
-        const horizontal = wall.args[0] > wall.args[2];
-        const span = (horizontal ? wall.args[0] : wall.args[2]) * 2;
-        const count = Math.max(1, Math.round(span / 3.2));
-        const offset =
-          (Math.floor(count / 2) - (count - 1) / 2) * (span / count);
-        const sign = wall.facing === "south" || wall.facing === "east" ? 1 : -1;
+  const lampLights = $derived.by(() => {
+    if (outside) {
+      return Array.from({ length: maxLampLights }, (_unused, slot) => ({
+        id: `room-lamp-${slot}`,
+        intensity: 0,
+        position: inactiveLightPosition,
+      }));
+    }
 
-        return horizontal
-          ? ([
-              wall.position[0] + offset * sign,
-              wall.position[1] - 0.86,
-              wall.position[2] + (wall.args[2] + 0.52) * sign,
-            ] as Vec3)
-          : ([
-              wall.position[0] + (wall.args[0] + 0.52) * sign,
-              wall.position[1] - 0.86,
-              wall.position[2] - offset * sign,
-            ] as Vec3);
+    const positions = foundryWallKitLampPositions({
+      decoratedWallFacings,
+      limit: scene.roomWalls.length,
+      roomWalls: scene.roomWalls,
+    }).slice(0, maxLampLights);
+
+    return Array.from({ length: maxLampLights }, (_unused, slot) => {
+      const position = positions[slot];
+
+      return {
+        id: `room-lamp-${slot}`,
+        intensity: position ? 0.7 : 0,
+        position: position ?? inactiveLightPosition,
+      };
+    });
+  });
+  let environmentFlushStartedAt = 0;
+
+  $effect.pre(() => {
+    scene.currentRoom.id;
+    scene.currentRoomTemplate.id;
+    scene.roomWalls;
+    scene.roomDoors;
+    scene.roomDoorSeals;
+    scene.roomHazards;
+    scene.roomPlatforms;
+    environmentFlushStartedAt = markTransitionPhaseStart();
+  });
+
+  $effect(() => {
+    scene.currentRoom.id;
+    scene.currentRoomTemplate.id;
+    scene.roomWalls;
+    scene.roomDoors;
+    scene.roomDoorSeals;
+    scene.roomHazards;
+    scene.roomPlatforms;
+    markTransitionPhaseEnd(
+      "flush-scene-environment",
+      environmentFlushStartedAt,
+      () => ({
+        doors: scene.roomDoors.length,
+        hazards: scene.roomHazards.length,
+        platforms: scene.roomPlatforms.length,
+        roomId: scene.currentRoom.id,
+        templateId: scene.currentRoomTemplate.id,
+        walls: scene.roomWalls.length,
       })
-  );
+    );
+  });
 </script>
 
 <RoomFloor
@@ -112,13 +223,13 @@
   showWallKit={!outside}
 />
 
-{#each lampLightPositions as position, slot (slot)}
+{#each lampLights as light (light.id)}
   <T.PointLight
     color="#ff9d43"
     decay={1.6}
     distance={5.4}
-    intensity={0.7}
-    {position}
+    intensity={light.intensity}
+    position={light.position}
   />
 {/each}
 
@@ -183,6 +294,40 @@
   <RoomArtifactPedestal
     animationNow={0}
     currentArtifactTemplate={artifactPedestalWarmupTemplate}
+  />
+
+  <RoomDoors
+    bossDoorTexture={textures.bossDoor}
+    doorOpenAmount={0}
+    roomDoors={roomDoorWarmups}
+    roomDoorSeals={roomDoorSealWarmups}
+  />
+
+  <RoomPlatforms animationNow={0} roomPlatforms={roomPlatformWarmups} />
+
+  <T.Mesh
+    castShadow
+    geometry={cachedBox(19.8, 4.34, 0.5)}
+    position={[0, 2.1, 0]}
+    receiveShadow={false}
+  >
+    <T.MeshStandardMaterial color="#3b3025" metalness={0.1} roughness={0.86} />
+  </T.Mesh>
+
+  <T.Mesh
+    castShadow
+    geometry={cachedBox(0.5, 4.34, 16.2)}
+    position={[0, 2.1, 0]}
+    receiveShadow={false}
+  >
+    <T.MeshStandardMaterial color="#241d17" metalness={0.1} roughness={0.86} />
+  </T.Mesh>
+
+  <InstancedFoundryWallKits
+    limit={wallKitWarmups.length}
+    roomWalls={wallKitWarmups}
+    wallDecalTexture={textures.foundryFloorDecals}
+    wallTexture={textures.foundryWall}
   />
 
   {#each [textures.treasureFloor, textures.bossFloor, textures.bossDoor, textures.lavaSurface, textures.bossBanner, textures.foundryFloor, textures.foundryWall] as texture}

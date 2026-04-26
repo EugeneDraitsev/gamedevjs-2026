@@ -65,30 +65,30 @@
       uSandB: { value: new Color("#d1bd84") },
     } as Record<string, IUniform>,
     vertexShader: /* glsl */ `
-                                        varying vec2 vRiverbedUv;
-                                        varying vec3 vWorldPos;
-                                        void main() {
-                                          vRiverbedUv = uv;
-                                          vec4 worldPos = modelMatrix * vec4(position, 1.0);
-                                          vWorldPos = worldPos.xyz;
-                                          gl_Position = projectionMatrix * viewMatrix * worldPos;
-                                        }
-                                      `,
+                                          varying vec2 vRiverbedUv;
+                                          varying vec3 vWorldPos;
+                                          void main() {
+                                            vRiverbedUv = uv;
+                                            vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                                            vWorldPos = worldPos.xyz;
+                                            gl_Position = projectionMatrix * viewMatrix * worldPos;
+                                          }
+                                        `,
     fragmentShader: /* glsl */ `
-                                        ${glslHash}
-                                        ${glslValueNoise}
-                                        uniform vec3 uSandA;
-                                        uniform vec3 uSandB;
-                                        varying vec2 vRiverbedUv;
-                                        varying vec3 vWorldPos;
-                                        void main() {
-                                          vec2 wp = vWorldPos.xz;
-                                          float grain = fbm2(wp * 1.4) * 0.7 + hash21(floor(wp * 7.0)) * 0.3;
-                                          float edge = 1.0 - smoothstep(0.42, 0.5, abs(vRiverbedUv.x - 0.5));
-                                          vec3 col = mix(uSandA, uSandB, grain);
-                                          gl_FragColor = vec4(col, edge * 0.78);
-                                        }
-                                      `,
+                                          ${glslHash}
+                                          ${glslValueNoise}
+                                          uniform vec3 uSandA;
+                                          uniform vec3 uSandB;
+                                          varying vec2 vRiverbedUv;
+                                          varying vec3 vWorldPos;
+                                          void main() {
+                                            vec2 wp = vWorldPos.xz;
+                                            float grain = fbm2(wp * 1.4) * 0.7 + hash21(floor(wp * 7.0)) * 0.3;
+                                            float edge = 1.0 - smoothstep(0.42, 0.5, abs(vRiverbedUv.x - 0.5));
+                                            vec3 col = mix(uSandA, uSandB, grain);
+                                            gl_FragColor = vec4(col, edge * 0.78);
+                                          }
+                                        `,
     depthWrite: false,
     polygonOffset: true,
     polygonOffsetFactor: -6,

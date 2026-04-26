@@ -1,5 +1,12 @@
 <script module lang="ts">
-  import { ExtrudeGeometry, Path, RingGeometry, Shape } from "three";
+  import {
+    ExtrudeGeometry,
+    MeshBasicMaterial,
+    MeshStandardMaterial,
+    Path,
+    RingGeometry,
+    Shape,
+  } from "three";
   import { gearPickupColors } from "./pickup-colors";
 
   const gearDepth = 12 / 44;
@@ -52,6 +59,34 @@
   const gearOuterRingGeometry = new RingGeometry(0.5, 0.78, 96);
   const gearInnerRingGeometry = new RingGeometry(12 / 44, 0.44, 96);
   const gearGrooveGeometry = new RingGeometry(0.47, 0.49, 96);
+  const gearBodyMaterial = new MeshStandardMaterial({
+    color: gearPickupColors.body,
+    emissive: gearPickupColors.bodyEmissive,
+    emissiveIntensity: 0.18,
+    metalness: 0.34,
+    opacity: 1,
+    roughness: 0.28,
+    transparent: true,
+  });
+  const gearOuterRingMaterial = new MeshStandardMaterial({
+    color: gearPickupColors.outerRing,
+    metalness: 0.28,
+    opacity: 1,
+    roughness: 0.22,
+    transparent: true,
+  });
+  const gearInnerRingMaterial = new MeshStandardMaterial({
+    color: gearPickupColors.innerRing,
+    metalness: 0.32,
+    opacity: 1,
+    roughness: 0.24,
+    transparent: true,
+  });
+  const gearGrooveMaterial = new MeshBasicMaterial({
+    color: gearPickupColors.groove,
+    opacity: 0.8,
+    transparent: true,
+  });
 </script>
 
 <script lang="ts">
@@ -78,6 +113,13 @@
     Math.sin(animationNow * 0.0011 + pickup.createdAt) * 0.055
   );
   const gearY = $derived(-pickup.position[1] + 0.22 + gearFloat);
+
+  $effect(() => {
+    gearBodyMaterial.opacity = spawnEase;
+    gearOuterRingMaterial.opacity = spawnEase;
+    gearInnerRingMaterial.opacity = spawnEase;
+    gearGrooveMaterial.opacity = spawnEase * 0.8;
+  });
 </script>
 
 <T.Group
@@ -85,40 +127,24 @@
   rotation={[-Math.PI / 2 + gearTilt, 0, 0]}
   scale={[gearScale, gearScale, gearScale]}
 >
-  <T.Mesh castShadow geometry={gearBodyGeometry}>
-    <T.MeshStandardMaterial
-      color={gearPickupColors.body}
-      emissive={gearPickupColors.bodyEmissive}
-      emissiveIntensity={0.18}
-      metalness={0.34}
-      opacity={spawnEase}
-      roughness={0.28}
-      transparent
-    />
-  </T.Mesh>
-  <T.Mesh geometry={gearOuterRingGeometry} position={[0, 0, gearDepth + 0.01]}>
-    <T.MeshStandardMaterial
-      color={gearPickupColors.outerRing}
-      metalness={0.28}
-      opacity={spawnEase}
-      roughness={0.22}
-      transparent
-    />
-  </T.Mesh>
-  <T.Mesh geometry={gearInnerRingGeometry} position={[0, 0, gearDepth + 0.02]}>
-    <T.MeshStandardMaterial
-      color={gearPickupColors.innerRing}
-      metalness={0.32}
-      opacity={spawnEase}
-      roughness={0.24}
-      transparent
-    />
-  </T.Mesh>
-  <T.Mesh geometry={gearGrooveGeometry} position={[0, 0, gearDepth + 0.03]}>
-    <T.MeshBasicMaterial
-      color={gearPickupColors.groove}
-      opacity={spawnEase * 0.8}
-      transparent
-    />
-  </T.Mesh>
+  <T.Mesh
+    castShadow={false}
+    geometry={gearBodyGeometry}
+    material={gearBodyMaterial}
+  />
+  <T.Mesh
+    geometry={gearOuterRingGeometry}
+    material={gearOuterRingMaterial}
+    position={[0, 0, gearDepth + 0.01]}
+  />
+  <T.Mesh
+    geometry={gearInnerRingGeometry}
+    material={gearInnerRingMaterial}
+    position={[0, 0, gearDepth + 0.02]}
+  />
+  <T.Mesh
+    geometry={gearGrooveGeometry}
+    material={gearGrooveMaterial}
+    position={[0, 0, gearDepth + 0.03]}
+  />
 </T.Group>

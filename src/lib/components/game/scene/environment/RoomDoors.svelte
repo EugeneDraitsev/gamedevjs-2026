@@ -3,6 +3,10 @@
   import { Collider, RigidBody } from "@threlte/rapier";
   import type { Texture } from "three";
   import FoundryDoorFrame from "$lib/components/game/scene/environment/walls/FoundryDoorFrame.svelte";
+  import {
+    markTransitionPhaseEnd,
+    markTransitionPhaseStart,
+  } from "$lib/debug/transition-perf";
   import { cachedBox } from "$lib/game/cached-geometries";
   import type { DoorMarker, DoorSeal, Vec3 } from "$lib/types/game";
 
@@ -56,6 +60,26 @@
   const gateRails = [-1.24, 0.92];
   const gateRivetOffsets = [-0.34, 0.34];
   const gateRivetRows = [-0.72, 0.42];
+  let flushStartedAt = 0;
+
+  $effect.pre(() => {
+    roomDoors;
+    roomDoorSeals;
+    doorOpenAmount;
+    flushStartedAt = markTransitionPhaseStart();
+  });
+
+  $effect(() => {
+    roomDoors;
+    roomDoorSeals;
+    doorOpenAmount;
+    markTransitionPhaseEnd("flush-room-doors", flushStartedAt, () => ({
+      doors: roomDoors.length,
+      mechanicSeals: roomDoorSeals.filter((seal) => seal.style === "mechanic")
+        .length,
+      seals: roomDoorSeals.length,
+    }));
+  });
 </script>
 
 {#each roomDoors as door (door.id)}
@@ -110,7 +134,7 @@
       {#if doorOpenAmount <= 1}
         {#each gateSides as side}
           <T.Mesh
-            castShadow={sealVisualDepthWrite(seal)}
+            castShadow={false}
             geometry={sealBoxGeo(seal, 0.42, seal.args[1] * 2.08, 0.5)}
             position={sealPosition(
               seal,
@@ -130,7 +154,7 @@
           </T.Mesh>
 
           <T.Mesh
-            castShadow={sealVisualDepthWrite(seal)}
+            castShadow={false}
             geometry={sealBoxGeo(seal, 0.72, 0.24, 0.72)}
             position={sealPosition(
               seal,
@@ -152,7 +176,7 @@
 
         {#each [-seal.args[1] - 0.02, seal.args[1] - 0.14] as y}
           <T.Mesh
-            castShadow={sealVisualDepthWrite(seal)}
+            castShadow={false}
             geometry={sealBoxGeo(seal, sealSpan(seal) + 0.9, 0.22, 0.38)}
             position={sealPosition(seal, 0, y)}
             receiveShadow
@@ -179,7 +203,7 @@
           >
             {#each gateBarOffsets as offset}
               <T.Mesh
-                castShadow={sealVisualDepthWrite(seal)}
+                castShadow={false}
                 geometry={sealBoxGeo(seal, 0.08, seal.args[1] * 1.4, 0.12)}
                 position={sealPosition(seal, offset, -0.1)}
                 receiveShadow
@@ -197,7 +221,7 @@
 
             {#each gateRails as y}
               <T.Mesh
-                castShadow={sealVisualDepthWrite(seal)}
+                castShadow={false}
                 geometry={sealBoxGeo(seal, 0.88, 0.14, 0.14)}
                 position={sealPosition(seal, 0, y)}
                 receiveShadow
@@ -214,7 +238,7 @@
             {/each}
 
             <T.Mesh
-              castShadow={sealVisualDepthWrite(seal)}
+              castShadow={false}
               geometry={sealBoxGeo(seal, 0.38, 0.28, 0.18)}
               position={sealPosition(seal, 0, -0.38)}
               receiveShadow
@@ -234,7 +258,7 @@
             {#each gateRivetRows as y}
               {#each gateRivetOffsets as offset}
                 <T.Mesh
-                  castShadow={sealVisualDepthWrite(seal)}
+                  castShadow={false}
                   geometry={sealBoxGeo(seal, 0.11, 0.11, 0.2)}
                   position={sealPosition(seal, offset, y)}
                 >
@@ -284,7 +308,7 @@
         seal.position[2],
       ]}
     >
-      <T.Mesh castShadow receiveShadow>
+      <T.Mesh castShadow={false} receiveShadow>
         <T.BoxGeometry
           args={[
             seal.args[0] * 2,

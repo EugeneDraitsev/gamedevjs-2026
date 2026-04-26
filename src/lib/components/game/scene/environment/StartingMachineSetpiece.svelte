@@ -24,6 +24,10 @@
   } from "three";
   import crackHeavyUrl from "$lib/assets/generated/core-prison-dome-crack-heavy.png?url";
   import crackLightUrl from "$lib/assets/generated/core-prison-dome-crack-light.png?url";
+  import {
+    markTransitionPhaseEnd,
+    markTransitionPhaseStart,
+  } from "$lib/debug/transition-perf";
   import { corePrisonSealCenterZ } from "$lib/game/scene-layout";
   import type { Vec3 } from "$lib/types/game";
 
@@ -246,6 +250,30 @@
   let instructionTexture = $state<CanvasTexture | null>(null);
   let crackTextureLight = $state<Texture | null>(null);
   let crackTextureHeavy = $state<Texture | null>(null);
+  let flushStartedAt = 0;
+
+  $effect.pre(() => {
+    active;
+    locked;
+    sealHits;
+    sealHitsRequired;
+    flushStartedAt = markTransitionPhaseStart();
+  });
+
+  $effect(() => {
+    active;
+    locked;
+    sealHits;
+    sealHitsRequired;
+    markTransitionPhaseEnd("flush-starting-setpiece", flushStartedAt, () => ({
+      active,
+      hasCrackHeavy: Boolean(crackTextureHeavy),
+      hasCrackLight: Boolean(crackTextureLight),
+      hasInstruction: Boolean(instructionTexture),
+      locked,
+      sealHits,
+    }));
+  });
 
   onMount(() => {
     if (

@@ -85,7 +85,7 @@
 
 <T.Group position={[x, y, 0.54]} scale={[scale, scale, scale]}>
   <T.Group rotation={[0, 0, angle]}>
-    <T.Mesh castShadow geometry={gearBodyGeometry}>
+    <T.Mesh castShadow={false} geometry={gearBodyGeometry}>
       <T.MeshStandardMaterial
         color={trimColor}
         metalness={0.78}
@@ -116,7 +116,7 @@
       rotation={[0, 0, -angle * 1.35]}
       scale={[0.56, 0.56, 0.56]}
     >
-      <T.Mesh castShadow geometry={gearBodyGeometry}>
+      <T.Mesh castShadow={false} geometry={gearBodyGeometry}>
         <T.MeshStandardMaterial
           color={trimColor}
           metalness={0.78}

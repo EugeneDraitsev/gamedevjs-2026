@@ -18,6 +18,10 @@
   import FoundryGearSet from "$lib/components/game/scene/environment/walls/FoundryGearSet.svelte";
   import type { RoomEnvironmentId } from "$lib/config/room-templates";
   import {
+    markTransitionPhaseEnd,
+    markTransitionPhaseStart,
+  } from "$lib/debug/transition-perf";
+  import {
     cachedBox,
     cachedCone,
     cachedCylinder,
@@ -392,21 +396,21 @@
     topColor: { value: new Color("#d9e1d9") },
   };
   const outsideHazeVertex = `
-                                                      varying vec2 vUv;
-                                                      void main() {
-                                                        vUv = uv;
-                                                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                                                      }
-                                                    `;
+                                                        varying vec2 vUv;
+                                                        void main() {
+                                                          vUv = uv;
+                                                          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                                                        }
+                                                      `;
   const outsideHazeFragment = `
-                                                      varying vec2 vUv;
-                                                      uniform vec3 bottomColor;
-                                                      uniform vec3 topColor;
-                                                      void main() {
-                                                        vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
-                                                        gl_FragColor = vec4(color, 0.42);
-                                                      }
-                                                    `;
+                                                        varying vec2 vUv;
+                                                        uniform vec3 bottomColor;
+                                                        uniform vec3 topColor;
+                                                        void main() {
+                                                          vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
+                                                          gl_FragColor = vec4(color, 0.42);
+                                                        }
+                                                      `;
 
   let {
     animationNow = 0,
@@ -466,6 +470,35 @@
       ? Math.max(0, (animationNow - corePrisonSealBrokenAt) / 1000)
       : 999
   );
+  let flushStartedAt = 0;
+
+  $effect.pre(() => {
+    environment;
+    floorExitOpenAmount;
+    outsideGateUnlocked;
+    outsideDetailLevel;
+    corePrisonSealLocked;
+    flushStartedAt = markTransitionPhaseStart();
+  });
+
+  $effect(() => {
+    environment;
+    floorExitOpenAmount;
+    outsideGateUnlocked;
+    outsideDetailLevel;
+    corePrisonSealLocked;
+    markTransitionPhaseEnd(
+      "flush-template-environment",
+      flushStartedAt,
+      () => ({
+        corePrisonSealLocked,
+        environment,
+        floorExitOpenAmount,
+        outsideDetailLevel,
+        outsideGateUnlocked,
+      })
+    );
+  });
 
   // Snap a hardcoded Codex prop position onto the procedural heightmap
   // so nothing floats above or sinks into the new terrain. The original
@@ -525,14 +558,14 @@
     <T.MeshStandardMaterial color="#100c08" metalness={0.28} roughness={0.78} />
   </T.Mesh>
 
-  <T.Mesh position={[0, 2.15, -10.2]} castShadow receiveShadow>
+  <T.Mesh position={[0, 2.15, -10.2]} castShadow={false} receiveShadow>
     <T.PlaneGeometry args={[24, 4.9]} />
     <T.MeshStandardMaterial color="#18120d" metalness={0.42} roughness={0.74} />
   </T.Mesh>
 
   <T.Mesh
     position={[-12.15, 2.05, -0.5]}
-    castShadow
+    castShadow={false}
     receiveShadow
     rotation={[0, Math.PI / 2, 0]}
   >
@@ -542,7 +575,7 @@
 
   <T.Mesh
     position={[12.15, 2.05, -0.5]}
-    castShadow
+    castShadow={false}
     receiveShadow
     rotation={[0, -Math.PI / 2, 0]}
   >
@@ -801,7 +834,7 @@
         restitution={0.04}
       />
 
-      <T.Mesh castShadow receiveShadow>
+      <T.Mesh castShadow={false} receiveShadow>
         <T.BoxGeometry args={[4.4, 0.36, 2.4]} />
         <T.MeshStandardMaterial
           color="#1b2935"
@@ -810,7 +843,7 @@
         />
       </T.Mesh>
 
-      <T.Mesh castShadow receiveShadow position={[0, 0.23, 0]}>
+      <T.Mesh castShadow={false} receiveShadow position={[0, 0.23, 0]}>
         <T.BoxGeometry args={[4.6, 0.07, 2.55]} />
         <T.MeshStandardMaterial
           color="#24384a"
@@ -820,7 +853,11 @@
       </T.Mesh>
 
       {#each [-1, 1] as side}
-        <T.Mesh castShadow receiveShadow position={[0, 0.31, side * 1.24]}>
+        <T.Mesh
+          castShadow={false}
+          receiveShadow
+          position={[0, 0.31, side * 1.24]}
+        >
           <T.BoxGeometry args={[4.65, 0.1, 0.14]} />
           <T.MeshStandardMaterial
             color="#8a5c31"
@@ -832,7 +869,11 @@
 
       {#each [-1, 1] as x}
         {#each [-1, 1] as z}
-          <T.Mesh castShadow receiveShadow position={[x * 2.1, 0.34, z * 1.02]}>
+          <T.Mesh
+            castShadow={false}
+            receiveShadow
+            position={[x * 2.1, 0.34, z * 1.02]}
+          >
             <T.BoxGeometry args={[0.36, 0.1, 0.36]} />
             <T.MeshStandardMaterial
               color="#b77b42"
@@ -849,7 +890,7 @@
     <RigidBody type="fixed">
       <Collider shape="cuboid" args={[0.6, 0.45, 0.6]} friction={0.95} />
 
-      <T.Mesh castShadow receiveShadow>
+      <T.Mesh castShadow={false} receiveShadow>
         <T.BoxGeometry args={[1.2, 0.9, 1.2]} />
         <T.MeshStandardMaterial
           color="#1f3442"
@@ -858,7 +899,7 @@
         />
       </T.Mesh>
 
-      <T.Mesh castShadow receiveShadow position={[0, 0.49, 0]}>
+      <T.Mesh castShadow={false} receiveShadow position={[0, 0.49, 0]}>
         <T.BoxGeometry args={[1.28, 0.08, 1.28]} />
         <T.MeshStandardMaterial
           color="#263d4f"
@@ -870,7 +911,7 @@
       {#each [-1, 1] as x}
         {#each [-1, 1] as z}
           <T.Mesh
-            castShadow
+            castShadow={false}
             receiveShadow
             position={[x * 0.47, 0.58, z * 0.47]}
           >
@@ -890,7 +931,7 @@
     <RigidBody type="fixed">
       <Collider shape="cuboid" args={[0.9, 0.65, 0.9]} friction={0.95} />
 
-      <T.Mesh castShadow receiveShadow>
+      <T.Mesh castShadow={false} receiveShadow>
         <T.BoxGeometry args={[1.8, 1.3, 1.8]} />
         <T.MeshStandardMaterial
           color="#20394a"
@@ -899,7 +940,7 @@
         />
       </T.Mesh>
 
-      <T.Mesh castShadow receiveShadow position={[0, 0.69, 0]}>
+      <T.Mesh castShadow={false} receiveShadow position={[0, 0.69, 0]}>
         <T.BoxGeometry args={[1.9, 0.09, 1.9]} />
         <T.MeshStandardMaterial
           color="#2a4356"
@@ -911,7 +952,7 @@
       {#each [-1, 1] as x}
         {#each [-1, 1] as z}
           <T.Mesh
-            castShadow
+            castShadow={false}
             receiveShadow
             position={[x * 0.76, 0.81, z * 0.76]}
           >
@@ -959,7 +1000,7 @@
 {#if environment === "treasure-gears"}
   <T.Group position={[0, 0.18, 0]}>
     <T.Mesh
-      castShadow
+      castShadow={false}
       geometry={cachedCylinder(1.55, 1.92, 0.36, 8)}
       receiveShadow
     >
@@ -991,7 +1032,7 @@
       {#each [-1, 1] as z}
         <T.Group position={[x * 2.55, 0.15, z * 2.2]}>
           <T.Mesh
-            castShadow
+            castShadow={false}
             geometry={cachedCylinder(0.22, 0.34, 0.5, 6)}
             receiveShadow
           >
@@ -1002,7 +1043,7 @@
             />
           </T.Mesh>
           <T.Mesh
-            castShadow
+            castShadow={false}
             geometry={cachedSphere(0.18, 14, 10)}
             position={[0, 0.39, 0]}
           >
@@ -1032,7 +1073,7 @@
       </T.Mesh>
 
       <T.Mesh
-        castShadow
+        castShadow={false}
         geometry={cachedTorus(mount.size, 0.16, 12, 30)}
         position={[0, 0, 0.2]}
       >
@@ -1046,7 +1087,7 @@
       </T.Mesh>
 
       <T.Mesh
-        castShadow
+        castShadow={false}
         geometry={cachedCylinder(0.34, 0.34, 0.24, 20)}
         position={[0, 0, 0.22]}
       >
@@ -1059,7 +1100,7 @@
 
       {#each gearTeeth as tooth, toothIndex}
         <T.Mesh
-          castShadow
+          castShadow={false}
           geometry={cachedBox(0.26, 0.44, 0.2)}
           position={[tooth.x * mount.size, tooth.y * mount.size, 0.2]}
           rotation={[0, 0, tooth.rotation + (index + toothIndex) * 0.03]}
@@ -1078,7 +1119,7 @@
 {#if environment === "boss-gears"}
   <T.Group position={[0, 2.25, -7.28]}>
     <T.Mesh
-      castShadow
+      castShadow={false}
       geometry={cachedBox(15.2, 0.18, 0.18)}
       position={[0, 1.62, 0.12]}
       receiveShadow
@@ -1100,7 +1141,7 @@
         scale={[1, x === 0 ? Math.max(0.08, 1 - bannerLift * 0.72) : 1, 1]}
       >
         <T.Mesh
-          castShadow
+          castShadow={false}
           geometry={cachedPlane(2.7, 3.25)}
           position={[0, 0.04, 0]}
           receiveShadow
@@ -1119,7 +1160,7 @@
         </T.Mesh>
         {#each [-1, 1] as side}
           <T.Mesh
-            castShadow
+            castShadow={false}
             geometry={cachedBox(0.08, 2.92, 0.08)}
             position={[side * 0.98, 0.03, 0.03]}
             receiveShadow
@@ -1134,7 +1175,7 @@
           </T.Mesh>
         {/each}
         <T.Mesh
-          castShadow
+          castShadow={false}
           geometry={cachedBox(1.75, 0.08, 0.08)}
           position={[0, -1.33, 0.04]}
           receiveShadow
@@ -1169,7 +1210,7 @@
   {#each [-1, 1] as side}
     <T.Group position={[side * 6.4, 0.46, -4.95]}>
       <T.Mesh
-        castShadow
+        castShadow={false}
         geometry={cachedCylinder(0.46, 0.62, 0.38, 6)}
         receiveShadow
       >
@@ -1180,7 +1221,7 @@
         />
       </T.Mesh>
       <T.Mesh
-        castShadow
+        castShadow={false}
         geometry={cachedBox(0.72, 0.9, 0.72)}
         position={[0, 0.62, 0]}
         receiveShadow
@@ -1192,7 +1233,7 @@
         />
       </T.Mesh>
       <T.Mesh
-        castShadow
+        castShadow={false}
         geometry={cachedCone(0.38, 0.58, 6)}
         position={[0, 1.18, 0]}
         receiveShadow
