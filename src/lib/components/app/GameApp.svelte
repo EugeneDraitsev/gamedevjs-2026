@@ -1,8 +1,12 @@
 <script lang="ts">
   import type { Component } from "svelte";
   import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import {
+    getCurrentAppSearchParam,
+    gotoAppRoute,
+    setAppSearchParam,
+  } from "$lib/app/navigation";
   import {
     gameMusic,
     type MusicCue,
@@ -108,7 +112,8 @@
   let floorAdvancePhase = $state<FloorAdvancePhase>("idle");
   let floorAdvanceTimers: number[] = [];
   let gearCount = $state(0);
-  let runReady = $state(page.url.searchParams.get("continue") !== "1");
+  let routeQueryRevision = $state(0);
+  let runReady = $state(getCurrentAppSearchParam(page.url, "continue") !== "1");
   let sceneBootReady = $state(false);
   let sceneLoadFailed = $state(false);
   let sceneLoadProgress = $state<SceneLoadProgress>({
@@ -145,7 +150,11 @@
   );
   const runtimeControlsLocked = $derived(controlsLocked || !sceneReady);
   const sceneInstanceKey = $derived(`${dungeon.seed}:${sceneResetKey}`);
-  const debugEnabled = $derived(page.url.searchParams.get("debug") === "true");
+  const readAppSearchParam = (key: string, revision: number) =>
+    revision < 0 ? null : getCurrentAppSearchParam(page.url, key);
+  const debugEnabled = $derived(
+    readAppSearchParam("debug", routeQueryRevision) === "true"
+  );
 
   const swingParams = $derived<SwingParams>({
     ...DEFAULT_SWING,
@@ -351,7 +360,7 @@
   const withDebugParam = (path: string) => {
     const nextUrl = new URL(path, page.url);
 
-    if (page.url.searchParams.get("debug") === "true") {
+    if (readAppSearchParam("debug", routeQueryRevision) === "true") {
       nextUrl.searchParams.set("debug", "true");
     }
 
@@ -369,23 +378,23 @@
       fadeOutMs: 1800,
       startDelayMs: 360,
     });
-    await goto(withDebugParam("/"));
+    await gotoAppRoute(withDebugParam("/"));
   };
 
   const setDebugEnabled = async (enabled: boolean) => {
-    const nextUrl = new URL(page.url);
+    const nextUrl = setAppSearchParam(
+      page.url,
+      "debug",
+      enabled ? "true" : null
+    );
 
-    if (enabled) {
-      nextUrl.searchParams.set("debug", "true");
-    } else {
-      nextUrl.searchParams.delete("debug");
-    }
-
-    await goto(nextUrl, {
+    await gotoAppRoute(nextUrl, {
       keepFocus: true,
       noScroll: true,
       replaceState: true,
     });
+
+    routeQueryRevision += 1;
   };
 
   const removeInventoryModule = (moduleId: MachineModuleId) => {
@@ -673,7 +682,7 @@
   onMount(() => {
     const savedRun = loadRunSave(seed);
 
-    if (page.url.searchParams.get("continue") === "1" && savedRun) {
+    if (getCurrentAppSearchParam(page.url, "continue") === "1" && savedRun) {
       applyRunState(savedRun);
     }
 
@@ -688,8 +697,13 @@
     const onCoarseChange = (event: MediaQueryListEvent) => {
       touchControls = event.matches || isTouchDevice();
     };
+    const onRouteQueryChange = () => {
+      routeQueryRevision += 1;
+    };
 
     coarseQuery.addEventListener("change", onCoarseChange);
+    window.addEventListener("hashchange", onRouteQueryChange);
+    window.addEventListener("popstate", onRouteQueryChange);
 
     let isActive = true;
 
@@ -739,6 +753,8 @@
       isActive = false;
       clearFloorAdvanceTimers();
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("hashchange", onRouteQueryChange);
+      window.removeEventListener("popstate", onRouteQueryChange);
       coarseQuery.removeEventListener("change", onCoarseChange);
       if (deathModalTimer) {
         window.clearTimeout(deathModalTimer);

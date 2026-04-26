@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import {
+    getCurrentAppSearchParam,
+    gotoAppRoute,
+    setAppSearchParam,
+  } from "$lib/app/navigation";
   import { gameMusic } from "$lib/audio/music";
   import { gameSfx } from "$lib/audio/sfx";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
@@ -12,32 +16,37 @@
   } from "$lib/config/scene-settings";
 
   let settings = $state(loadSceneSettings());
-  const debugEnabled = $derived(page.url.searchParams.get("debug") === "true");
+  let routeQueryRevision = $state(0);
+  const readAppSearchParam = (key: string, revision: number) =>
+    revision < 0 ? null : getCurrentAppSearchParam(page.url, key);
+  const debugEnabled = $derived(
+    readAppSearchParam("debug", routeQueryRevision) === "true"
+  );
 
   const resetDefaults = () => {
     Object.assign(settings, createSceneSettings());
   };
 
   const setDebugEnabled = async (enabled: boolean) => {
-    const nextUrl = new URL(page.url);
+    const nextUrl = setAppSearchParam(
+      page.url,
+      "debug",
+      enabled ? "true" : null
+    );
 
-    if (enabled) {
-      nextUrl.searchParams.set("debug", "true");
-    } else {
-      nextUrl.searchParams.delete("debug");
-    }
-
-    await goto(nextUrl, {
+    await gotoAppRoute(nextUrl, {
       keepFocus: true,
       noScroll: true,
       replaceState: true,
     });
+
+    routeQueryRevision += 1;
   };
 
   const withDebugParam = (path: string) => {
     const nextUrl = new URL(path, page.url);
 
-    if (page.url.searchParams.get("debug") === "true") {
+    if (readAppSearchParam("debug", routeQueryRevision) === "true") {
       nextUrl.searchParams.set("debug", "true");
     }
 
@@ -51,12 +60,23 @@
   });
 
   onMount(() => {
+    const onRouteQueryChange = () => {
+      routeQueryRevision += 1;
+    };
+
+    window.addEventListener("hashchange", onRouteQueryChange);
+    window.addEventListener("popstate", onRouteQueryChange);
     gameMusic.preload();
     gameMusic.playCue("menu", {
       fadeInMs: 2000,
       fadeOutMs: 1500,
       startDelayMs: 260,
     });
+
+    return () => {
+      window.removeEventListener("hashchange", onRouteQueryChange);
+      window.removeEventListener("popstate", onRouteQueryChange);
+    };
   });
 </script>
 
@@ -66,7 +86,7 @@
   <SettingsPanel
     {debugEnabled}
     bind:settings
-    onBack={() => goto(withDebugParam("/"))}
+    onBack={() => gotoAppRoute(withDebugParam("/"))}
     onDebugEnabledChange={setDebugEnabled}
     onResetDefaults={resetDefaults}
   />

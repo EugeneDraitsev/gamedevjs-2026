@@ -1,4 +1,5 @@
 import { Howl, Howler } from "howler";
+import { base } from "$app/paths";
 
 export type MusicTrackId =
   | "boss"
@@ -36,23 +37,23 @@ export interface MusicTransitionOptions {
 const musicTracks: Record<MusicTrackId, MusicTrackConfig> = {
   boss: {
     baseVolume: 0.82,
-    src: ["/audio/music/boss-cold-gear-override.mp3"],
+    src: [`${base}/audio/music/boss-cold-gear-override.mp3`],
   },
   "boss-catacombs": {
     baseVolume: 0.82,
-    src: ["/audio/music/boss-catacomb-orb.mp3"],
+    src: [`${base}/audio/music/boss-catacomb-orb.mp3`],
   },
   level: {
     baseVolume: 0.78,
-    src: ["/audio/music/level-industrial-ambient.mp3"],
+    src: [`${base}/audio/music/level-industrial-ambient.mp3`],
   },
   menu: {
     baseVolume: 0.7,
-    src: ["/audio/music/menu-colossal-weight.mp3"],
+    src: [`${base}/audio/music/menu-colossal-weight.mp3`],
   },
   outside: {
     baseVolume: 0.76,
-    src: ["/audio/music/forest-impulse.mp3"],
+    src: [`${base}/audio/music/forest-impulse.mp3`],
   },
 };
 

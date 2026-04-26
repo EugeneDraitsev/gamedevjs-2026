@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import { getCurrentAppSearchParam, gotoAppRoute } from "$lib/app/navigation";
   import { gameMusic } from "$lib/audio/music";
   import MainMenu from "$lib/components/app/MainMenu.svelte";
   import { initialDungeonFloor, outsideFloor } from "$lib/config/run-floor";
@@ -97,7 +97,7 @@
   const withDebugParam = (path: string) => {
     const nextUrl = new URL(path, page.url);
 
-    if (page.url.searchParams.get("debug") === "true") {
+    if (getCurrentAppSearchParam(page.url, "debug") === "true") {
       nextUrl.searchParams.set("debug", "true");
     }
 
@@ -114,7 +114,7 @@
       restart: cue === "level",
       startDelayMs: 380,
     });
-    await goto(path);
+    await gotoAppRoute(path);
   };
 
   const startNewGame = async () => {
@@ -146,7 +146,7 @@
 
   const openRoute = async (path: URL | string) => {
     await gameMusic.unlock();
-    await goto(path);
+    await gotoAppRoute(path);
   };
 </script>
 
