@@ -10,6 +10,7 @@ export interface WarmupPointOfInterest {
 }
 
 export interface WarmupStabilityOptions {
+  cleanCycles?: number;
   maxPasses: number;
   minPasses: number;
   stableFrameMs: number;
@@ -24,6 +25,7 @@ export interface WarmupFrameSample {
 }
 
 export interface WarmupStabilityDecision {
+  cleanCycles: number;
   cleanViewCount: number;
   done: boolean;
   maxReached: boolean;
@@ -56,34 +58,42 @@ export const createWarmupStabilityTracker = (
 ) => {
   const maxPasses = clampInt(options.maxPasses, 1);
   const minPasses = Math.min(maxPasses, clampInt(options.minPasses, 1));
+  const requiredCleanCycles = clampInt(options.cleanCycles ?? 1, 1);
   const requiredStablePasses = clampInt(options.stablePasses, 1);
   const viewCount = clampInt(options.viewCount, 1);
-  const cleanViewsSinceLastProgram = new Set<number>();
+  const cleanViewCounts = new Map<number, number>();
   let pass = 0;
   let stablePasses = 0;
+  let cleanCycles = 0;
 
   const record = (sample: WarmupFrameSample): WarmupStabilityDecision => {
     pass += 1;
 
     if (sample.newPrograms > 0) {
       stablePasses = 0;
-      cleanViewsSinceLastProgram.clear();
+      cleanViewCounts.clear();
+      cleanCycles = 0;
     } else {
-      cleanViewsSinceLastProgram.add(
-        Math.max(0, Math.floor(sample.viewIndex)) % viewCount
-      );
+      const viewIndex = Math.max(0, Math.floor(sample.viewIndex)) % viewCount;
+
+      cleanViewCounts.set(viewIndex, (cleanViewCounts.get(viewIndex) ?? 0) + 1);
       stablePasses =
         sample.duration <= options.stableFrameMs ? stablePasses + 1 : 0;
+      cleanCycles =
+        cleanViewCounts.size >= viewCount
+          ? Math.min(...cleanViewCounts.values())
+          : 0;
     }
 
     const maxReached = pass >= maxPasses;
     const stableEnough =
       pass >= minPasses &&
       stablePasses >= requiredStablePasses &&
-      cleanViewsSinceLastProgram.size >= viewCount;
+      cleanCycles >= requiredCleanCycles;
 
     return {
-      cleanViewCount: cleanViewsSinceLastProgram.size,
+      cleanCycles,
+      cleanViewCount: cleanViewCounts.size,
       done: maxReached || stableEnough,
       maxReached,
       pass,

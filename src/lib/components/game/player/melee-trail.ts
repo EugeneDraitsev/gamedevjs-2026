@@ -88,6 +88,7 @@ const trailFragmentShader = /* glsl */ `
     gl_FragColor = vec4(color * brightness, alpha);
   }
 `;
+const trailProgramCacheKey = () => "player-melee-trail-v1";
 
 export const createMeleeTrail = (meleeParams: SwingParams) => {
   const data = buildSwingRibbonGeometryData(meleeParams, 56);
@@ -124,6 +125,7 @@ export const createMeleeTrail = (meleeParams: SwingParams) => {
     blending: AdditiveBlending,
     side: DoubleSide,
   });
+  material.customProgramCacheKey = trailProgramCacheKey;
 
   return { geometry, material };
 };

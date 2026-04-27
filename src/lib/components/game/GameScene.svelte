@@ -42,6 +42,7 @@
     getOutsideChunkPlan,
   } from "$lib/game/outside-chunk/plan";
   import { setOutsideChunkSeed } from "$lib/game/outside-chunk-context";
+  import { pauseGameSceneTimers } from "$lib/game/pause-timers";
   import { spawnPlayerProjectile } from "$lib/game/projectile-spawner";
   import {
     buildOutsideWarmupViews,
@@ -200,8 +201,20 @@
   });
   const shaderCompileViews = $derived(outside ? outsideShaderCompileViews : []);
   const shaderWarmupViews = $derived(outside ? outsideShaderCompileViews : []);
-  const shaderWarmupMinPasses = $derived(outside ? 18 : 6);
-  const shaderWarmupMaxPasses = $derived(outside ? 72 : 30);
+  const shaderWarmupCleanCycles = $derived(outside ? 2 : 1);
+  const shaderWarmupMinPasses = $derived(
+    outside
+      ? Math.max(18, outsideShaderCompileViews.length * shaderWarmupCleanCycles)
+      : 6
+  );
+  const shaderWarmupMaxPasses = $derived(
+    outside
+      ? Math.max(
+          72,
+          outsideShaderCompileViews.length * (shaderWarmupCleanCycles + 2)
+        )
+      : 30
+  );
   const shaderWarmupStablePasses = $derived(outside ? 6 : 3);
   const sceneWarmupsVisible = $derived(!(runtimeWarmupActive || sceneReady));
   const sceneActorsVisible = $derived(
@@ -924,9 +937,16 @@
 
       previousTime = time;
 
-      if (scene.controlsLocked || timing.playerDeathActive) {
+      if (timing.playerDeathActive) {
         timing.now = time;
         textures.advanceLava(delta);
+      } else if (scene.controlsLocked) {
+        pauseGameSceneTimers({
+          combat,
+          deltaMs: delta * 1000,
+          player,
+          timing,
+        });
       } else {
         tick(time, delta);
       }
@@ -976,6 +996,7 @@
       shadowsEnabled={!outside}
       shaderWarmupTextures={bossShaderWarmupTextures}
       warmupTextures={warmupPreloadTextures}
+      warmupCleanRenderCycles={shaderWarmupCleanCycles}
       warmupMinRenderPasses={shaderWarmupMinPasses}
       warmupMaxRenderPasses={shaderWarmupMaxPasses}
       warmupReady={rendererWarmupReady}

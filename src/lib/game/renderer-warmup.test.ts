@@ -52,6 +52,7 @@ describe("renderer warmup", () => {
     expect(
       tracker.record({ duration: 3, newPrograms: 0, viewIndex: 2 })
     ).toMatchObject({
+      cleanCycles: 1,
       cleanViewCount: 3,
       done: true,
       stablePasses: 3,
@@ -67,6 +68,7 @@ describe("renderer warmup", () => {
     expect(
       tracker.record({ duration: 120, newPrograms: 1, viewIndex: 2 })
     ).toMatchObject({
+      cleanCycles: 0,
       cleanViewCount: 0,
       done: false,
       stablePasses: 0,
@@ -88,6 +90,7 @@ describe("renderer warmup", () => {
     expect(
       tracker.record({ duration: 3, newPrograms: 0, viewIndex: 2 })
     ).toMatchObject({
+      cleanCycles: 1,
       cleanViewCount: 3,
       done: true,
       stablePasses: 3,
@@ -123,6 +126,44 @@ describe("renderer warmup", () => {
       cleanViewCount: 2,
       done: true,
       stablePasses: 2,
+    });
+  });
+
+  it("can require repeated clean cycles across every warmup view", () => {
+    const tracker = createWarmupStabilityTracker({
+      cleanCycles: 2,
+      maxPasses: 10,
+      minPasses: 1,
+      stableFrameMs: 20,
+      stablePasses: 1,
+      viewCount: 2,
+    });
+
+    expect(
+      tracker.record({ duration: 3, newPrograms: 0, viewIndex: 0 })
+    ).toMatchObject({
+      cleanCycles: 0,
+      cleanViewCount: 1,
+      done: false,
+    });
+    expect(
+      tracker.record({ duration: 3, newPrograms: 0, viewIndex: 1 })
+    ).toMatchObject({
+      cleanCycles: 1,
+      cleanViewCount: 2,
+      done: false,
+    });
+    expect(
+      tracker.record({ duration: 3, newPrograms: 0, viewIndex: 0 })
+    ).toMatchObject({
+      cleanCycles: 1,
+      done: false,
+    });
+    expect(
+      tracker.record({ duration: 3, newPrograms: 0, viewIndex: 1 })
+    ).toMatchObject({
+      cleanCycles: 2,
+      done: true,
     });
   });
 

@@ -513,7 +513,7 @@
   {/each}
 
   {#if textures.bossFloor && textures.bossFloorHeight}
-    <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
+    <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
       <T.PlaneGeometry args={[4, 4]} />
       <T.MeshStandardMaterial
         map={textures.bossFloor}
@@ -526,7 +526,7 @@
   {/if}
 
   {#if textures.bossFloor && textures.bossFloorNormal}
-    <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
+    <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
       <T.PlaneGeometry args={[4, 4]} />
       <T.MeshStandardMaterial
         map={textures.bossFloor}
@@ -539,7 +539,7 @@
   {/if}
 
   {#if textures.treasureFloor && textures.treasureFloorHeight}
-    <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
+    <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
       <T.PlaneGeometry args={[4, 4]} />
       <T.MeshStandardMaterial
         map={textures.treasureFloor}
@@ -555,7 +555,7 @@
   {/if}
 
   {#if textures.treasureFloor && textures.treasureFloorNormal}
-    <T.Mesh rotation={[-Math.PI / 2, 0, 0]}>
+    <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
       <T.PlaneGeometry args={[4, 4]} />
       <T.MeshStandardMaterial
         map={textures.treasureFloor}

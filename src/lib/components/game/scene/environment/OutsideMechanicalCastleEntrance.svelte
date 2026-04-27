@@ -429,6 +429,7 @@
     uTime: { value: 0 },
     uUnlocked: { value: 0 },
   };
+  const gateGlowProgramCacheKey = () => "outside-gate-glow-v1";
 
   $effect(() => {
     gateGlowUniforms.uTime.value = animationNow / 1000;
@@ -542,10 +543,11 @@
       />
     </T.Mesh>
 
-    <T.Mesh position={[0, 6.1, 2.04]} renderOrder={12}>
+    <T.Mesh frustumCulled={false} position={[0, 6.1, 2.04]} renderOrder={12}>
       <T.PlaneGeometry args={[6.8, 9.8]} />
       <T.ShaderMaterial
         blending={AdditiveBlending}
+        customProgramCacheKey={gateGlowProgramCacheKey}
         depthWrite={false}
         fragmentShader={gateGlowFragment}
         side={DoubleSide}

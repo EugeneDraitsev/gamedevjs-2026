@@ -96,6 +96,7 @@
     side: DoubleSide,
     transparent: true,
   });
+  riverbedMaterial.customProgramCacheKey = () => "outside-riverbed-v1";
 
   const { material, uniforms } = createWaterMaterial({
     deepColor: "#123f58",
@@ -114,6 +115,7 @@
   <T.Mesh
     geometry={riverbed.geometry}
     material={riverbedMaterial}
+    frustumCulled={false}
     renderOrder={1}
   />
 {/each}
@@ -121,6 +123,7 @@
 <T.Mesh
   {geometry}
   {material}
+  frustumCulled={false}
   rotation={[-Math.PI / 2, 0, 0]}
   position={[0, 0, 0]}
   renderOrder={2}

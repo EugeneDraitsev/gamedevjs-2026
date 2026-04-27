@@ -79,9 +79,10 @@
                                             gl_FragColor = vec4(col, alpha);
                                           }
                                         `;
+  const wakeProgramCacheKey = () => "outside-water-wake-v1";
 
-  const makeMaterial = () =>
-    new ShaderMaterial({
+  const makeMaterial = () => {
+    const material = new ShaderMaterial({
       blending: AdditiveBlending,
       depthWrite: false,
       fragmentShader,
@@ -94,6 +95,11 @@
       } as Record<string, IUniform>,
       vertexShader,
     });
+
+    material.customProgramCacheKey = wakeProgramCacheKey;
+    return material;
+  };
+  const warmupMaterial = makeMaterial();
 
   const sampledInWater = $derived.by(() => {
     const plan = outsidePlan();
@@ -113,6 +119,9 @@
   let wakeTime = 0;
   let nextId = 0;
   let segments = $state<WakeSegment[]>([]);
+
+  warmupMaterial.uniforms.uAge.value = 0.5;
+  warmupMaterial.uniforms.uOpacity.value = 0;
 
   const emit = (x: number, z: number, yaw: number, strength: number) => {
     const material = makeMaterial();
@@ -134,6 +143,7 @@
 
   useTask((delta) => {
     wakeTime += delta;
+    warmupMaterial.uniforms.uTime.value = wakeTime;
     const previousX = lastX;
     const previousZ = lastZ;
     const dx = previousX === null ? 0 : position[0] - previousX;
@@ -185,8 +195,22 @@
     for (const segment of segments) {
       segment.material.dispose();
     }
+
+    warmupMaterial.dispose();
   });
 </script>
+
+<!-- Keeps the wake shader compiled even when no visible wake segments exist. -->
+<T.Mesh
+  material={warmupMaterial}
+  frustumCulled={false}
+  position={[position[0], 0.08, position[2]]}
+  rotation={[Math.PI / 2, 0, 0]}
+  scale={[0.001, 0.001, 1]}
+  renderOrder={4}
+>
+  <T.PlaneGeometry args={[1, 1, 1, 1]} />
+</T.Mesh>
 
 {#each segments as segment (segment.id)}
   <T.Group

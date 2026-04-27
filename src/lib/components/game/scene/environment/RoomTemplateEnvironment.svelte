@@ -415,6 +415,7 @@
                                                           gl_FragColor = vec4(color, opacity);
                                                         }
                                                       `;
+  const outsideHazeProgramCacheKey = () => "outside-haze-v1";
 
   let {
     animationNow = 0,
@@ -655,9 +656,14 @@
 
   <OutsideTerrain texture={outsideEarthTexture} />
 
-  <T.Mesh position={[0, 12, -112]} rotation={[-0.14, 0, 0]}>
+  <T.Mesh
+    frustumCulled={false}
+    position={[0, 12, -112]}
+    rotation={[-0.14, 0, 0]}
+  >
     <T.PlaneGeometry args={[150, 58]} />
     <T.ShaderMaterial
+      customProgramCacheKey={outsideHazeProgramCacheKey}
       depthWrite={false}
       fragmentShader={outsideHazeFragment}
       transparent
@@ -667,9 +673,14 @@
   </T.Mesh>
 
   {#each [-1, 1] as side}
-    <T.Mesh position={[side * 47, 12, -112]} rotation={[-0.14, 0, 0]}>
+    <T.Mesh
+      frustumCulled={false}
+      position={[side * 47, 12, -112]}
+      rotation={[-0.14, 0, 0]}
+    >
       <T.PlaneGeometry args={[56, 58]} />
       <T.ShaderMaterial
+        customProgramCacheKey={outsideHazeProgramCacheKey}
         depthWrite={false}
         fragmentShader={outsideHazeFragment}
         transparent

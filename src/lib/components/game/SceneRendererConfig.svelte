@@ -40,6 +40,7 @@
     shaderWarmupTextures = {},
     showEnvironmentMap = false,
     warmupCatalogRenderPasses = 6,
+    warmupCleanRenderCycles = 1,
     warmupMaxRenderPasses = 30,
     warmupMinRenderPasses = 6,
     warmupReady = true,
@@ -65,6 +66,7 @@
     shaderWarmupTextures?: BossShaderWarmupTextures;
     showEnvironmentMap?: boolean;
     warmupCatalogRenderPasses?: number;
+    warmupCleanRenderCycles?: number;
     warmupMaxRenderPasses?: number;
     warmupMinRenderPasses?: number;
     warmupReady?: boolean;
@@ -349,6 +351,7 @@
         stableFrameMs: warmupStableFrameMs,
         stablePasses: stableWarmupPasses(),
         viewCount: warmupViewCount(),
+        cleanCycles: warmupCleanRenderCycles,
       });
 
     const runReadyWarmupRenderPass = () => {

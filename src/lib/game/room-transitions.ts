@@ -74,6 +74,7 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
   }
 
   const nextRoom = dungeon.rooms[transition.roomId];
+  const nextTemplate = roomTemplateById[nextRoom.templateId];
   const entryDirection =
     nextRoom.kind === "boss"
       ? "south"
@@ -85,7 +86,12 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
   );
   room.lastTransitionAt = now;
   room.transitionPending = true;
-  timing.beginRoomTransition(now, nextRoom.kind === "boss");
+  timing.beginRoomTransition(
+    now,
+    nextRoom.kind === "boss" ||
+      nextRoom.kind === "treasure" ||
+      nextTemplate.layout === "outside-yard"
+  );
   markTransitionTrigger({
     fromKind: currentRoom.kind,
     fromRoomId: currentRoom.id,
@@ -114,7 +120,6 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
     timing.lastHazardAt = appliedAt;
     player.impactVelocity = null;
 
-    const nextTemplate = roomTemplateById[nextRoom.templateId];
     const bossAlreadyResolved =
       room.clearedSet.has(nextRoom.id) ||
       (completedBossRoomIds?.has(nextRoom.id) ?? false);

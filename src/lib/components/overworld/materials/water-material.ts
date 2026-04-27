@@ -173,6 +173,7 @@ export const createWaterMaterial = (opts?: {
     transparent: true,
     depthWrite: false,
   });
+  material.customProgramCacheKey = () => "overworld-water-v1";
 
   return { material, uniforms };
 };

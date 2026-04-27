@@ -17,6 +17,8 @@ import {
   PointLight,
   RGBAFormat,
   Scene,
+  Sprite,
+  SpriteMaterial,
   type Texture,
   UnsignedByteType,
   type WebGLRenderer,
@@ -146,6 +148,23 @@ const createWarmupMaterials = ({
     normalMap: normal,
     roughness: 0.62,
   }),
+  new MeshStandardMaterial({
+    color: "#7dffd7",
+    emissive: "#7dffd7",
+    emissiveIntensity: 0.24,
+    metalness: 0.16,
+    opacity: 0.58,
+    roughness: 0.14,
+    transparent: true,
+  }),
+  new SpriteMaterial({
+    color: "#ffffff",
+    depthTest: false,
+    depthWrite: false,
+    map: diffuse,
+    opacity: 0.98,
+    transparent: true,
+  }),
   new MeshBasicMaterial({
     blending: AdditiveBlending,
     color: "#8beeff",
@@ -185,7 +204,17 @@ export const createBossShaderWarmupBundle = (
   const boxGeometry = new BoxGeometry(1, 1, 1);
   const planeGeometry = new PlaneGeometry(1, 1);
   const materials = createWarmupMaterials({ bump, diffuse, normal });
-  const meshes = materials.map((material, index) => {
+  const objects = materials.map((material, index) => {
+    if (material instanceof SpriteMaterial) {
+      const sprite = new Sprite(material);
+
+      sprite.frustumCulled = false;
+      sprite.position.set((index - 2.5) * 0.78, 0.18 + index * 0.04, 0);
+      sprite.scale.set(0.72, 0.72, 0.72);
+      scene.add(sprite);
+      return sprite;
+    }
+
     const geometry = index === 0 ? planeGeometry : boxGeometry;
     const mesh = new Mesh(geometry, material);
 
@@ -215,8 +244,8 @@ export const createBossShaderWarmupBundle = (
 
   return {
     dispose: () => {
-      for (const mesh of meshes) {
-        scene.remove(mesh);
+      for (const object of objects) {
+        scene.remove(object);
       }
 
       boxGeometry.dispose();

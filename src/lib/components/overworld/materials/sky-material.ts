@@ -102,6 +102,7 @@ export const createSkyMaterial = (): {
     side: BackSide,
     depthWrite: false,
   });
+  material.customProgramCacheKey = () => "overworld-sky-v1";
 
   return { material, uniforms };
 };
