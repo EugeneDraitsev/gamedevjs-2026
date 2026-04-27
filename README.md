@@ -11,11 +11,15 @@ the castle road.
 
 ## Screenshots
 
-![Orb Knight main menu](static/screenshots/orb-knight-menu.webp)
+![Orb Knight splash](static/screenshots/orb-knight-splash.webp)
 
-![Orb Knight gameplay](static/screenshots/orb-knight-gameplay.webp)
+![Orb Knight combat](static/screenshots/orb-knight-combat.webp)
 
 ![Orb Knight loadout screen](static/screenshots/orb-knight-loadout.webp)
+
+![Orb Knight boss arena](static/screenshots/orb-knight-boss-arena.webp)
+
+![Orb Knight outside shop](static/screenshots/orb-knight-outside-shop.webp)
 
 ## What is in the demo
 
