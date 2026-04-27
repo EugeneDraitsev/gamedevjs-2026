@@ -39,6 +39,54 @@
     settings: SceneSettings;
   }
 
+  const folderStateStorageKey = "warden-trial-debug-folders";
+
+  type FolderKey =
+    | "camera"
+    | "physics"
+    | "lighting"
+    | "melee"
+    | "materials"
+    | "cheats"
+    | "debug";
+
+  const folderDefaults: Record<FolderKey, boolean> = {
+    camera: false,
+    physics: false,
+    lighting: false,
+    melee: false,
+    materials: false,
+    cheats: false,
+    debug: true,
+  };
+
+  const loadFolderState = (): Record<FolderKey, boolean> => {
+    if (typeof window === "undefined") {
+      return { ...folderDefaults };
+    }
+
+    try {
+      const raw = window.localStorage.getItem(folderStateStorageKey);
+
+      if (!raw) {
+        return { ...folderDefaults };
+      }
+
+      const parsed = JSON.parse(raw) as Partial<Record<FolderKey, boolean>>;
+      const merged = { ...folderDefaults };
+
+      for (const key of Object.keys(folderDefaults) as FolderKey[]) {
+        if (typeof parsed[key] === "boolean") {
+          merged[key] = parsed[key] as boolean;
+        }
+      }
+
+      return merged;
+    } catch {
+      return { ...folderDefaults };
+    }
+  };
+
   const cameraModeOptions: ListOptions<CameraMode> = {
     Follow: "follow",
     Orbit: "orbit",
@@ -157,6 +205,28 @@
   }: DebugPaneProps = $props();
   let debugFloor = $state(String(initialDungeonFloor));
   let statsContainer = $state<HTMLDivElement>();
+  const folderExpanded = $state(loadFolderState());
+
+  $effect(() => {
+    const snapshot: Record<FolderKey, boolean> = {
+      camera: folderExpanded.camera,
+      physics: folderExpanded.physics,
+      lighting: folderExpanded.lighting,
+      melee: folderExpanded.melee,
+      materials: folderExpanded.materials,
+      cheats: folderExpanded.cheats,
+      debug: folderExpanded.debug,
+    };
+
+    try {
+      window.localStorage.setItem(
+        folderStateStorageKey,
+        JSON.stringify(snapshot)
+      );
+    } catch {
+      // ignore quota / disabled storage
+    }
+  });
 
   $effect(() => {
     debugFloor = String(currentFloor);
@@ -227,7 +297,7 @@
   ></div>
 
   <Pane position="inline" title="Debug Controls" width={320}>
-    <Folder title="Camera" expanded={false}>
+    <Folder title="Camera" bind:expanded={folderExpanded.camera}>
       <List
         bind:value={settings.cameraMode}
         label="Mode"
@@ -284,7 +354,7 @@
       <Button on:click={resetCameraDefaults} title="Reset camera defaults" />
     </Folder>
 
-    <Folder title="Physics" expanded={false}>
+    <Folder title="Physics" bind:expanded={folderExpanded.physics}>
       <Slider
         bind:value={settings.gravityY}
         format={formatFloat}
@@ -328,7 +398,7 @@
       <Button on:click={resetPhysicsDefaults} title="Reset physics defaults" />
     </Folder>
 
-    <Folder title="Lighting + Vibes" expanded={false}>
+    <Folder title="Lighting + Vibes" bind:expanded={folderExpanded.lighting}>
       <Slider
         bind:value={settings.sunIntensity}
         format={formatFloat}
@@ -454,7 +524,7 @@
       />
     </Folder>
 
-    <Folder title="Melee" expanded={false}>
+    <Folder title="Melee" bind:expanded={folderExpanded.melee}>
       <Checkbox bind:value={settings.meleeShowSword} label="Show sword" />
       <Slider
         bind:value={settings.meleeSwordOpacity}
@@ -591,7 +661,7 @@
       <Button on:click={resetMeleeDefaults} title="Reset melee defaults" />
     </Folder>
 
-    <Folder title="Materials" expanded={false}>
+    <Folder title="Materials" bind:expanded={folderExpanded.materials}>
       <List
         bind:value={settings.floorTheme}
         label="Floor"
@@ -608,7 +678,7 @@
       />
     </Folder>
 
-    <Folder title="Cheats" expanded={false}>
+    <Folder title="Cheats" bind:expanded={folderExpanded.cheats}>
       <Checkbox bind:value={cheats.oneHitKill} label="One-Hit Kill" />
       <Checkbox bind:value={cheats.infiniteHealth} label="Infinite Health" />
       <Button
@@ -622,7 +692,7 @@
       <Button on:click={() => cheats.reset()} title="Reset cheat defaults" />
     </Folder>
 
-    <Folder title="Debug">
+    <Folder title="Debug" bind:expanded={folderExpanded.debug}>
       <List
         bind:value={debugFloor}
         label="Run floor"

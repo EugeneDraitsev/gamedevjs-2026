@@ -72,7 +72,7 @@
   import { cheats } from "$lib/stores/cheats.svelte";
   import { GameSceneStore } from "$lib/stores/game-scene.svelte";
   import { setGameSceneContext } from "$lib/stores/scene-context";
-  import type { MeleeFrame, Vec3 } from "$lib/types/game";
+  import type { ActivePickup, MeleeFrame, Vec3 } from "$lib/types/game";
   import type { GameSceneProps } from "$lib/types/game-components";
 
   let {
@@ -84,6 +84,7 @@
     floorReliefMaps = true,
     floorReliefStrength = 1.4,
     gearCount = 0,
+    initialCheckpoint = null,
     inventoryModuleIds = [],
     machineLoadout = createDefaultMachineLoadout(),
     machineStats,
@@ -100,6 +101,7 @@
     onPlayerDeath,
     onPurchaseShopOffer,
     onReady,
+    onRunCheckpointChange,
     purchasedShopOfferIds = [],
     revivalNonce = 0,
     settings,
@@ -445,6 +447,12 @@
       const startBounds = getRoomBounds(
         roomTemplateById[startRoom.templateId].layout
       );
+      const checkpoint =
+        initialCheckpoint &&
+        initialCheckpoint.floorIndex === dungeon.floor &&
+        initialCheckpoint.currentRoomId in dungeon.rooms
+          ? initialCheckpoint
+          : null;
 
       timing.resetForFloor();
       combat.resetForFloor();
@@ -457,11 +465,64 @@
       if (startRoom.templateId === "outside-start") {
         pickups.seedRoom(startRoomId, createOutsidePickups(performance.now()));
       }
-      pickups.enterRoom(startRoomId);
       player.resetForFloor();
-      room.teleportTo(
-        getStartRoomSpawnTarget(startRoom.templateId, startBounds)
-      );
+
+      if (checkpoint) {
+        room.currentId = checkpoint.currentRoomId;
+        // Make sure the saved room is in the explored/released sets so
+        // doors don't re-lock and minimap state matches.
+        const exploredWithCurrent = checkpoint.exploredRoomIds.includes(
+          checkpoint.currentRoomId
+        )
+          ? checkpoint.exploredRoomIds
+          : [...checkpoint.exploredRoomIds, checkpoint.currentRoomId];
+        const releasedWithCurrent = checkpoint.releasedRoomIds.includes(
+          checkpoint.currentRoomId
+        )
+          ? checkpoint.releasedRoomIds
+          : [...checkpoint.releasedRoomIds, checkpoint.currentRoomId];
+
+        room.exploredIds = exploredWithCurrent;
+        room.clearedEnemyIds = [...checkpoint.clearedEnemyRoomIds];
+        room.releasedIds = releasedWithCurrent;
+        // Seed the previous-frame "inside artifact radius" flag to true so
+        // no spurious outside→inside transition is detected on the first
+        // physics frames. The body spawns at (0, 0.58, 0) — inside the
+        // pickup radius — and there's a small window before the teleport
+        // applies; without this seed the first frame would read inside=true
+        // / prev=false and auto-collect. The flag self-corrects on the
+        // next frame once the body settles at the saved position.
+        room.artifactPickupPlayerInside = true;
+        // Restore per-room pickup state so already-collected items stay
+        // collected and outside-yard pickups keep their seeded layout.
+        // Done before enterRoom() so the existing entry isn't replaced.
+        pickups.itemsByRoomId = Object.fromEntries(
+          Object.entries(checkpoint.pickupsByRoomId).map(([roomId, items]) => [
+            roomId,
+            items.map((item) => ({ ...item })),
+          ])
+        );
+        pickups.enterRoom(checkpoint.currentRoomId);
+        // Restore the cleansing-sphere progress so the player picks up where
+        // they left off mid-fight in the core-prison start room.
+        corePrisonSealHits = checkpoint.corePrisonSealHits;
+        corePrisonSealBrokenAt = checkpoint.corePrisonSealBrokenAt;
+        if (checkpoint.playerHealth > 0) {
+          player.health = Math.min(player.maxHealth, checkpoint.playerHealth);
+        }
+        player.ammo = Math.min(player.magazineSize, checkpoint.playerAmmo);
+        room.teleportTo(checkpoint.playerPosition);
+      } else {
+        pickups.enterRoom(startRoomId);
+        // The body spawns at (0, 0.58, 0) which sits inside the artifact
+        // pickup radius. Pre-mark the flag as "inside" so the first physics
+        // frame (still at the spawn point) doesn't register a fictitious
+        // outside→inside transition before the room-entry teleport applies.
+        room.artifactPickupPlayerInside = true;
+        room.teleportTo(
+          getStartRoomSpawnTarget(startRoom.templateId, startBounds)
+        );
+      }
     });
   });
 
@@ -477,6 +538,65 @@
     }
 
     onMusicCue?.(outside ? "outside" : "level");
+  });
+
+  // Persist a "where am I" checkpoint upstream so GameApp can store it
+  // alongside the run save. Throttled so per-frame position updates
+  // don't spam the parent. Room transitions reset the throttle so the
+  // first emit after a transition is immediate.
+  let lastCheckpointEmitAt = 0;
+  let lastCheckpointRoomId = "";
+
+  $effect(() => {
+    if (!onRunCheckpointChange) {
+      return;
+    }
+
+    const currentRoomId = room.currentId;
+    if (!currentRoomId) {
+      return;
+    }
+
+    // Track reactive deps even when throttled.
+    const exploredIds = room.exploredIds;
+    const clearedEnemyIds = room.clearedEnemyIds;
+    const releasedIds = room.releasedIds;
+    const lastPosition = player.lastPosition;
+    const playerHealth = player.health;
+    const playerAmmo = player.ammo;
+    const pickupsByRoomId = pickups.itemsByRoomId;
+    const sealHits = corePrisonSealHits;
+    const sealBrokenAt = corePrisonSealBrokenAt;
+
+    const now = performance.now();
+    const roomChanged = currentRoomId !== lastCheckpointRoomId;
+    if (!roomChanged && now - lastCheckpointEmitAt < 400) {
+      return;
+    }
+
+    lastCheckpointEmitAt = now;
+    lastCheckpointRoomId = currentRoomId;
+
+    // Deep-copy pickup arrays so the persisted snapshot doesn't alias the
+    // live store (which keeps mutating as the player walks around).
+    const pickupsSnapshot: Record<string, ActivePickup[]> = {};
+    for (const [roomId, items] of Object.entries(pickupsByRoomId)) {
+      pickupsSnapshot[roomId] = items.map((item) => ({ ...item }));
+    }
+
+    onRunCheckpointChange({
+      clearedEnemyRoomIds: [...clearedEnemyIds],
+      corePrisonSealBrokenAt: sealBrokenAt,
+      corePrisonSealHits: sealHits,
+      currentRoomId,
+      exploredRoomIds: [...exploredIds],
+      floorIndex: dungeon.floor,
+      pickupsByRoomId: pickupsSnapshot,
+      playerAmmo,
+      playerHealth,
+      playerPosition: [lastPosition[0], lastPosition[1], lastPosition[2]],
+      releasedRoomIds: [...releasedIds],
+    });
   });
 
   $effect(() => {

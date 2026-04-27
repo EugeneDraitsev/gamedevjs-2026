@@ -544,7 +544,9 @@
       <T.MeshStandardMaterial
         map={textures.treasureFloor}
         bumpMap={textures.treasureFloorHeight}
-        bumpScale={1.4}
+        bumpScale={22.4}
+        normalMap={null}
+        normalScale={[2, 2]}
         transparent
         alphaTest={0.08}
         metalness={0.22}
@@ -559,6 +561,7 @@
       <T.PlaneGeometry args={[4, 4]} />
       <T.MeshStandardMaterial
         map={textures.treasureFloor}
+        bumpMap={null}
         normalMap={textures.treasureFloorNormal}
         normalScale={[2, 2]}
         transparent

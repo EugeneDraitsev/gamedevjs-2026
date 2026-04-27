@@ -10,6 +10,12 @@ export class RoomStore {
   teleportNonce = $state(0);
   teleportTarget = $state<Vec3 | null>(null);
   entryDirection = $state<DungeonRoomDirection>("south");
+  // Whether the player was inside the artifact pickup radius on the
+  // previous physics frame. Used to fire the auto-pickup only on the
+  // outside → inside transition (a real "step-in"), so teleporting
+  // into the radius (continue-from-checkpoint, debug spawn, etc.)
+  // never auto-collects.
+  artifactPickupPlayerInside = $state(false);
 
   unlockingRoomId = "";
   unlockStartedAt = 0;
@@ -54,6 +60,7 @@ export class RoomStore {
     this.doorOpenAmount = 1;
     this.teleportTarget = null;
     this.teleportNonce = 0;
+    this.artifactPickupPlayerInside = false;
     this.unlockingRoomId = "";
     this.unlockStartedAt = 0;
     this.lastTransitionAt = 0;

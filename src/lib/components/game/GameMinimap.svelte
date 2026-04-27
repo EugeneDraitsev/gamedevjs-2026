@@ -14,6 +14,15 @@
 
   let expanded = $state(false);
   const outside = $derived(scene.currentRoomTemplate.layout === "outside-yard");
+  const hasUnclaimedArtifact = (
+    room: (typeof scene.visibleMinimapRooms)[number]
+  ) =>
+    Boolean(
+      room.artifactType &&
+        !scene.collectedArtifactRoomSet.has(room.id) &&
+        (room.kind === "treasure" ||
+          (room.kind === "boss" && scene.room.clearedSet.has(room.id)))
+    );
   const mapX = (x: number) =>
     ((x / scene.roomBounds.wallHalfWidth + 1) / 2) * 100;
   const mapY = (z: number) =>
@@ -180,6 +189,12 @@
               <span
                 class="pickup-icon key"
                 aria-label="Gate key in room"
+              ></span>
+            {/if}
+            {#if hasUnclaimedArtifact(room)}
+              <span
+                class="pickup-icon artifact"
+                aria-label="Unclaimed artifact in room"
               ></span>
             {/if}
           </div>
@@ -497,6 +512,32 @@
     block-size: 0.08rem;
     content: "";
     background: rgba(4, 26, 23, 0.82);
+  }
+
+  .pickup-icon.artifact {
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: 0.62rem;
+    block-size: 0.62rem;
+    color: rgba(255, 222, 128, 0.98);
+    background: currentColor;
+    border-radius: 0;
+    box-shadow:
+      0 0 0.32rem rgba(255, 198, 96, 0.85),
+      0 0 0.6rem rgba(255, 198, 96, 0.4);
+    clip-path: polygon(
+      50% 0%,
+      61% 35%,
+      98% 35%,
+      68% 57%,
+      79% 91%,
+      50% 70%,
+      21% 91%,
+      32% 57%,
+      2% 35%,
+      39% 35%
+    );
+    transform: translate(-50%, -50%);
   }
 
   .settings-button {

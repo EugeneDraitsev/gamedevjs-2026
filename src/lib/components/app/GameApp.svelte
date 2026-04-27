@@ -58,6 +58,7 @@
     clearRunSave,
     createDefaultRunState,
     loadRunSave,
+    type RunCheckpoint,
     type SavedRunState,
     saveRunSave,
   } from "$lib/game/run-save";
@@ -137,6 +138,13 @@
   let playerDeathPending = $state(false);
   let deathModalOpen = $state(false);
   let revivalNonce = $state(0);
+  // Latest "where am I" snapshot from the running scene; persisted alongside
+  // the rest of the run state so re-entering the route lands the player back
+  // in the same room/position. `bootCheckpoint` is what we hand to GameScene
+  // on initial mount; it's cleared once consumed so subsequent floor boots
+  // (advance, debug-floor, restart) start fresh at the dungeon's start room.
+  let runCheckpoint = $state.raw<RunCheckpoint | null>(null);
+  let bootCheckpoint = $state.raw<RunCheckpoint | null>(null);
   let musicFloorIndex: number | null = null;
   let lastGiveAllModulesNonce = 0;
   let deathModalTimer = 0;
@@ -248,6 +256,11 @@
     purchasedShopOfferIds = [...(state.purchasedShopOfferIds ?? [])];
     playerDeathPending = false;
     deathModalOpen = false;
+    runCheckpoint = state.checkpoint ?? null;
+    bootCheckpoint =
+      state.checkpoint && state.checkpoint.floorIndex === state.floorIndex
+        ? state.checkpoint
+        : null;
     if (deathModalTimer) {
       window.clearTimeout(deathModalTimer);
       deathModalTimer = 0;
@@ -271,6 +284,8 @@
     collectedArtifactRooms = [];
     floorIndex = nextFloor;
     floorAdvanceTarget = getNextRunFloor(nextFloor);
+    runCheckpoint = null;
+    bootCheckpoint = null;
     resetScene();
   };
 
@@ -574,6 +589,8 @@
       collectedArtifactRooms = [];
       sceneReady = false;
       floorAdvanceWaitingForScene = true;
+      runCheckpoint = null;
+      bootCheckpoint = null;
       floorIndex = nextFloor;
     }, floorAdvanceCloseMs);
   };
@@ -625,6 +642,10 @@
     }
 
     saveRunSave(seed, {
+      checkpoint:
+        runCheckpoint && runCheckpoint.floorIndex === floorIndex
+          ? runCheckpoint
+          : null,
       collectedArtifactRooms,
       floorIndex,
       gearCount,
@@ -828,6 +849,7 @@
         controlsLocked={runtimeControlsLocked}
         {dungeon}
         {gearCount}
+        initialCheckpoint={bootCheckpoint}
         inventoryModuleIds={moduleInventory}
         {machineLoadout}
         meleeParams={swingParams}
@@ -842,7 +864,16 @@
         onOpenLoadout={openLoadout}
         onPlayerDeath={handlePlayerDeath}
         onPurchaseShopOffer={purchaseShopOffer}
-        onReady={() => (sceneReady = true)}
+        onReady={() => {
+          sceneReady = true;
+          // The boot checkpoint has been consumed by the scene's
+          // initial floor reset; clear it so subsequent re-mounts
+          // (floor advance, restart, debug-floor jump) start from
+          // the dungeon's actual start room instead of re-applying
+          // a stale "where I was" snapshot.
+          bootCheckpoint = null;
+        }}
+        onRunCheckpointChange={(checkpoint) => (runCheckpoint = checkpoint)}
         {purchasedShopOfferIds}
         {revivalNonce}
         {settings}

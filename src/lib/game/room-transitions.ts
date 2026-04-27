@@ -58,13 +58,23 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
   const transition = currentRoomUnlocked
     ? getTransition(currentRoom, position)
     : null;
+  const artifactDistance = Math.hypot(position[0], position[2]);
+  const insideArtifactRadius = artifactDistance < 1.5;
+  // Fire the artifact pickup only on the outside → inside transition
+  // (a genuine step-in). Teleports that land directly inside the
+  // radius — continue-from-checkpoint, debug-floor jump, etc. — start
+  // with the flag already set to inside, so no transition is detected
+  // and the artifact stays put until the player walks out and back in.
+  const justSteppedInsideArtifactRadius =
+    insideArtifactRadius && !room.artifactPickupPlayerInside;
+  room.artifactPickupPlayerInside = insideArtifactRadius;
 
   if (
     !transition ||
     room.transitionPending ||
     now - room.lastTransitionAt < 240
   ) {
-    if (currentArtifactType && Math.hypot(position[0], position[2]) < 1.5) {
+    if (currentArtifactType && justSteppedInsideArtifactRadius) {
       timing.pickArtifact(currentArtifactType, now);
       gameSfx.playArtifactPickup();
       onCollectArtifact?.(currentRoom.id, currentArtifactType);

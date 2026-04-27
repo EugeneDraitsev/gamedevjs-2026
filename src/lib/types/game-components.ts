@@ -13,6 +13,7 @@ import type { RoomTemplate } from "$lib/config/room-templates";
 import type { SceneSettings } from "$lib/config/scene-settings";
 import type { ShopOffer } from "$lib/config/shop-offers";
 import type { WeaponBuild } from "$lib/config/weapon-graph";
+import type { RunCheckpoint } from "$lib/game/run-save";
 import type {
   ActiveBeam,
   ActiveEnemy,
@@ -42,6 +43,7 @@ export interface GameSceneProps {
   floorReliefMaps?: boolean;
   floorReliefStrength?: number;
   gearCount?: number;
+  initialCheckpoint?: RunCheckpoint | null;
   inventoryModuleIds?: MachineModuleId[];
   machineLoadout?: MachineLoadout;
   machineStats: MachineStats;
@@ -58,6 +60,7 @@ export interface GameSceneProps {
   onPlayerDeath?: () => void;
   onPurchaseShopOffer?: (offer: ShopOffer) => void;
   onReady?: () => void;
+  onRunCheckpointChange?: (checkpoint: RunCheckpoint) => void;
   purchasedShopOfferIds?: string[];
   revivalNonce?: number;
   settings: SceneSettings;

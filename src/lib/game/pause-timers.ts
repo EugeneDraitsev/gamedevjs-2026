@@ -22,6 +22,13 @@ export const pauseGameSceneTimers = ({
     return;
   }
 
+  // Advance the frozen "now" alongside every shifted createdAt so visual
+  // ages (animationNow - createdAt) stay constant through the pause. If
+  // we only shifted createdAts forward, ages would go negative each frame
+  // and scale formulas like `1 + Math.min(cap, age / dur)` would produce
+  // huge negative scales (the giant flipped damage popup bug).
+  timing.now += deltaMs;
+
   combat.pauseEnemyTimedActors(deltaMs);
 
   for (const beam of combat.beams) {

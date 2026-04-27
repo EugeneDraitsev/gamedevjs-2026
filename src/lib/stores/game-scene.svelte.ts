@@ -220,7 +220,9 @@ export class GameSceneStore {
       : null
   );
   readonly playerHitFlash = $derived(
-    Math.max(0, 1 - (this.timing.now - this.player.lastHitAt) / 180)
+    this.player.lastHitAt > 0
+      ? Math.max(0, 1 - (this.timing.now - this.player.lastHitAt) / 180)
+      : 0
   );
   readonly playerRecoverRatio = $derived(
     this.player.recoverDuration > 0

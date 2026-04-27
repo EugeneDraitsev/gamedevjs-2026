@@ -19,8 +19,8 @@
       class="damage-popup"
       class:heal={popup.variant === "heal"}
       class:player={popup.variant === "player"}
-      style:opacity={Math.max(0, 1 - (animationNow - popup.createdAt) / damagePopupDurationMs)}
-      style:transform={`scale(${popup.variant === "player" ? 1.02 + Math.min(0.42, (animationNow - popup.createdAt) / 220) : 0.9 + Math.min(0.35, (animationNow - popup.createdAt) / 240)})`}
+      style:opacity={Math.max(0, 1 - Math.max(0, animationNow - popup.createdAt) / damagePopupDurationMs)}
+      style:transform={`scale(${popup.variant === "player" ? 1.02 + Math.min(0.42, Math.max(0, animationNow - popup.createdAt) / 220) : 0.9 + Math.min(0.35, Math.max(0, animationNow - popup.createdAt) / 240)})`}
     >
       {#if popup.variant === "player"}
         -{popup.amount}
