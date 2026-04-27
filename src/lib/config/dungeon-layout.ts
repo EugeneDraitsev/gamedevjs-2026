@@ -111,6 +111,149 @@ const sampleUnique = <T>(items: T[], count: number, random: () => number) => {
   return picked;
 };
 
+const connectRoomsViaExits = (
+  left: DungeonRoom,
+  right: DungeonRoom,
+  direction: DungeonRoomDirection
+) => {
+  left.exits[direction] = right.id;
+  right.exits[oppositeDirection[direction]] = left.id;
+};
+
+interface FillerRoomCandidate {
+  grid: [number, number];
+  neighborCount: number;
+}
+
+interface FloorShape {
+  branchCount: number;
+  branchLengthBase: number;
+  branchLengthVariance: number;
+  fillerRoomMax: number;
+  fillerRoomMin: number;
+  straightPreference: number;
+}
+
+const getFloorShape = (runFloor: number): FloorShape => {
+  if (runFloor === initialDungeonFloor) {
+    // First dungeon floor stays compact and tutorial-shaped — short
+    // branches, mostly straight, just a hint of filler. Targets ~12-15
+    // rooms total (start + polygon + boss + treasure + shop + branches
+    // + filler).
+    return {
+      branchCount: 3,
+      branchLengthBase: 1,
+      branchLengthVariance: 1,
+      fillerRoomMax: 2,
+      fillerRoomMin: 1,
+      straightPreference: 0.85,
+    };
+  }
+
+  // Subsequent floors feel like a small dungeon: three meaningful
+  // branches that turn about half the time and a modest sprinkle of
+  // filler so the connect-adjacent pass still produces real loops
+  // without ballooning the layout. Targets ~17-21 rooms total.
+  return {
+    branchCount: 3,
+    branchLengthBase: 2,
+    branchLengthVariance: 2,
+    fillerRoomMax: 3,
+    fillerRoomMin: 2,
+    straightPreference: 0.55,
+  };
+};
+
+const collectFillerCandidates = (
+  rooms: Record<string, DungeonRoom>,
+  occupied: Map<string, string>
+) => {
+  const candidates = new Map<string, FillerRoomCandidate>();
+
+  for (const room of Object.values(rooms)) {
+    if (room.kind === "polygon") {
+      continue;
+    }
+
+    for (const direction of directions) {
+      const cell: [number, number] = [
+        room.grid[0] + direction.dx,
+        room.grid[1] + direction.dy,
+      ];
+      const cellKey = getCellKey(cell);
+
+      if (occupied.has(cellKey) || candidates.has(cellKey)) {
+        continue;
+      }
+
+      const neighborCount = directions.filter((other) =>
+        occupied.has(getCellKey([cell[0] + other.dx, cell[1] + other.dy]))
+      ).length;
+
+      candidates.set(cellKey, { grid: cell, neighborCount });
+    }
+  }
+
+  return candidates;
+};
+
+const populateFillerRooms = (
+  rooms: Record<string, DungeonRoom>,
+  occupied: Map<string, string>,
+  random: () => number,
+  fillerRoomCount: number,
+  spawnFiller: (grid: [number, number]) => void
+) => {
+  for (let filler = 0; filler < fillerRoomCount; filler += 1) {
+    const candidates = collectFillerCandidates(rooms, occupied);
+
+    if (candidates.size === 0) {
+      break;
+    }
+
+    const sorted = [...candidates.values()].sort(
+      (left, right) => right.neighborCount - left.neighborCount
+    );
+    const topHalf = sorted.slice(0, Math.max(1, Math.ceil(sorted.length / 2)));
+    const pick = topHalf[Math.floor(random() * topHalf.length)];
+
+    spawnFiller(pick.grid);
+  }
+};
+
+const connectAdjacentRooms = (
+  rooms: Record<string, DungeonRoom>,
+  occupied: Map<string, string>
+) => {
+  for (const room of Object.values(rooms)) {
+    if (room.kind === "polygon") {
+      continue;
+    }
+
+    for (const direction of directions) {
+      if (room.exits[direction.key]) {
+        continue;
+      }
+
+      const neighborId = occupied.get(
+        getCellKey([room.grid[0] + direction.dx, room.grid[1] + direction.dy])
+      );
+
+      if (!neighborId) {
+        continue;
+      }
+
+      const neighbor = rooms[neighborId];
+
+      if (neighbor.kind === "polygon") {
+        continue;
+      }
+
+      connectRoomsViaExits(room, neighbor, direction.key);
+    }
+  }
+};
+
 export const createDungeonLayout = (
   seed: string,
   floor = initialDungeonFloor
@@ -162,14 +305,7 @@ export const createDungeonLayout = (
       ({ dx, dy }) => !occupied.has(getCellKey([x + dx, y + dy]))
     );
 
-  const connectRooms = (
-    left: DungeonRoom,
-    right: DungeonRoom,
-    direction: DungeonRoomDirection
-  ) => {
-    left.exits[direction] = right.id;
-    right.exits[oppositeDirection[direction]] = left.id;
-  };
+  const connectRooms = connectRoomsViaExits;
 
   if (runFloor === outsideFloor) {
     const outside = createRoom("normal", [0, 0], "outside-start");
@@ -205,50 +341,59 @@ export const createDungeonLayout = (
     runFloor === initialDungeonFloor ? "core-prison" : "normal-empty"
   );
 
-  const branches = sampleUnique(getFreeDirections(start.grid), 3, random).map(
-    (direction) => {
-      const firstRoom = createRoom(
+  const shape = getFloorShape(runFloor);
+  const branches = sampleUnique(
+    getFreeDirections(start.grid),
+    shape.branchCount,
+    random
+  ).map((direction) => {
+    const firstRoom = createRoom(
+      "normal",
+      [start.grid[0] + direction.dx, start.grid[1] + direction.dy],
+      sampleNormalTemplateId()
+    );
+
+    connectRooms(start, firstRoom, direction.key);
+
+    const rooms = [start, firstRoom];
+    const stepCount =
+      shape.branchLengthBase +
+      Math.floor(random() * (shape.branchLengthVariance + 1));
+
+    for (let step = 0; step < stepCount; step += 1) {
+      const previous = rooms.at(-1) ?? firstRoom;
+      const options = getFreeDirections(previous.grid);
+
+      if (options.length === 0) {
+        break;
+      }
+
+      const straight = options.find(
+        (candidate) => candidate.key === direction.key
+      );
+      // Only take the straight option when the random roll says so AND
+      // the option is actually available — otherwise pick any free
+      // direction so branches snake through the grid instead of
+      // shooting off in a single line.
+      const nextDirection =
+        straight && random() < shape.straightPreference
+          ? straight
+          : options[Math.floor(random() * options.length)];
+      const nextRoom = createRoom(
         "normal",
-        [start.grid[0] + direction.dx, start.grid[1] + direction.dy],
+        [
+          previous.grid[0] + nextDirection.dx,
+          previous.grid[1] + nextDirection.dy,
+        ],
         sampleNormalTemplateId()
       );
 
-      connectRooms(start, firstRoom, direction.key);
-
-      const rooms = [start, firstRoom];
-
-      for (
-        let step = 0;
-        step <
-        (runFloor === initialDungeonFloor ? 1 : 3) + Math.floor(random() * 2);
-        step += 1
-      ) {
-        const previous = rooms.at(-1) ?? firstRoom;
-        const options = getFreeDirections(previous.grid);
-
-        if (options.length === 0) {
-          break;
-        }
-
-        const nextDirection =
-          options.find((candidate) => candidate.key === direction.key) ??
-          options[Math.floor(random() * options.length)];
-        const nextRoom = createRoom(
-          "normal",
-          [
-            previous.grid[0] + nextDirection.dx,
-            previous.grid[1] + nextDirection.dy,
-          ],
-          sampleNormalTemplateId()
-        );
-
-        connectRooms(previous, nextRoom, nextDirection.key);
-        rooms.push(nextRoom);
-      }
-
-      return { direction: direction.key, rooms };
+      connectRooms(previous, nextRoom, nextDirection.key);
+      rooms.push(nextRoom);
     }
-  );
+
+    return { direction: direction.key, rooms };
+  });
   const mainBranch = [...branches].sort(
     (left, right) => right.rooms.length - left.rooms.length
   )[0];
@@ -319,6 +464,21 @@ export const createDungeonLayout = (
 
     connectRooms(shopAnchor, shop, shopDirection.key);
   }
+
+  // Fill in a handful of extra rooms in cells that already touch multiple
+  // existing rooms so the dungeon feels less like a few thin tendrils and
+  // more like a connected complex. Floor -1 gets the bigger sprinkle.
+  const fillerRoomCount =
+    shape.fillerRoomMin +
+    Math.floor(random() * (shape.fillerRoomMax - shape.fillerRoomMin + 1));
+  populateFillerRooms(rooms, occupied, random, fillerRoomCount, (grid) => {
+    createRoom("normal", grid, sampleNormalTemplateId());
+  });
+
+  // Connect every pair of grid-adjacent rooms that isn't already linked,
+  // turning the branch tree into a graph with cycles so every room with
+  // a neighbour has a doorway to it.
+  connectAdjacentRooms(rooms, occupied);
 
   return {
     floor: runFloor,
