@@ -17,11 +17,13 @@
   import AppModalShell from "$lib/components/app/AppModalShell.svelte";
   import DeathModal from "$lib/components/app/DeathModal.svelte";
   import EndDemoModal from "$lib/components/app/EndDemoModal.svelte";
+  import { scheduleEndDemoStoryImagePreload } from "$lib/components/app/end-demo-story";
   import FloorAdvanceTransition from "$lib/components/app/FloorAdvanceTransition.svelte";
   import HowToPlayPanel from "$lib/components/app/HowToPlayPanel.svelte";
   import SceneLoadingOverlay from "$lib/components/app/SceneLoadingOverlay.svelte";
   import SettingsPanel from "$lib/components/app/SettingsPanel.svelte";
   import MobileControls from "$lib/components/game/MobileControls.svelte";
+  import { scheduleBossIntroImagePreload } from "$lib/components/game/overlays/boss-intro-assets";
   import LoadoutModal from "$lib/components/loadout/LoadoutModal.svelte";
   import { createDungeonLayout } from "$lib/config/dungeon-layout";
   import {
@@ -110,8 +112,11 @@
   let floorAdvanceTarget = $state(getNextRunFloor(initialDungeonFloor));
   let floorAdvancePending = $state(false);
   let floorAdvancePhase = $state<FloorAdvancePhase>("idle");
+  let floorAdvanceWaitingForScene = $state(false);
   let floorAdvanceTimers: number[] = [];
   let gearCount = $state(0);
+  let cancelBossIntroImagePreload: (() => void) | null = null;
+  let cancelEndDemoImagePreload: (() => void) | null = null;
   let routeQueryRevision = $state(0);
   let runReady = $state(getCurrentAppSearchParam(page.url, "continue") !== "1");
   let sceneBootReady = $state(false);
@@ -211,6 +216,24 @@
     clearFloorAdvanceTimers();
     floorAdvancePending = false;
     floorAdvancePhase = "idle";
+    floorAdvanceWaitingForScene = false;
+  };
+
+  const beginFloorAdvanceOpening = () => {
+    if (!(floorAdvancePending && floorAdvancePhase === "covered")) {
+      return;
+    }
+
+    floorAdvanceWaitingForScene = false;
+
+    scheduleFloorAdvanceStep(() => {
+      floorAdvancePhase = "opening";
+
+      scheduleFloorAdvanceStep(() => {
+        floorAdvancePhase = "idle";
+        floorAdvancePending = false;
+      }, floorAdvanceOpenMs);
+    }, floorAdvanceHoldMs);
   };
 
   const applyRunState = (state: SavedRunState) => {
@@ -549,18 +572,33 @@
     scheduleFloorAdvanceStep(() => {
       floorAdvancePhase = "covered";
       collectedArtifactRooms = [];
+      sceneReady = false;
+      floorAdvanceWaitingForScene = true;
       floorIndex = nextFloor;
-
-      scheduleFloorAdvanceStep(() => {
-        floorAdvancePhase = "opening";
-
-        scheduleFloorAdvanceStep(() => {
-          floorAdvancePhase = "idle";
-          floorAdvancePending = false;
-        }, floorAdvanceOpenMs);
-      }, floorAdvanceHoldMs);
     }, floorAdvanceCloseMs);
   };
+
+  $effect(() => {
+    if (
+      floorAdvanceWaitingForScene &&
+      sceneReady &&
+      floorAdvancePhase === "covered"
+    ) {
+      beginFloorAdvanceOpening();
+    }
+  });
+
+  $effect(() => {
+    if (sceneReady && !cancelEndDemoImagePreload) {
+      cancelEndDemoImagePreload = scheduleEndDemoStoryImagePreload();
+    }
+  });
+
+  $effect(() => {
+    if (sceneReady && !cancelBossIntroImagePreload) {
+      cancelBossIntroImagePreload = scheduleBossIntroImagePreload();
+    }
+  });
 
   $effect(() => {
     saveSceneSettings(settings);
@@ -692,7 +730,6 @@
     gameMusic.syncMix(settings);
     gameSfx.syncMix(settings);
     gameSfx.warmupGameplayEvents();
-
     const coarseQuery = window.matchMedia("(pointer: coarse)");
     const onCoarseChange = (event: MediaQueryListEvent) => {
       touchControls = event.matches || isTouchDevice();
@@ -752,6 +789,10 @@
     return () => {
       isActive = false;
       clearFloorAdvanceTimers();
+      cancelBossIntroImagePreload?.();
+      cancelBossIntroImagePreload = null;
+      cancelEndDemoImagePreload?.();
+      cancelEndDemoImagePreload = null;
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("hashchange", onRouteQueryChange);
       window.removeEventListener("popstate", onRouteQueryChange);
@@ -820,7 +861,7 @@
   />
 
   <SceneLoadingOverlay
-    active={!sceneReady && floorAdvancePhase === "idle"}
+    active={!sceneReady && (floorAdvancePhase === "idle" || floorAdvancePhase === "covered")}
     detail={sceneLoadFailed ? "Could not initialize scene" : sceneLoadProgress.detail}
     label="Loading"
     progress={sceneLoadFailed ? null : sceneLoadProgress.progress}

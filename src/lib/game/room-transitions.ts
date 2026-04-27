@@ -85,7 +85,7 @@ export const handlePlayerPositionChange = (args: TransitionArgs) => {
   );
   room.lastTransitionAt = now;
   room.transitionPending = true;
-  timing.beginRoomTransition(now);
+  timing.beginRoomTransition(now, nextRoom.kind === "boss");
   markTransitionTrigger({
     fromKind: currentRoom.kind,
     fromRoomId: currentRoom.id,

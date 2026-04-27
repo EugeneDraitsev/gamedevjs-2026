@@ -1,10 +1,18 @@
 import type { Object3D, Scene, WebGLRenderer } from "three";
 import { cachedGeometryStats } from "$lib/game/cached-geometries";
 
+interface RendererProgramInfo {
+  cacheKey: string;
+  id: number;
+  name: string;
+  usedTimes: number;
+}
+
 interface RendererSnapshot {
   calls: number;
   geometries: number;
   heapMB: number | null;
+  programInfos: RendererProgramInfo[];
   programs: number;
   sceneNodes: number;
   textures: number;
@@ -82,6 +90,7 @@ interface TransitionRecord {
     calls: number;
     geo: number;
     heapMB: number | null;
+    newPrograms: RendererProgramInfo[];
     nodes: number;
     progs: number;
     tex: number;
@@ -112,7 +121,7 @@ const RENDER_SLOW_MS = 16;
 const GAME_FRAME_SLOW_MS = 8;
 const PHASE_SLOW_MS = 4;
 const TRACE_AFTER_APPLY_MS = 1200;
-const PERF_VERSION = "rt-perf-v17-instanced-heal-pickup";
+const PERF_VERSION = "rt-perf-v34-tested-warmup-coverage";
 
 let enabled = false;
 let renderer: WebGLRenderer | null = null;
@@ -124,6 +133,7 @@ let frameWatcher = 0;
 let lastFrameAt = 0;
 let transitionSeq = 0;
 let firstSpikeProgramsLogged = false;
+let lastRenderProgramKeys = new Set<string>();
 let activeTrace: {
   gameLogs: number;
   phaseLogs: number;
@@ -167,10 +177,20 @@ const countSceneNodes = (s: Object3D | null): number => {
   return n;
 };
 
+const rendererPrograms = (r: WebGLRenderer): RendererProgramInfo[] =>
+  r.info.programs?.map((p) => ({
+    cacheKey:
+      (p as unknown as { cacheKey?: string }).cacheKey ?? `${p.name}:${p.id}`,
+    id: p.id,
+    name: p.name,
+    usedTimes: p.usedTimes,
+  })) ?? [];
+
 const snapshot = (r: WebGLRenderer): RendererSnapshot => ({
   calls: r.info.render.calls,
   geometries: r.info.memory.geometries,
   heapMB: heapMB(),
+  programInfos: rendererPrograms(r),
   programs: r.info.programs?.length ?? 0,
   sceneNodes: countSceneNodes(scene),
   textures: r.info.memory.textures,
@@ -367,6 +387,13 @@ const recordRenderSample = (
   const duration = endedAt - startedAt;
   const traceLogAllowed = Boolean(trace && trace.renderLogs < 8);
   const shouldLog = duration > RENDER_SLOW_MS || traceLogAllowed;
+  const programInfos = rendererPrograms(r);
+  const newRenderPrograms = programInfos.filter(
+    (program) => !lastRenderProgramKeys.has(program.cacheKey)
+  );
+  lastRenderProgramKeys = new Set(
+    programInfos.map((program) => program.cacheKey)
+  );
   const sample: RenderSample = {
     at: startedAt,
     calls: r.info.render.calls,
@@ -400,6 +427,14 @@ const recordRenderSample = (
       ? "color:#fb7185;font-weight:bold"
       : "color:#67e8f9"
   );
+
+  if (sample.duration > RENDER_SLOW_MS && newRenderPrograms.length > 0) {
+    console.log(
+      `%c[rt render new programs] #${sample.seq ?? "-"} +${newRenderPrograms.length}`,
+      "color:#fbbf24;font-weight:bold",
+      newRenderPrograms
+    );
+  }
 };
 
 const wrapRenderer = (r: WebGLRenderer): void => {
@@ -435,6 +470,9 @@ const wrapRenderer = (r: WebGLRenderer): void => {
 export const setTransitionRenderer = (next: WebGLRenderer | null): void => {
   if (next) {
     renderer = next;
+    lastRenderProgramKeys = new Set(
+      rendererPrograms(next).map((program) => program.cacheKey)
+    );
     wrapRenderer(next);
   }
 };
@@ -469,13 +507,7 @@ const installRtPerfApi = (): void => {
     last: () => ringBuffer.at(-1),
     loaf: () => recentLoaf.slice(),
     phases: () => phaseSamples.slice(),
-    programs: () =>
-      renderer?.info.programs?.map((p) => ({
-        cacheKey: (p as unknown as { cacheKey?: string }).cacheKey,
-        id: p.id,
-        name: p.name,
-        usedTimes: p.usedTimes,
-      })) ?? [],
+    programs: () => (renderer ? rendererPrograms(renderer) : []),
     sceneSummary: () => {
       if (!scene) {
         return null;
@@ -741,6 +773,7 @@ interface DeltaBundle {
   calls: number;
   geo: number;
   heapMB: number | null;
+  newPrograms: RendererProgramInfo[];
   nodes: number;
   progs: number;
   tex: number;
@@ -759,11 +792,17 @@ const computeDeltas = (
     before.heapMB !== null && after.heapMB !== null
       ? after.heapMB - before.heapMB
       : null;
+  const beforeProgramKeys = new Set(
+    before.programInfos.map((program) => program.cacheKey)
+  );
 
   return {
     calls: after.calls - before.calls,
     geo: after.geometries - before.geometries,
     heapMB: heapDelta,
+    newPrograms: after.programInfos.filter(
+      (program) => !beforeProgramKeys.has(program.cacheKey)
+    ),
     nodes: after.sceneNodes - before.sceneNodes,
     progs: after.programs - before.programs,
     tex: after.textures - before.textures,
@@ -832,6 +871,18 @@ const maybeLogFirstSpikePrograms = (): void => {
     "%c[rt] last 15 programs (first spike):",
     "color:#7dd3fc",
     programs
+  );
+};
+
+const logNewPrograms = (seq: number, deltas: DeltaBundle | null): void => {
+  if (!deltas?.newPrograms.length) {
+    return;
+  }
+
+  console.log(
+    `%c[rt new programs] #${seq} +${deltas.newPrograms.length}`,
+    "color:#fbbf24;font-weight:bold",
+    deltas.newPrograms
   );
 };
 
@@ -1037,6 +1088,7 @@ export const markTransitionApplyEnd = (): void => {
     logTraceSummaries(seq, traceSamples);
 
     if (isSpike) {
+      logNewPrograms(seq, deltas);
       maybeLogFirstSpikePrograms();
     }
 

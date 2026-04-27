@@ -20,6 +20,7 @@ export class TimingStore {
   pickedArtifactAt = $state(0);
   pickedArtifactType = $state<MachineModuleId | null>(null);
   playerDeathStartedAt = $state(0);
+  roomTransitionCoverActive = $state(false);
   roomTransitionStartedAt = $state(0);
   lastHazardAt = 0;
 
@@ -120,8 +121,13 @@ export class TimingStore {
     this.pickedArtifactType = type;
   }
 
-  beginRoomTransition(at: number) {
+  beginRoomTransition(at: number, coverUntilWarm = false) {
+    this.roomTransitionCoverActive = coverUntilWarm;
     this.roomTransitionStartedAt = at;
+  }
+
+  clearRoomTransitionCover() {
+    this.roomTransitionCoverActive = false;
   }
 
   beginPlayerDeath(at: number) {
@@ -143,6 +149,7 @@ export class TimingStore {
     this.pickedArtifactAt = 0;
     this.pickedArtifactType = null;
     this.playerDeathStartedAt = 0;
+    this.roomTransitionCoverActive = false;
     this.roomTransitionStartedAt = 0;
     this.lastHazardAt = 0;
   }

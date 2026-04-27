@@ -1,12 +1,9 @@
 <script lang="ts">
-  import ironWardenPlaqueUrl from "$lib/assets/generated/boss-intro/iron-warden.png";
-  import mineHeraldPlaqueUrl from "$lib/assets/generated/boss-intro/mine-herald.png";
+  import {
+    bossIntroPlaqueByEnemyId,
+    fallbackBossIntroPlaqueUrl,
+  } from "$lib/components/game/overlays/boss-intro-assets";
   import type { SceneOverlayProps } from "$lib/types/game";
-
-  const bossIntroPlaqueByEnemyId: Record<string, string> = {
-    "iron-warden": ironWardenPlaqueUrl,
-    "mine-herald": mineHeraldPlaqueUrl,
-  };
 
   let {
     bossIntroEnemyId,
@@ -21,7 +18,7 @@
     Math.sin((1 - bossIntroProgress) * Math.PI)
   );
   const bossIntroPlaqueUrl = $derived(
-    bossIntroPlaqueByEnemyId[bossIntroEnemyId] ?? ironWardenPlaqueUrl
+    bossIntroPlaqueByEnemyId[bossIntroEnemyId] ?? fallbackBossIntroPlaqueUrl
   );
 </script>
 

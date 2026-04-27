@@ -19,6 +19,18 @@
   export const enemyConeGeometry = new ConeGeometry(1, 1, 18);
   export const stealthWingGeometry = new BoxGeometry(1, 1, 1);
   export const stealthNoseGeometry = new ConeGeometry(1, 1, 4);
+  export const stealthForwardThrusterGeometry = new CylinderGeometry(
+    1,
+    0.78,
+    1,
+    6
+  );
+  export const stealthRearThrusterGeometry = new CylinderGeometry(
+    0.78,
+    1,
+    1,
+    6
+  );
   export const enemyHealthBarGeometry = new BoxGeometry(1.1, 0.11, 0.06);
   export const enemyEyeMaterial = new MeshStandardMaterial({
     color: "#f5fbff",
@@ -693,11 +705,11 @@
 
           <T.Mesh
             castShadow
+            geometry={stealthForwardThrusterGeometry}
             position={[side * enemy.radius * 1.18, enemy.radius * 0.03, enemy.radius * 0.58]}
             rotation={[Math.PI / 2, 0, 0]}
             scale={[enemy.radius * 0.22, enemy.radius * 0.34, enemy.radius * 0.22]}
           >
-            <T.CylinderGeometry args={[1, 0.78, 1, 6]} />
             <T.MeshStandardMaterial
               color="#5c4c41"
               emissive={enemy.color}
@@ -712,11 +724,11 @@
 
           <T.Mesh
             castShadow
+            geometry={stealthRearThrusterGeometry}
             position={[side * enemy.radius * 1.18, enemy.radius * 0.03, -enemy.radius * 0.72]}
             rotation={[Math.PI / 2, 0, 0]}
             scale={[enemy.radius * 0.24, enemy.radius * 0.4, enemy.radius * 0.24]}
           >
-            <T.CylinderGeometry args={[0.78, 1, 1, 6]} />
             <T.MeshStandardMaterial
               color="#2f3748"
               emissive={enemy.color}

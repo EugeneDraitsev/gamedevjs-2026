@@ -10,7 +10,12 @@ import type { PickupStore } from "$lib/stores/pickups.svelte";
 import type { PlayerStore } from "$lib/stores/player.svelte";
 import type { RoomStore } from "$lib/stores/room.svelte";
 import type { TimingStore } from "$lib/stores/timing.svelte";
-import type { ActiveEnemyShot, ActiveProjectile, Vec3 } from "$lib/types/game";
+import type {
+  ActiveBomb,
+  ActiveEnemyShot,
+  ActiveProjectile,
+  Vec3,
+} from "$lib/types/game";
 import { stepEnemies } from "./enemy-stepper";
 
 vi.mock("$lib/audio/sfx", () => ({
@@ -395,6 +400,309 @@ describe("stepEnemies ranged shot caps", () => {
       });
 
       expect(combat.enemyShots).toHaveLength(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+});
+
+describe("stepEnemies debug and pause handling", () => {
+  it("applies one-hit kill to veil-stalker projectile hits", () => {
+    const nowSpy = vi.spyOn(performance, "now").mockReturnValue(10_000);
+    const template = roomTemplateById["normal-veil"];
+    const currentRoomId = "veil-room";
+    const room = createRoomStub();
+    const [veilStalker] = createRoomEnemies(
+      {
+        exits: {},
+        grid: [0, 0],
+        id: currentRoomId,
+        kind: "normal",
+        label: "Veil",
+        templateId: "normal-veil",
+      },
+      template,
+      "south",
+      new Set(),
+      9000
+    );
+    const weaponBuild = computeMachineStats(
+      createDefaultMachineLoadout()
+    ).weaponBuild;
+    const projectile: ActiveProjectile = {
+      build: { ...weaponBuild, damage: 1, radius: 10 },
+      id: "veil-kill-shot",
+      position: [0, 0.62, 0],
+      velocity: [0, 0, 1],
+    };
+    const combat = {
+      beams: [],
+      bombs: [],
+      damagePopups: [],
+      deflectBursts: [],
+      enemies: [{ ...veilStalker, position: [0, 0.62, 0] as Vec3 }],
+      enemyShots: [],
+      gateLasers: [],
+      healBursts: [],
+      projectilePositions: new Map([["veil-kill-shot", [0, 0.62, 0] as Vec3]]),
+      projectiles: [projectile],
+      popDamage: vi.fn(),
+      popProjectileImpact: vi.fn(),
+      removeProjectiles: vi.fn(),
+    } as unknown as CombatStore;
+    const player = {
+      health: 6,
+      lastHitAt: 0,
+      lastPosition: [6, 1, 0] as Vec3,
+      lastTouchHitAt: 0,
+      pushImpact: vi.fn(),
+      triggerRecover: vi.fn(),
+    } as unknown as PlayerStore;
+    const pickups = {
+      dropRoom: vi.fn(() => 0),
+    } as unknown as PickupStore;
+    const timing = {
+      enemyWakeUntil: 0,
+      lastHazardAt: 0,
+    } as unknown as TimingStore;
+
+    try {
+      stepEnemies({
+        combat,
+        currentRoomId,
+        currentRoomTemplate: template,
+        delta: 0.016,
+        doorOpenDelayMs: 120,
+        doorOpenDurationMs: 520,
+        isCurrentRoomCombat: true,
+        oneHitKill: true,
+        pickups,
+        player,
+        room,
+        roomHazards: [],
+        roomPlatforms: [],
+        timing,
+      });
+
+      expect(combat.enemies).toHaveLength(0);
+      expect(combat.popDamage).toHaveBeenCalledWith(
+        veilStalker?.hp,
+        expect.any(Array),
+        "enemy"
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("freezes enemy shots and bombs while enemy simulation is paused", () => {
+    const nowSpy = vi.spyOn(performance, "now").mockReturnValue(10_000);
+    const template = {
+      ...roomTemplateById["normal-line"],
+      enemyCount: 1,
+      enemyTemplateId: "blast-runner",
+    };
+    const currentRoomId = "paused-room";
+    const room = createRoomStub();
+    const [enemy] = createRoomEnemies(
+      {
+        exits: {},
+        grid: [0, 0],
+        id: currentRoomId,
+        kind: "normal",
+        label: "Paused",
+        templateId: "normal-line",
+      },
+      template,
+      "south",
+      new Set(),
+      5000
+    );
+    const bomb: ActiveBomb = {
+      armAt: 9000,
+      color: "#ffb24d",
+      damage: 1,
+      expiresAt: 11_000,
+      explosionRadius: 2.4,
+      hp: 3,
+      id: "paused-bomb",
+      lastHitAt: 0,
+      maxHp: 3,
+      originId: enemy?.id ?? "",
+      position: [0, 0.62, 0],
+      radius: 0.42,
+      spawnedAt: 8000,
+      velocity: [12, 0, 0],
+    };
+    const shot: ActiveEnemyShot = {
+      color: "#ffd6a0",
+      damage: 1,
+      id: "paused-shot",
+      position: [0, 1, 0],
+      radius: 0.18,
+      ttlMs: 1000,
+      velocity: [0, 0, 12],
+    };
+    const combat = {
+      beams: [],
+      bombs: [bomb],
+      damagePopups: [],
+      deflectBursts: [],
+      enemies: [
+        {
+          ...enemy,
+          lastBombAt: 5000,
+          lastShotAt: 4000,
+          position: [6, 0.62, 0] as Vec3,
+        },
+      ],
+      enemyShots: [shot],
+      gateLasers: [],
+      healBursts: [],
+      projectiles: [] as ActiveProjectile[],
+      popDamage: vi.fn(),
+      popProjectileImpact: vi.fn(),
+      removeProjectiles: vi.fn(),
+    } as unknown as CombatStore;
+    const player = {
+      health: 6,
+      lastHitAt: 0,
+      lastPosition: [0, 1, 0] as Vec3,
+      lastTouchHitAt: 0,
+      pushImpact: vi.fn(),
+      triggerRecover: vi.fn(),
+    } as unknown as PlayerStore;
+    const pickups = {
+      dropRoom: vi.fn(() => 0),
+    } as unknown as PickupStore;
+    const timing = {
+      enemyWakeUntil: 0,
+      lastHazardAt: 0,
+    } as unknown as TimingStore;
+
+    try {
+      stepEnemies({
+        combat,
+        currentRoomId,
+        currentRoomTemplate: template,
+        delta: 1,
+        doorOpenDelayMs: 120,
+        doorOpenDurationMs: 520,
+        enemyAiPaused: true,
+        isCurrentRoomCombat: true,
+        pickups,
+        player,
+        room,
+        roomHazards: [],
+        roomPlatforms: [],
+        timing,
+      });
+
+      expect(player.health).toBe(6);
+      expect(player.triggerRecover).not.toHaveBeenCalled();
+      expect(combat.enemyShots[0]).toMatchObject({
+        position: [0, 1, 0],
+        ttlMs: 1000,
+      });
+      expect(combat.bombs[0]).toMatchObject({
+        armAt: 9000,
+        expiresAt: 11_000,
+        position: [0, 0.62, 0],
+      });
+      expect(combat.enemies[0]).toMatchObject({
+        lastBombAt: 6000,
+        lastShotAt: 5000,
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("does not let veil-stalker finish its shot windup while paused", () => {
+    const nowSpy = vi.spyOn(performance, "now").mockReturnValue(10_000);
+    const template = roomTemplateById["normal-veil"];
+    const currentRoomId = "paused-veil-room";
+    const room = createRoomStub();
+    const [enemy] = createRoomEnemies(
+      {
+        exits: {},
+        grid: [0, 0],
+        id: currentRoomId,
+        kind: "normal",
+        label: "Paused Veil",
+        templateId: "normal-veil",
+      },
+      template,
+      "south",
+      new Set(),
+      5000
+    );
+    const combat = {
+      beams: [],
+      bombs: [],
+      damagePopups: [],
+      deflectBursts: [],
+      enemies: [
+        {
+          ...enemy,
+          lastBombAt: 8000,
+          lastShotAt: 5000,
+          position: [0, 0.62, 0] as Vec3,
+          stealthAimYaw: 0,
+          stealthMode: "aiming" as const,
+        },
+      ],
+      enemyShots: [],
+      gateLasers: [],
+      healBursts: [],
+      projectiles: [] as ActiveProjectile[],
+      stealthBeams: [],
+      popDamage: vi.fn(),
+      popProjectileImpact: vi.fn(),
+      removeProjectiles: vi.fn(),
+    } as unknown as CombatStore;
+    const player = {
+      health: 6,
+      lastHitAt: 0,
+      lastPosition: [0, 1, 4] as Vec3,
+      lastTouchHitAt: 0,
+      pushImpact: vi.fn(),
+      triggerRecover: vi.fn(),
+    } as unknown as PlayerStore;
+    const pickups = {
+      dropRoom: vi.fn(() => 0),
+    } as unknown as PickupStore;
+    const timing = {
+      enemyWakeUntil: 0,
+      lastHazardAt: 0,
+    } as unknown as TimingStore;
+
+    try {
+      stepEnemies({
+        combat,
+        currentRoomId,
+        currentRoomTemplate: template,
+        delta: 1,
+        doorOpenDelayMs: 120,
+        doorOpenDurationMs: 520,
+        enemyAiPaused: true,
+        isCurrentRoomCombat: true,
+        pickups,
+        player,
+        room,
+        roomHazards: [],
+        roomPlatforms: [],
+        timing,
+      });
+
+      expect(player.health).toBe(6);
+      expect(player.triggerRecover).not.toHaveBeenCalled();
+      expect(combat.stealthBeams).toHaveLength(0);
+      expect(combat.enemies[0]).toMatchObject({
+        lastBombAt: 9000,
+        lastShotAt: 6000,
+        stealthMode: "aiming",
+      });
     } finally {
       nowSpy.mockRestore();
     }

@@ -7,16 +7,26 @@
   import RoomHazards from "$lib/components/game/scene/environment/RoomHazards.svelte";
   import RoomPlatforms from "$lib/components/game/scene/environment/RoomPlatforms.svelte";
   import RoomTemplateEnvironment from "$lib/components/game/scene/environment/RoomTemplateEnvironment.svelte";
+  import RoomWallShadows from "$lib/components/game/scene/environment/RoomWallShadows.svelte";
   import RoomWalls from "$lib/components/game/scene/environment/RoomWalls.svelte";
   import InstancedFoundryWallKits from "$lib/components/game/scene/environment/walls/InstancedFoundryWallKits.svelte";
   import { getMachineModule } from "$lib/config/machine-modules";
+  import { roomTemplateById } from "$lib/config/room-templates";
   import {
     markTransitionPhaseEnd,
     markTransitionPhaseStart,
   } from "$lib/debug/transition-perf";
-  import { cachedBox } from "$lib/game/cached-geometries";
+  import { cachedBox, cachedPlane } from "$lib/game/cached-geometries";
   import { foundryWallKitLampPositions } from "$lib/game/foundry-wall-kit-layout";
-  import { getRoomHazards } from "$lib/game/scene-layout";
+  import {
+    createDoorMarkers,
+    createDoorSeals,
+    createRoomWalls,
+    getRoomBounds,
+    getRoomHazards,
+    getRoomPlatforms,
+    getRoomSkin,
+  } from "$lib/game/scene-layout";
   import { getGameSceneContext } from "$lib/stores/scene-context";
   import type {
     DoorMarker,
@@ -136,6 +146,61 @@
   );
   const gearlessWallFacings = $derived(
     scene.currentRoom.kind === "boss" ? bossGearlessWallFacings : null
+  );
+  const warmupBossRoom = $derived.by(
+    () =>
+      Object.values(scene.dungeon.rooms).find((candidate) => {
+        if (candidate.kind !== "boss") {
+          return false;
+        }
+
+        const template = roomTemplateById[candidate.templateId];
+
+        return template?.environment === "boss-gears";
+      }) ?? null
+  );
+  const warmupBossTemplate = $derived(
+    warmupBossRoom ? roomTemplateById[warmupBossRoom.templateId] : null
+  );
+  const warmupBossSkin = $derived(
+    warmupBossRoom && warmupBossTemplate
+      ? getRoomSkin(warmupBossRoom, warmupBossTemplate)
+      : null
+  );
+  const warmupBossBounds = $derived(
+    warmupBossTemplate ? getRoomBounds(warmupBossTemplate.layout) : null
+  );
+  const warmupBossWalls = $derived.by(() => {
+    if (!(warmupBossRoom && warmupBossSkin)) {
+      return [] as StaticWall[];
+    }
+
+    return createRoomWalls(
+      warmupBossRoom,
+      scene.currentWallPalette,
+      warmupBossSkin
+    );
+  });
+  const warmupBossWallKitLimit = $derived(
+    warmupBossWalls.filter(
+      (wall) => wall.style === "mechanic" && (wall.opacity ?? 1) >= 1
+    ).length
+  );
+  const warmupBossDoors = $derived(
+    warmupBossRoom && warmupBossSkin
+      ? createDoorMarkers(warmupBossRoom, scene.dungeon, warmupBossSkin)
+      : []
+  );
+  const warmupBossDoorSeals = $derived(
+    warmupBossRoom && warmupBossSkin
+      ? createDoorSeals(warmupBossRoom, warmupBossSkin)
+      : []
+  );
+  const warmupBossHazards = $derived(
+    warmupBossTemplate ? getRoomHazards(warmupBossTemplate.layout) : []
+  );
+  const warmupBossPlatforms = $derived(
+    warmupBossTemplate ? getRoomPlatforms(warmupBossTemplate.layout) : []
   );
   const lampLights = $derived.by(() => {
     if (outside) {
@@ -280,6 +345,107 @@
   openAmount={scene.floorExitOpenAmount}
 />
 
+{#if warmupBossRoom && warmupBossTemplate && warmupBossBounds}
+  <T.Group position={[0, 0, 0]} visible={warmupVisible}>
+    <T.Mesh
+      geometry={cachedPlane(
+        warmupBossBounds.floorHalfWidth * 2,
+        warmupBossBounds.floorHalfDepth * 2
+      )}
+      position={[0, 0.045, 0]}
+      receiveShadow
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
+      <T.MeshStandardMaterial
+        map={textures.bossFloor}
+        bumpMap={scene.floorReliefMaps ? textures.bossFloorHeight : null}
+        bumpScale={18 * scene.floorReliefStrength}
+        metalness={0.24}
+        normalMap={scene.floorReliefMaps && !textures.bossFloorHeight
+          ? textures.bossFloorNormal
+          : null}
+        normalScale={[2.2, 2.2]}
+        roughness={0.64}
+      />
+    </T.Mesh>
+
+    <RoomWallShadows roomWalls={warmupBossWalls} />
+
+    {#each warmupBossWalls as wall (wall.id)}
+      <T.Mesh
+        castShadow={(wall.opacity ?? 1) >= 1}
+        geometry={cachedBox(
+          wall.args[0] * 2,
+          wall.args[1] * 1.55,
+          wall.args[2] * 2
+        )}
+        position={[
+          wall.position[0],
+          wall.position[1] - 0.25,
+          wall.position[2],
+        ]}
+        receiveShadow
+      >
+        <T.MeshStandardMaterial
+          color={wall.color}
+          depthWrite={(wall.opacity ?? 1) >= 1}
+          metalness={0.1}
+          opacity={wall.opacity ?? 1}
+          roughness={0.86}
+          transparent={(wall.opacity ?? 1) < 1}
+        />
+      </T.Mesh>
+    {/each}
+
+    <InstancedFoundryWallKits
+      animationNow={0}
+      decoratedWallFacings={bossDecoratedWallFacings}
+      gearlessWallFacings={bossGearlessWallFacings}
+      limit={warmupBossWallKitLimit}
+      roomWalls={warmupBossWalls}
+      wallDecalTexture={textures.foundryFloorDecals}
+      wallTexture={textures.foundryWall}
+    />
+
+    <RoomDoors
+      bossDoorTexture={textures.bossDoor}
+      doorOpenAmount={0}
+      physicsEnabled={false}
+      roomDoors={warmupBossDoors}
+      roomDoorSeals={warmupBossDoorSeals}
+    />
+
+    <RoomHazards
+      animationNow={0}
+      lavaSurfaceTexture={textures.lavaSurface}
+      roomHazards={warmupBossHazards}
+    />
+
+    <RoomPlatforms animationNow={0} roomPlatforms={warmupBossPlatforms} />
+
+    <RoomTemplateEnvironment
+      animationNow={0}
+      bossBannerTexture={textures.bossBanner}
+      corePrisonSealBrokenAt={0}
+      corePrisonSealHits={0}
+      corePrisonSealHitsRequired={2}
+      corePrisonSealLocked={false}
+      currentFloorPalette={scene.currentFloorPalette}
+      environment={warmupBossTemplate.environment}
+      floorExitOpenAmount={0}
+      outsideGateUnlocked={false}
+      outsideDetailLevel={0}
+      startAnimationAt={0}
+      outsideEarthDecalTexture={null}
+      outsideEarthTexture={null}
+      outsideRockDecalTexture={null}
+      outsideRocksTexture={null}
+      outsideWaterDecalTexture={null}
+      outsideWaterTexture={null}
+    />
+  </T.Group>
+{/if}
+
 <T.Group
   position={[0, 0.08, 0]}
   scale={[0.001, 0.001, 0.001]}
@@ -299,6 +465,7 @@
   <RoomDoors
     bossDoorTexture={textures.bossDoor}
     doorOpenAmount={0}
+    physicsEnabled={false}
     roomDoors={roomDoorWarmups}
     roomDoorSeals={roomDoorSealWarmups}
   />

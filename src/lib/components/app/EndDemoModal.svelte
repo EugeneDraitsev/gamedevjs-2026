@@ -56,7 +56,13 @@
 <section class="panel end-demo-panel">
   <div class="comic-shell">
     <figure class="comic-frame">
-      <img alt={activeSlide.alt} decoding="async" src={activeSlide.image}>
+      <img
+        alt={activeSlide.alt}
+        decoding="async"
+        fetchpriority="high"
+        loading="eager"
+        src={activeSlide.image}
+      >
     </figure>
 
     <div class="story-copy">

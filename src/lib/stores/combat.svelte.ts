@@ -32,6 +32,33 @@ export class CombatStore {
   readonly meleeHitEnemies = new Map<number, Set<string>>();
   currentMeleeFrame: MeleeFrame | null = null;
 
+  pauseEnemyTimedActors(deltaMs: number) {
+    if (deltaMs <= 0) {
+      return;
+    }
+
+    for (const bomb of this.bombs) {
+      bomb.armAt += deltaMs;
+      bomb.expiresAt += deltaMs;
+      bomb.lastHitAt += deltaMs;
+      bomb.spawnedAt += deltaMs;
+    }
+
+    for (const shot of this.enemyShots) {
+      if (typeof shot.lastHitAt === "number") {
+        shot.lastHitAt += deltaMs;
+      }
+    }
+
+    for (const laser of this.gateLasers) {
+      laser.createdAt += deltaMs;
+    }
+
+    for (const beam of this.stealthBeams) {
+      beam.createdAt += deltaMs;
+    }
+  }
+
   popDamage(amount: number, position: Vec3, variant: DamagePopup["variant"]) {
     this.damagePopups.push({
       amount,
@@ -131,8 +158,10 @@ export class CombatStore {
     popupDurationMs: number,
     burstDurationMs: number,
     projectileImpactBurstDurationMs: number,
-    healBurstDurationMs: number
+    healBurstDurationMs: number,
+    enemyPauseDeltaMs = 0
   ) {
+    this.pauseEnemyTimedActors(enemyPauseDeltaMs);
     this.beams = this.beams.filter(
       (beam) => now - beam.createdAt < beamDurationMs
     );

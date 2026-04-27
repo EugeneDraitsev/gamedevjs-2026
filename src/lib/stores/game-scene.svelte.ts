@@ -246,6 +246,7 @@ export class GameSceneStore {
   );
   readonly sceneControlsLocked = $derived(
     this.controlsLocked ||
+      this.timing.roomTransitionCoverActive ||
       this.timing.bossIntroActive ||
       this.timing.playerDeathActive
   );
@@ -305,6 +306,7 @@ export class GameSceneStore {
     playerReloadRatio: this.playerReloadRatio,
     playerReloading: this.player.reloading,
     projectedDamagePopups: this.projectedDamagePopups,
+    roomTransitionCoverActive: this.timing.roomTransitionCoverActive,
     roomTransitionProgress: this.timing.roomTransitionProgress,
     vignetteIntensity:
       this.currentRoomTemplate.layout === "outside-yard"

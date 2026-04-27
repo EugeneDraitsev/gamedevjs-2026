@@ -30,6 +30,7 @@
   ></div>
 
   <RoomTransitionOverlay
+    roomTransitionCoverActive={overlays.roomTransitionCoverActive}
     roomTransitionProgress={overlays.roomTransitionProgress}
   />
 

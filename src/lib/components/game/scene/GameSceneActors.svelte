@@ -163,11 +163,13 @@
   let {
     activeActorsVisible = true,
     actorWarmupEnabled = true,
+    pickupWarmupEnabled = true,
     shopWarmupEnabled = true,
     warmupVisible = true,
   }: {
     activeActorsVisible?: boolean;
     actorWarmupEnabled?: boolean;
+    pickupWarmupEnabled?: boolean;
     shopWarmupEnabled?: boolean;
     warmupVisible?: boolean;
   } = $props();
@@ -609,7 +611,7 @@
   });
 </script>
 
-{#if actorWarmupEnabled || shopWarmupEnabled}
+{#if actorWarmupEnabled || pickupWarmupEnabled || shopWarmupEnabled}
   <T.Group
     visible={warmupVisible}
     position={[0, 0.02, 0]}
@@ -623,11 +625,15 @@
       {#each bombWarmups as bomb (bomb.id)}
         <BombActor animationNow={0} {bomb} />
       {/each}
+    {/if}
 
+    {#if pickupWarmupEnabled}
       {#each pickupWarmups as pickup (pickup.id)}
         <PickupActor animationNow={pickupWarmupNow} {pickup} />
       {/each}
+    {/if}
 
+    {#if actorWarmupEnabled}
       {#each enemyShotWarmups as shot (shot.id)}
         <T.Group position={shot.position}>
           {#if shot.kind === "wheel"}

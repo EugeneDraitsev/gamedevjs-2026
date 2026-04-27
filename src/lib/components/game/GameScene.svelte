@@ -37,8 +37,16 @@
     applyMeleeHitsToEnemies,
     handleMeleeFrame,
   } from "$lib/game/melee-resolver";
+  import {
+    DEFAULT_CHUNK_CONFIG,
+    getOutsideChunkPlan,
+  } from "$lib/game/outside-chunk/plan";
   import { setOutsideChunkSeed } from "$lib/game/outside-chunk-context";
   import { spawnPlayerProjectile } from "$lib/game/projectile-spawner";
+  import {
+    buildOutsideWarmupViews,
+    type WarmupView,
+  } from "$lib/game/renderer-warmup";
   import { handlePlayerPositionChange } from "$lib/game/room-transitions";
   import {
     beamDurationMs,
@@ -101,8 +109,11 @@
 
   const scene = new GameSceneStore();
   let sceneReady = $state(false);
+  let runtimeWarmupActive = $state(false);
+  let rendererWarmupReady = $state(false);
   let outsideDetailLevel = $state(3);
   let outsideDetailFrame = 0;
+  let transitionCoverFrame = 0;
   const syncSceneInputs = () =>
     scene.syncInputs({
       collectedArtifactRoomIds,
@@ -137,6 +148,65 @@
     scene.settings.cameraOrthographic ? orthographicCamera : perspectiveCamera
   );
   const outside = $derived(scene.currentRoomTemplate.layout === "outside-yard");
+  const outsideBaseShaderCompileViews = [
+    {
+      position: [0, 42, 72],
+      target: [0, 0, 30],
+    },
+    {
+      position: [0, 42, 10],
+      target: [0, 0, -32],
+    },
+    {
+      position: [-44, 44, -18],
+      target: [-18, 0, -58],
+    },
+    {
+      position: [44, 44, -18],
+      target: [18, 0, -58],
+    },
+    {
+      position: [-72, 38, 46],
+      target: [-42, 0, 18],
+    },
+    {
+      position: [-72, 38, -8],
+      target: [-48, 0, -38],
+    },
+    {
+      position: [72, 38, 46],
+      target: [42, 0, 18],
+    },
+    {
+      position: [72, 38, -8],
+      target: [48, 0, -38],
+    },
+    {
+      position: [0, 46, -76],
+      target: [0, 0, -112],
+    },
+    {
+      position: [0, 52, -130],
+      target: [0, 0, -156],
+    },
+  ] satisfies WarmupView[];
+  const outsideShaderCompileViews = $derived.by(() => {
+    const plan = getOutsideChunkPlan({
+      ...DEFAULT_CHUNK_CONFIG,
+      seed: `outside-${dungeon.seed}`,
+    });
+
+    return buildOutsideWarmupViews(outsideBaseShaderCompileViews, plan.pois);
+  });
+  const shaderCompileViews = $derived(outside ? outsideShaderCompileViews : []);
+  const shaderWarmupViews = $derived(outside ? outsideShaderCompileViews : []);
+  const shaderWarmupMinPasses = $derived(outside ? 18 : 6);
+  const shaderWarmupMaxPasses = $derived(outside ? 72 : 30);
+  const shaderWarmupStablePasses = $derived(outside ? 6 : 3);
+  const sceneWarmupsVisible = $derived(!(runtimeWarmupActive || sceneReady));
+  const sceneActorsVisible = $derived(
+    !outside || runtimeWarmupActive || sceneReady
+  );
   const corePrisonSealLocked = $derived(
     scene.currentRoomTemplate.environment === "core-prison" &&
       corePrisonSealHits < corePrisonSealHitsRequired
@@ -187,6 +257,11 @@
     textures.treasureFloorHeight,
     textures.treasureFloorNormal,
   ]);
+  const bossShaderWarmupTextures = $derived.by(() => ({
+    bump: textures.bossFloorHeight,
+    diffuse: textures.bossFloor,
+    normal: textures.bossFloorNormal,
+  }));
   const blockingPreloadTextures = $derived.by(() => {
     if (outside) {
       return outsidePreloadTextures;
@@ -216,9 +291,13 @@
       return;
     }
 
+    runtimeWarmupActive = false;
     sceneReady = true;
     onReady?.();
     revealOutsideDetails();
+  };
+  const startRuntimeWarmup = () => {
+    runtimeWarmupActive = true;
   };
   const clearOutsideDetailFrame = () => {
     if (outsideDetailFrame) {
@@ -229,6 +308,30 @@
   const revealOutsideDetails = () => {
     clearOutsideDetailFrame();
     outsideDetailLevel = 3;
+  };
+  const clearTransitionCoverFrame = () => {
+    if (transitionCoverFrame) {
+      window.cancelAnimationFrame(transitionCoverFrame);
+      transitionCoverFrame = 0;
+    }
+  };
+  const finishTransitionCoverAfterWarmFrames = () => {
+    clearTransitionCoverFrame();
+
+    let framesLeft = 5;
+    const step = () => {
+      framesLeft -= 1;
+
+      if (framesLeft <= 0) {
+        transitionCoverFrame = 0;
+        timing.clearRoomTransitionCover();
+        return;
+      }
+
+      transitionCoverFrame = window.requestAnimationFrame(step);
+    };
+
+    transitionCoverFrame = window.requestAnimationFrame(step);
   };
 
   setGameSceneContext(scene);
@@ -275,10 +378,18 @@
   $effect(() => {
     dungeon.seed;
     scene.currentRoom.id;
+    runtimeWarmupActive = false;
     outsideDetailLevel = 3;
+
+    untrack(() => {
+      if (timing.roomTransitionCoverActive) {
+        finishTransitionCoverAfterWarmFrames();
+      }
+    });
 
     return () => {
       clearOutsideDetailFrame();
+      clearTransitionCoverFrame();
     };
   });
 
@@ -444,6 +555,7 @@
       light.shadow.map?.dispose();
       light.shadow.map = null;
       light.shadow.needsUpdate = false;
+      rendererWarmupReady = true;
       return;
     }
 
@@ -462,6 +574,7 @@
     shadowCamera.updateProjectionMatrix();
 
     light.shadow.needsUpdate = true;
+    rendererWarmupReady = true;
   });
 
   const handleShoot = ({
@@ -652,6 +765,8 @@
   };
 
   const tick = (time: number, delta: number) => {
+    const enemySimulationPaused = enemyAiPaused || controlsLocked;
+
     timing.now = time;
     combat.pruneExpired(
       time,
@@ -659,7 +774,8 @@
       damagePopupDurationMs,
       deflectBurstDurationMs,
       projectileImpactBurstDurationMs,
-      healBurstDurationMs
+      healBurstDurationMs,
+      enemySimulationPaused ? delta * 1000 : 0
     );
     textures.advanceLava(delta);
 
@@ -709,7 +825,7 @@
       delta,
       doorOpenDelayMs,
       doorOpenDurationMs,
-      enemyAiPaused,
+      enemyAiPaused: enemySimulationPaused,
       isCurrentRoomCombat: scene.isCurrentRoomCombat,
       oneHitKill: cheats.oneHitKill,
       pickups,
@@ -839,6 +955,7 @@
     return () => {
       textureLoadAbort.abort();
       clearOutsideDetailFrame();
+      clearTransitionCoverFrame();
       window.cancelAnimationFrame(frameId);
     };
   });
@@ -849,13 +966,21 @@
     <SceneRendererConfig
       backgroundColor={outside ? "#c7d0c0" : "#050403"}
       compileBeforeReady
+      compileViews={shaderCompileViews}
       environmentMap={textures.environmentMap}
       exposure={outside ? 0.82 : scene.settings.toneMappingExposure}
       onProgress={onLoadProgress}
       onReady={markSceneReady}
+      onWarmupStart={startRuntimeWarmup}
       preloadTextures={blockingPreloadTextures}
       shadowsEnabled={!outside}
+      shaderWarmupTextures={bossShaderWarmupTextures}
       warmupTextures={warmupPreloadTextures}
+      warmupMinRenderPasses={shaderWarmupMinPasses}
+      warmupMaxRenderPasses={shaderWarmupMaxPasses}
+      warmupReady={rendererWarmupReady}
+      warmupStableRenderPasses={shaderWarmupStablePasses}
+      warmupViews={shaderWarmupViews}
       showEnvironmentMap={!outside && scene.settings.showEnvironmentMap}
     />
     <T.Fog
@@ -928,13 +1053,15 @@
         {corePrisonSealHitsRequired}
         {corePrisonSealLocked}
         {outsideDetailLevel}
-        warmupVisible={!sceneReady}
+        warmupVisible={sceneWarmupsVisible && !outside}
       />
 
       <GameSceneActors
-        activeActorsVisible={!outside || sceneReady}
-        actorWarmupEnabled
-        warmupVisible={!sceneReady}
+        activeActorsVisible={sceneActorsVisible}
+        actorWarmupEnabled={!outside}
+        pickupWarmupEnabled
+        shopWarmupEnabled={!outside}
+        warmupVisible={sceneWarmupsVisible}
       />
 
       {#if showPlayer}

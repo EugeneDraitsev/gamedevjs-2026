@@ -866,7 +866,8 @@ const stepStealthEnemy = (
     [0, 0, 0],
     hp,
     now,
-    spentProjectiles
+    spentProjectiles,
+    ctx.oneHitKill
   ));
 
   if (hp <= 0) {
@@ -1113,11 +1114,13 @@ const stepEnemy = (
 const stepPausedEnemy = (
   ctx: StepContext,
   enemy: ActiveEnemy,
+  delta: number,
   now: number,
   spentProjectiles: Set<string>
 ) => {
   const { combat } = ctx;
   const position = enemy.position;
+  const pausedMs = Math.max(0, delta * 1000);
   let hp = enemy.hp;
   let lastHitAt = enemy.lastHitAt;
 
@@ -1140,7 +1143,12 @@ const stepPausedEnemy = (
   return Object.assign(enemy, {
     hp,
     knockbackVelocity: [0, 0, 0] as Vec3,
+    lastBombAt:
+      typeof enemy.lastBombAt === "number"
+        ? enemy.lastBombAt + pausedMs
+        : enemy.lastBombAt,
     lastHitAt,
+    lastShotAt: enemy.lastShotAt + pausedMs,
     position,
   });
 };
@@ -1675,7 +1683,7 @@ const stepActiveEnemies = (
 
     if (ctx.enemyAiPaused) {
       result = {
-        enemy: stepPausedEnemy(ctx, enemy, now, spentProjectiles),
+        enemy: stepPausedEnemy(ctx, enemy, delta, now, spentProjectiles),
         gateKeeperDefeated: false,
         playerDamage: 0,
         shots: [],
@@ -1857,6 +1865,7 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
   } = args;
   const now = performance.now();
   const enemiesSleeping = now < timing.enemyWakeUntil;
+  const enemySimulationPaused = Boolean(args.enemyAiPaused);
   const spentProjectiles = new Set<string>();
   let lootSpawned = false;
   let nextHealth = player.health;
@@ -1888,12 +1897,15 @@ export const stepEnemies = (args: StepEnemiesArgs): StepEnemiesResult => {
   }
 
   nextHealth = Math.max(0, nextHealth - applyHazardDamage(ctx, now));
-  nextHealth = Math.max(0, nextHealth - stepGateLasers(ctx, now));
-  nextHealth = Math.max(0, nextHealth - stepEnemyShots(ctx, delta, now));
-  nextHealth = Math.max(
-    0,
-    nextHealth - stepBombs(ctx, delta, now, spentProjectiles)
-  );
+
+  if (!enemySimulationPaused) {
+    nextHealth = Math.max(0, nextHealth - stepGateLasers(ctx, now));
+    nextHealth = Math.max(0, nextHealth - stepEnemyShots(ctx, delta, now));
+    nextHealth = Math.max(
+      0,
+      nextHealth - stepBombs(ctx, delta, now, spentProjectiles)
+    );
+  }
 
   const steppedEnemies = stepActiveEnemies(
     ctx,

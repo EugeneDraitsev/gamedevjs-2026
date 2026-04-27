@@ -407,9 +407,15 @@
 
   let {
     animationNow = 0,
+    facadeEnabled = true,
+    lightsEnabled = true,
+    physicsEnabled = true,
     unlocked = false,
   }: {
     animationNow?: number;
+    facadeEnabled?: boolean;
+    lightsEnabled?: boolean;
+    physicsEnabled?: boolean;
     unlocked?: boolean;
   } = $props();
 
@@ -417,7 +423,6 @@
   const pulse = $derived(0.72 + Math.sin(animationNow * 0.0052) * 0.28);
   const gateLeafOffset = $derived(unlocked ? 6.35 : 1.18);
   const openPassageOpacity = $derived(unlocked ? 1 : 0.001);
-  const openPassageScale = $derived(unlocked ? 1 : 0.001);
   const gateGlowUniforms = {
     uLockedColor: { value: new Color("#ffb24d") },
     uOpenColor: { value: new Color("#73ffe4") },
@@ -432,22 +437,24 @@
 </script>
 
 <T.Group position={[0, baseY, -80.6]}>
-  <T.Group position={[0, 18.2, 0]}>
-    <RigidBody type="fixed">
-      <Collider shape="cuboid" args={[41.5, 5.2, 1.25]} />
-    </RigidBody>
-  </T.Group>
-  <T.Group position={[-15.8, 6.4, 0.4]}>
-    <RigidBody type="fixed">
-      <Collider shape="cuboid" args={[7.6, 6.5, 1.6]} />
-    </RigidBody>
-  </T.Group>
-  <T.Group position={[15.8, 6.4, 0.4]}>
-    <RigidBody type="fixed">
-      <Collider shape="cuboid" args={[7.6, 6.5, 1.6]} />
-    </RigidBody>
-  </T.Group>
-  {#if !unlocked}
+  {#if physicsEnabled}
+    <T.Group position={[0, 18.2, 0]}>
+      <RigidBody type="fixed">
+        <Collider shape="cuboid" args={[41.5, 5.2, 1.25]} />
+      </RigidBody>
+    </T.Group>
+    <T.Group position={[-15.8, 6.4, 0.4]}>
+      <RigidBody type="fixed">
+        <Collider shape="cuboid" args={[7.6, 6.5, 1.6]} />
+      </RigidBody>
+    </T.Group>
+    <T.Group position={[15.8, 6.4, 0.4]}>
+      <RigidBody type="fixed">
+        <Collider shape="cuboid" args={[7.6, 6.5, 1.6]} />
+      </RigidBody>
+    </T.Group>
+  {/if}
+  {#if !unlocked && physicsEnabled}
     <T.Group position={[0, 5.5, 1.35]}>
       <RigidBody type="fixed">
         <Collider shape="cuboid" args={[3.2, 5.2, 0.7]} />
@@ -455,9 +462,11 @@
     </T.Group>
   {/if}
 
-  {#each castleMeshes as mesh (mesh.uuid)}
-    <T is={mesh} />
-  {/each}
+  {#if facadeEnabled}
+    {#each castleMeshes as mesh (mesh.uuid)}
+      <T is={mesh} />
+    {/each}
+  {/if}
 
   {#if !unlocked}
     <T.Mesh position={[0, 7.15, 1.34]} renderOrder={2}>
@@ -589,10 +598,7 @@
     </T.Group>
   {/each}
 
-  <T.Group
-    position={[0, 0.06, -5.8]}
-    scale={[openPassageScale, openPassageScale, openPassageScale]}
-  >
+  <T.Group position={[0, 0.06, -5.8]}>
     <T.Mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
       <T.PlaneGeometry args={[7.4, 16.5]} />
       <T.MeshStandardMaterial
@@ -688,30 +694,32 @@
     </T.Group>
   {/each}
 
-  {#each signalLights as x}
+  {#if lightsEnabled}
+    {#each signalLights as x}
+      <T.PointLight
+        color="#ffb45d"
+        distance={9}
+        intensity={pulse * 0.9}
+        position={[x, 13.1, 2.8]}
+      />
+    {/each}
     <T.PointLight
-      color="#ffb45d"
-      distance={9}
-      intensity={pulse * 0.9}
-      position={[x, 13.1, 2.8]}
+      color="#71f3d4"
+      distance={13}
+      intensity={pulse * (unlocked ? 2.6 : 1.6)}
+      position={[0, 6.2, 4.1]}
     />
-  {/each}
-  <T.PointLight
-    color="#71f3d4"
-    distance={13}
-    intensity={pulse * (unlocked ? 2.6 : 1.6)}
-    position={[0, 6.2, 4.1]}
-  />
-  <T.PointLight
-    color={unlocked ? "#79ffe8" : "#ffb45d"}
-    distance={22}
-    intensity={unlocked ? 3.6 : 3.2}
-    position={[0, 7.2, 5.4]}
-  />
-  <T.PointLight
-    color="#ffe2a8"
-    distance={78}
-    intensity={2.6}
-    position={[0, 17.5, 20]}
-  />
+    <T.PointLight
+      color={unlocked ? "#79ffe8" : "#ffb45d"}
+      distance={22}
+      intensity={unlocked ? 3.6 : 3.2}
+      position={[0, 7.2, 5.4]}
+    />
+    <T.PointLight
+      color="#ffe2a8"
+      distance={78}
+      intensity={2.6}
+      position={[0, 17.5, 20]}
+    />
+  {/if}
 </T.Group>

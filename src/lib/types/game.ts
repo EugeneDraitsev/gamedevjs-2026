@@ -365,6 +365,7 @@ export interface SceneOverlayProps {
   playerReloading: boolean;
   playerReloadRatio: number;
   projectedDamagePopups: ProjectedDamagePopup[];
+  roomTransitionCoverActive: boolean;
   roomTransitionProgress: number;
   vignetteIntensity: number;
 }

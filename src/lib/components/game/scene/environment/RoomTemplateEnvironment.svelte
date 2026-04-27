@@ -391,10 +391,13 @@
       rotation: -0.15,
     },
   ];
-  const outsideHazeUniforms = {
+  const createOutsideHazeUniforms = (opacity: number) => ({
     bottomColor: { value: new Color("#87926d") },
+    opacity: { value: opacity },
     topColor: { value: new Color("#d9e1d9") },
-  };
+  });
+  const lockedGateHazeUniforms = createOutsideHazeUniforms(0.42);
+  const openGateHazeUniforms = createOutsideHazeUniforms(0.001);
   const outsideHazeVertex = `
                                                         varying vec2 vUv;
                                                         void main() {
@@ -405,10 +408,11 @@
   const outsideHazeFragment = `
                                                         varying vec2 vUv;
                                                         uniform vec3 bottomColor;
+                                                        uniform float opacity;
                                                         uniform vec3 topColor;
                                                         void main() {
                                                           vec3 color = mix(bottomColor, topColor, smoothstep(0.08, 1.0, vUv.y));
-                                                          gl_FragColor = vec4(color, 0.42);
+                                                          gl_FragColor = vec4(color, opacity);
                                                         }
                                                       `;
 
@@ -457,8 +461,8 @@
   const outsideDecorReady = $derived(outsideDetailLevel >= 2);
   const outsideColliderReady = $derived(outsideDetailLevel >= 3);
   const exitReveal = $derived(Math.max(0, Math.min(1, floorExitOpenAmount)));
-  const lockedGateHazeScale = $derived(outsideGateUnlocked ? 0.001 : 1);
-  const openGateHazeScale = $derived(outsideGateUnlocked ? 1 : 0.001);
+  const lockedGateHazeOpacity = $derived(outsideGateUnlocked ? 0.001 : 0.42);
+  const openGateHazeOpacity = $derived(outsideGateUnlocked ? 0.42 : 0.001);
   const bannerLift = $derived(exitReveal * exitReveal);
   const startAnimationAge = $derived(
     startAnimationAt > 0
@@ -487,6 +491,8 @@
     outsideGateUnlocked;
     outsideDetailLevel;
     corePrisonSealLocked;
+    lockedGateHazeUniforms.opacity.value = lockedGateHazeOpacity;
+    openGateHazeUniforms.opacity.value = openGateHazeOpacity;
     markTransitionPhaseEnd(
       "flush-template-environment",
       flushStartedAt,
@@ -649,33 +655,25 @@
 
   <OutsideTerrain texture={outsideEarthTexture} />
 
-  <T.Mesh
-    position={[0, 12, -112]}
-    rotation={[-0.14, 0, 0]}
-    scale={[lockedGateHazeScale, lockedGateHazeScale, 1]}
-  >
+  <T.Mesh position={[0, 12, -112]} rotation={[-0.14, 0, 0]}>
     <T.PlaneGeometry args={[150, 58]} />
     <T.ShaderMaterial
       depthWrite={false}
       fragmentShader={outsideHazeFragment}
       transparent
-      uniforms={outsideHazeUniforms}
+      uniforms={lockedGateHazeUniforms}
       vertexShader={outsideHazeVertex}
     />
   </T.Mesh>
 
   {#each [-1, 1] as side}
-    <T.Mesh
-      position={[side * 47, 12, -112]}
-      rotation={[-0.14, 0, 0]}
-      scale={[openGateHazeScale, openGateHazeScale, 1]}
-    >
+    <T.Mesh position={[side * 47, 12, -112]} rotation={[-0.14, 0, 0]}>
       <T.PlaneGeometry args={[56, 58]} />
       <T.ShaderMaterial
         depthWrite={false}
         fragmentShader={outsideHazeFragment}
         transparent
-        uniforms={outsideHazeUniforms}
+        uniforms={openGateHazeUniforms}
         vertexShader={outsideHazeVertex}
       />
     </T.Mesh>

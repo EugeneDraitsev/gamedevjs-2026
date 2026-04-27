@@ -13,11 +13,13 @@
   let {
     bossDoorTexture = null,
     doorOpenAmount,
+    physicsEnabled = true,
     roomDoors,
     roomDoorSeals,
   }: {
     bossDoorTexture?: Texture | null;
     doorOpenAmount: number;
+    physicsEnabled?: boolean;
     roomDoors: DoorMarker[];
     roomDoorSeals: DoorSeal[];
   } = $props();
@@ -290,14 +292,16 @@
       seal.position[2],
     ]}
   >
-    <RigidBody type="fixed">
-      <Collider
-        shape="cuboid"
-        args={seal.args}
-        friction={0.92}
-        restitution={0.02}
-      />
-    </RigidBody>
+    {#if physicsEnabled}
+      <RigidBody type="fixed">
+        <Collider
+          shape="cuboid"
+          args={seal.args}
+          friction={0.92}
+          restitution={0.02}
+        />
+      </RigidBody>
+    {/if}
   </T.Group>
 
   {#if seal.style !== "mechanic" && doorOpenAmount < 0.999}

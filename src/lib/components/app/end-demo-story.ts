@@ -43,3 +43,88 @@ export const endDemoStorySlides: EndDemoStorySlide[] = [
     alt: "Orb Knight standing on a road before a huge clockwork castle built into a mountain.",
   },
 ];
+
+const preloadedEndDemoImages: HTMLImageElement[] = [];
+let preloadEndDemoImagesPromise: Promise<void> | null = null;
+
+const addEndDemoImageHint = (slide: EndDemoStorySlide) => {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const existing = document.head.querySelector(
+    `link[data-end-demo-image="${slide.id}"]`
+  );
+
+  if (existing) {
+    return;
+  }
+
+  const link = document.createElement("link");
+
+  link.as = "image";
+  link.dataset.endDemoImage = slide.id;
+  link.href = slide.image;
+  link.rel = "prefetch";
+  document.head.append(link);
+};
+
+const loadAndDecodeEndDemoImage = (slide: EndDemoStorySlide) =>
+  new Promise<void>((resolve) => {
+    const image = new Image();
+
+    image.decoding = "async";
+    image.loading = "eager";
+    image.onload = () => {
+      const decode = image.decode?.();
+
+      if (decode) {
+        decode.catch(() => undefined).finally(resolve);
+        return;
+      }
+
+      resolve();
+    };
+    image.onerror = () => resolve();
+    image.src = slide.image;
+    preloadedEndDemoImages.push(image);
+  });
+
+export const preloadEndDemoStoryImages = () => {
+  if (preloadEndDemoImagesPromise || typeof Image === "undefined") {
+    return preloadEndDemoImagesPromise ?? Promise.resolve();
+  }
+
+  for (const slide of endDemoStorySlides) {
+    addEndDemoImageHint(slide);
+  }
+
+  preloadEndDemoImagesPromise = Promise.all(
+    endDemoStorySlides.map(loadAndDecodeEndDemoImage)
+  ).then(() => undefined);
+
+  return preloadEndDemoImagesPromise;
+};
+
+export const scheduleEndDemoStoryImagePreload = () => {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  if ("requestIdleCallback" in window) {
+    const id = window.requestIdleCallback(
+      () => {
+        preloadEndDemoStoryImages().catch(() => undefined);
+      },
+      { timeout: 2400 }
+    );
+
+    return () => window.cancelIdleCallback(id);
+  }
+
+  const id = setTimeout(() => {
+    preloadEndDemoStoryImages().catch(() => undefined);
+  }, 800);
+
+  return () => clearTimeout(id);
+};
