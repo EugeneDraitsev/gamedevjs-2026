@@ -1,4 +1,7 @@
 import type { Preview } from "@storybook/sveltekit";
+import { startEmbedBridge } from "./embed-bridge";
+
+startEmbedBridge();
 
 const preview: Preview = {
   parameters: {
